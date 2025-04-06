@@ -22,51 +22,103 @@ script_folder = Path(__file__).parent
 
 
 def Read_Mod(directory):
+    # Save the directory
+    with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
+        directories = pickle.load(directories_output)
+        directories["directory_mod"] = directory
+    with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
+        pickle.dump(directories, directories_output)
+    # Run script
     EDU_converter.mod_reader(bpy.path.abspath(directory))
 
 
 def Import_Faction(import_faction, directory, upg_model):
+    # Save the directory
+    with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
+        directories = pickle.load(directories_output)
+        directories["directory_units"] = directory
+    with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
+        pickle.dump(directories, directories_output)
+    # Run script
     EDU_converter.importer(bpy.path.abspath(directory), import_faction, 0, 0, 1, upg_model)
 
 
 def Import_Unit(import_faction, import_unit, directory, upg_model):
+    # Save the directory
+    with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
+        directories = pickle.load(directories_output)
+        directories["directory_units"] = directory
+    with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
+        pickle.dump(directories, directories_output)
+    # Run script
     EDU_converter.single_importer(bpy.path.abspath(directory), import_faction, import_unit, 0, 0, 1, upg_model)
 
+def Sort_Factions(self, context):
+    with open(script_folder/('text/available_factions.pkl'), 'rb') as import_factions_input:
+        factions = pickle.load(import_factions_input)
+    faction_list = []
+    for faction in factions:
+        entry = (faction, faction, "")
+        faction_list.append(entry)
+    return(faction_list)
 
 def Sort_By_Faction(self, context):
     with open(script_folder/('text/master_dictionary.pkl'), 'rb') as master_input:
         master_dictionary = pickle.load(master_input)
     import_faction = context.scene.med2_tools.import_faction_single
-    #print(import_faction)
     faction_units = []
     for unit in master_dictionary:
         if import_faction in unit["factions"]:
             entry = (unit["name"], unit["name"], "")
             faction_units.append(entry)
-    #print(faction_units)
     return(faction_units)
 
 
 def Import_Strat(directory):
+    # Save the directory
+    with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
+        directories = pickle.load(directories_output)
+        directories["directory_strat"] = directory
+    with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
+        pickle.dump(directories, directories_output)
+    # Run script
     strat_import.strat_importer(bpy.path.abspath(directory))
 
 
 def Import_Single_Dae(directory):
+    # Save the directory
+    with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
+        directories = pickle.load(directories_output)
+        directories["directory_single_dae"] = directory
+    with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
+        pickle.dump(directories, directories_output)
+    # Run script
     single_import.single_importer(bpy.path.abspath(directory))
 
 
 class MEDIMPORTER_OT_Properties(bpy.types.PropertyGroup):
-    directory_mod: StringProperty(name = "Mod data folder", description = "Directory to read mod data from", default = "C:\\Program Files", subtype = "DIR_PATH")
-    directory_units: StringProperty(name = "Units folder", description = "Directory to get unit models from", default = "C:\\Program Files", subtype = "DIR_PATH")
-    directory_strat: StringProperty(name = "Strat folder", description = "Directory to get strat models from", default = "C:\\Program Files", subtype = "DIR_PATH")
-    directory_single_dae: StringProperty(name = "Settlement .dae", description = "Directory to get strat models from", default = "C:\\Program Files", subtype = "FILE_PATH")
+    with open(script_folder/('text/directories.pkl'), 'rb') as directories_list:
+        try:
+            file_paths = pickle.load(directories_list)
+        except EOFError:
+            print("Empty directories.pkl file. Using default paths")
+            file_paths = {
+                "directory_mod": "C:\\Program Files",
+                "directory_units": "C:\\Program Files",
+                "directory_output": "C:\\Program Files",
+                "directory_strat": "C:\\Program Files",
+                "directory_single_dae": "C:\\Program Files"
+                }
+            with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
+                pickle.dump(file_paths, directories_output)
+    directory_mod: StringProperty(name = "Mod data folder", description = "Directory to read mod data from", default = file_paths["directory_mod"], subtype = "DIR_PATH")
+    directory_units: StringProperty(name = "Units folder", description = "Directory to get unit models from", default = file_paths["directory_units"], subtype = "DIR_PATH")
+    directory_output: StringProperty(name = "Output directory", description = "Directory to save the unit cards to", default = file_paths["directory_output"], subtype = "DIR_PATH")
+    directory_strat: StringProperty(name = "Strat folder", description = "Directory to get strat models from", default = file_paths["directory_strat"], subtype = "DIR_PATH")
+    directory_single_dae: StringProperty(name = "Settlement .dae", description = "Directory to get strat models from", default = file_paths["directory_single_dae"], subtype = "FILE_PATH")
 
-    with open(script_folder/('text/available_factions.pkl'), 'rb') as import_factions_input:
-        factions = pickle.load(import_factions_input)
-    with open(script_folder/('text/master_dictionary.pkl'), 'rb') as master_input:
-        master_dictionary = pickle.load(master_input)
-    import_faction: bpy.props.EnumProperty(name = "Faction list", description = "Select Faction", items = [(entry, entry, "") for entry in factions])
-    import_faction_single: bpy.props.EnumProperty(name = "Faction list", description = "Select Faction", items = [(entry, entry, "") for entry in factions])
+    import_faction: bpy.props.EnumProperty(name = "Faction list", description = "Select Faction", items = Sort_Factions)
+    import_faction_single: bpy.props.EnumProperty(name = "Faction list", description = "Select Faction", items = Sort_Factions)
     import_unit: bpy.props.EnumProperty(name = "Unit list", description = "Select Unit", items = Sort_By_Faction)
     upg_model: bpy.props.IntProperty(name="Upgrade tier", description = "Select armour upgrade level", default = 0, min = 0, max = 3)
     upg_model_single: bpy.props.IntProperty(name="Upgrade tier", description = "Select armour upgrade level", default = 0, min = 0, max = 3)
@@ -105,6 +157,7 @@ class MEDIMPORTER_OT_Sorter(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+        Sort_Factions(self, context)
         Sort_By_Faction(self, context)
         return{"FINISHED"}
 
@@ -130,9 +183,10 @@ class MEDIMPORTER_PT_Importer(bpy.types.Panel):
     def draw(self, context):
         if(context.mode == 'OBJECT'):
             layout=self.layout
-            layout.label(text = "Import By Faction")
             col = self.layout.column(align=True)
             col.prop (context.scene.med2_tools, "directory_units", text="")
+            layout.label(text = "Import Faction")
+            col = self.layout.column(align=True)
             col.prop (context.scene.med2_tools, "import_faction", text="")
             col.prop (context.scene.med2_tools, "upg_model", text="Armour upgrade level:")
             col.operator ("med2toolkit.importer", text="Import Faction")
@@ -166,10 +220,11 @@ class MEDIMPORTER_OT_Single_Importer(bpy.types.Operator):
         return{"FINISHED"}
  
 
-class MEDIMPORTER_PT_Misc(bpy.types.Panel):
-    bl_idname = "MEDIMPORTER_PT_Misc"
+
+class MEDIMPORTER_PT_Cards(bpy.types.Panel):
+    bl_idname = "MEDIMPORTER_PT_Cards"
     bl_parent_id = "MEDIMPORTER_PT_Toolkit"
-    bl_label = "Misc."
+    bl_label = "Unit Cards"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Med2 Toolkit"
@@ -177,9 +232,28 @@ class MEDIMPORTER_PT_Misc(bpy.types.Panel):
     def draw(self, context):
         if(context.mode == 'OBJECT'):
             layout=self.layout
+            layout.label(text = "Output Path:")
             col = self.layout.column(align=True)
+            col.prop (context.scene.med2_tools, "directory_output", text="")
             col.operator("med2toolkit.variations", text="Randomize Variations")
             col.operator("med2toolkit.rendered", text="Render Unit Cards")
+
+class MEDIMPORTER_PT_Misc(bpy.types.Panel):
+    bl_idname = "MEDIMPORTER_PT_Misc"
+    bl_parent_id = "MEDIMPORTER_PT_Toolkit"
+    bl_label = "Misc."
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Med2 Toolkit"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        if(context.mode == 'OBJECT'):
+            layout=self.layout
+            layout.label(text = "Generate IK controller")
+            col = self.layout.column(align=True)
+            col.prop (context.scene.med2_tools, "controller_type", text="")
+            col.operator("med2toolkit.controller", text="Generate IK controller")
             layout=self.layout
             layout.label(text = "Import Strat Models")
             col = self.layout.column(align=True)
@@ -190,11 +264,6 @@ class MEDIMPORTER_PT_Misc(bpy.types.Panel):
             col = self.layout.column(align=True)
             col.prop (context.scene.med2_tools, "directory_single_dae", text="")
             col.operator("med2toolkit.single_dae", text="Import Settlement")
-            layout=self.layout
-            layout.label(text = "Generate IK controller")
-            col = self.layout.column(align=True)
-            col.prop (context.scene.med2_tools, "controller_type", text="")
-            col.operator("med2toolkit.controller", text="Generate IK controller")
 
 
 class MEDIMPORTER_OT_Controller(bpy.types.Operator):
@@ -233,7 +302,14 @@ class MEDIMPORTER_OT_Renderer(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        EDU_converter.renderer()
+        # Save the directory
+        with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
+            directories = pickle.load(directories_output)
+            directories["directory_output"] = context.scene.med2_tools.directory_output
+        with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
+            pickle.dump(directories, directories_output)
+        # Run script
+        EDU_converter.renderer(context.scene.med2_tools.directory_output)
         return{"FINISHED"}
 
 
@@ -263,6 +339,7 @@ classes = [
     MEDIMPORTER_OT_Properties,
     MEDIMPORTER_PT_Mod_Data,
     MEDIMPORTER_PT_Importer,
+    MEDIMPORTER_PT_Cards,
     MEDIMPORTER_PT_Misc,
     MEDIMPORTER_OT_Reader,
     MEDIMPORTER_OT_Importer,
@@ -278,12 +355,14 @@ def register():
     for item in classes:
         bpy.utils.register_class(item)
     bpy.types.Scene.med2_tools = bpy.props.PointerProperty(type=MEDIMPORTER_OT_Properties)
+    bpy.types.Scene.med2_factions = bpy.props.EnumProperty(name = "", description = "Select Faction", items = Sort_Factions)
     bpy.types.Scene.med2_unit = bpy.props.EnumProperty(name = "", description = "Select Unit", items = Sort_By_Faction)
 
 def unregister():
     for item in classes:
         bpy.utils.unregister_class(item)
     del bpy.types.Scene.med2_tools
+    del bpy.types.Scene.med2_factions
     del bpy.types.Scene.med2_unit
     
 if __name__ == "__main__":
