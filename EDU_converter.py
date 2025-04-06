@@ -20,7 +20,6 @@ with open(script_folder/('Archer_IK_skeletons.txt'), 'r', encoding="utf8") as Ar
 
 
 def mod_reader(mod_folder):
-    #import_faction = "spain"
     master_dictionary = unit_reader(mod_folder)
     sort_factions(mod_folder)
     results = sort_bmdb(mod_folder)
@@ -61,7 +60,7 @@ def unit_reader(mod_folder):
             unit_engine = ["missing"]
             unit_mount = ["missing"]
             unit_model = []
-            unit_owners = ["missing"]
+            unit_owners = ["No Faction"]
             unit_card_dir = []
             riders = []
             flag = 0
@@ -95,13 +94,15 @@ def unit_reader(mod_folder):
             flag = 0
             for line in engines_lines:
                 if("type" in line and unit_engine[0].lower() in line.lower() and flag == 0):
-                    unit_engine = [line.split()[1]+".dae"]
                     flag = 1
-                # get engineer offsets
-                elif("engine_radius" in line and flag == 1):
-                    x_offset = float(line.split()[1])/2
+                elif("engine_mesh" in line and flag == 1):
+                    unit_engine = [re.sub(".*/|.mesh.*", "", line)+".glb"]
                     flag = 2
-                elif("engine_dock_dist" in line and flag == 2):
+                # get engineer offsets
+                elif("engine_radius" in line and flag == 2):
+                    x_offset = float(line.split()[1])/2
+                    flag = 3
+                elif("engine_dock_dist" in line and flag == 3):
                     y_offset = float(line.split()[1])
                     riders.append([x_offset, -y_offset, 0])
                     riders.append([-x_offset, -y_offset, 0])
@@ -135,6 +136,7 @@ def sort_factions(mod_folder):
         if ("faction" in line.split()):
             line = line.split()[-1]
             available_factions_list.append(line)
+    available_factions_list.append("No Faction")
     with open(script_folder/('text/available_factions.pkl'), 'wb') as available_factions_output:
         pickle.dump(available_factions_list, available_factions_output)
     return("Finished")
@@ -166,7 +168,7 @@ def sort_bmdb(mod_folder):
             factions = []
             mains = []
             attach = []
-            model = re.sub(".*/|\.mesh.*", "", line)+".dae"
+            model = re.sub(".*/|\.mesh.*", "", line)+".glb"
             flag = 1
         elif(flag == 1 and ".texture" in line):
             if([previous_line.split()[1]] in factions):
@@ -212,7 +214,7 @@ def sort_bmdb(mod_folder):
             factions = []
             mains = []
             attach = []
-            model = re.sub(".*/|\.mesh.*", "", line)+".dae"
+            model = re.sub(".*/|\.mesh.*", "", line)+".glb"
             flag = 1
         previous_line = line
     model_info = [model, factions, skeltype]
@@ -231,7 +233,7 @@ def find_model(master_dictionary, bmdb_list, model_list):
                 if(unit['model'][count].lower() in line.lower().split() and "/" not in line):
                     flag = 1
                 elif(flag == 1 and ".mesh" in line):
-                    unit['model'][count] = re.sub(".*/|.mesh.*", "", line)+".dae"
+                    unit['model'][count] = re.sub(".*/|.mesh.*", "", line)+".glb"
                     break
             for line in model_list:
                 if(unit['model'][count] == line[0]):
@@ -241,7 +243,7 @@ def find_model(master_dictionary, bmdb_list, model_list):
             if(unit["mount"][0] != "missing" and unit["mount"][0].lower() in line.lower() and "/" not in line):
                 flag = 2
             elif(flag == 2 and ".mesh" in line):
-                unit["mount"][0] = re.sub(".*/|.mesh.*", "", line)+".dae"
+                unit["mount"][0] = re.sub(".*/|.mesh.*", "", line)+".glb"
                 break
         for line in model_list:
             if(unit["mount"][0] == line[0]):
@@ -285,11 +287,26 @@ def importer(model_folder, import_faction, x ,y ,z, upg_target):
     with open(script_folder/('text/imported_units.pkl'), 'wb') as imported_units_output:
         pickle.dump(imported_units, imported_units_output)
     print("Succesfully imported", int(x/2), "units.\n")
-    render_setup.render_setup(model_folder)
     bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection
+    #Check if camera controller exists. If not, create controller and camera
+    controller = bpy.context.scene.objects.get("Camera Controller")
+    if not controller:
+        render_setup.render_setup(model_folder)
 
 
 def single_importer(model_folder, import_faction, import_unit, x ,y ,z, upg_target):
+    #Check for camera collection. Create if missing
+    test = bpy.data.collections.get("Camera")
+    if test == None:
+        new_col = bpy.data.collections.new("Camera")
+        bpy.context.scene.collection.children.link(new_col)
+    #Check if faction has a collection. Create if not
+    test = bpy.data.collections.get(import_faction)
+    if test == None:
+        new_col = bpy.data.collections.new(import_faction)
+        bpy.context.scene.collection.children.link(new_col)
+        bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection.children[-1]
+        print("New collection")
     with open(script_folder/('text/master_dictionary.pkl'), 'rb') as master_input:
         master_dictionary = pickle.load(master_input)
     for entry in master_dictionary:
@@ -305,19 +322,24 @@ def single_importer(model_folder, import_faction, import_unit, x ,y ,z, upg_targ
                     x+= 2
             break
     if x >0: print("Succesfully imported", import_unit)
+    bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection
+    #Check if camera controller exists. If not, create controller and camera
+    controller = bpy.context.scene.objects.get("Camera Controller")
+    if not controller:
+        render_setup.render_setup(model_folder)
 
 
-def infantry_importer(folder, dae_model, import_faction, x, y, z, upg_target):
-    print(dae_model)
+def infantry_importer(folder, glb_model, import_faction, x, y, z, upg_target):
+    print(glb_model)
     texture_path = folder+('textures/')
     #Define keywords
     try:
-        model = dae_model['model'][upg_target][0]
+        model = glb_model['model'][upg_target][0]
     except IndexError:
-        upg_target = len(dae_model['model'])-1
-        model = dae_model['model'][upg_target][0]
+        upg_target = len(glb_model['model'])-1
+        model = glb_model['model'][upg_target][0]
     texture_flag = 0
-    for entry in dae_model['model'][upg_target][1]:
+    for entry in glb_model['model'][upg_target][1]:
         print(entry)
         if entry[0] == import_faction:
             main_texture = entry[1]
@@ -334,14 +356,21 @@ def infantry_importer(folder, dae_model, import_faction, x, y, z, upg_target):
         return(0)
     else:
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
-        #Import .dae files, rename armatures and move the new objects
-        bpy.ops.wm.collada_import(filepath=(folder+model))
+        #Import .glb files, rename armatures and move the new objects
+        bpy.ops.import_scene.gltf(filepath=(folder+model), disable_bone_shape=True)
+        fac_col = bpy.data.collections[import_faction]
+        for obj in bpy.context.selected_objects:
+            for other_col in obj.users_collection:
+                other_col.objects.unlink(obj)
+            fac_col.objects.link(obj)
         armature = bpy.data.objects["Armature"]
-        armature.name = model.replace("_lod0.dae", "")
+        armature.name = model.replace("_lod0.glb", "")
         armature.location = (x, y, z)
+        armature.show_in_front = False
+        armature.display_type = 'WIRE'
         #generate IK controls if defined
         try:
-            IKType = dae_model['model'][upg_target][2]
+            IKType = glb_model['model'][upg_target][2]
             if IKType in Controller_2H:
                 obj_controller = IK_2H.IKGenerator(armature.name, x, y, z)
                 transfer_armature(armature, obj_controller)
@@ -378,7 +407,7 @@ def infantry_importer(folder, dae_model, import_faction, x, y, z, upg_target):
                 material.name = main_texture.replace(".dds", "")
                 material_workflow(texture_path, model, main_texture, main_normal, material)
             texture_flag = 0
-            for entry in dae_model['model'][upg_target][1]:
+            for entry in glb_model['model'][upg_target][1]:
                 if entry[0] == import_faction:
                     attachment_texture = entry[3]
                     attachment_normal = entry[4]
@@ -393,11 +422,14 @@ def infantry_importer(folder, dae_model, import_faction, x, y, z, upg_target):
             if "characterlod2__attach" in bpy.data.materials:
                 attachment_material = bpy.data.materials.get("characterlod2__attach")
                 attachment_material.name = ("characterlod0__attach")
-            attachment_material = bpy.data.materials["characterlod0__attach"]
-            result = check_existing_materials(attachment_material, attachment_texture)
-            if result == "False":
-                attachment_material.name = attachment_texture.replace(".dds", "")
-                material_workflow(texture_path, model, attachment_texture, attachment_normal, attachment_material)
+            material = bpy.data.materials.get("characterlod0__attach")
+            #Check if attachment texture exists
+            if material != None:
+                attachment_material = bpy.data.materials["characterlod0__attach"]
+                result = check_existing_materials(attachment_material, attachment_texture)
+                if result == "False":
+                    attachment_material.name = attachment_texture.replace(".dds", "")
+                    material_workflow(texture_path, model, attachment_texture, attachment_normal, attachment_material)
         else:
             material = bpy.data.materials.get("characterlod0__single")
             if material != None:
@@ -410,12 +442,12 @@ def infantry_importer(folder, dae_model, import_faction, x, y, z, upg_target):
         return(2)
 
 
-def mount_importer(folder, dae_model, import_faction, x, y, z, upg_target):
+def mount_importer(folder, glb_model, import_faction, x, y, z, upg_target):
     texture_path = folder+('textures/')
     #Define keywords
-    mount = dae_model['mount'][0][0]
+    mount = glb_model['mount'][0][0]
     texture_flag = 0
-    for entry in dae_model['mount'][0][1]:
+    for entry in glb_model['mount'][0][1]:
         print(entry)
         if entry[0] == import_faction:
             main_texture = entry[1]
@@ -432,11 +464,18 @@ def mount_importer(folder, dae_model, import_faction, x, y, z, upg_target):
         return(0)
     else:
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
-        #Import .dae files, rename armatures and move the new objects
-        bpy.ops.wm.collada_import(filepath=(folder+mount))
+        #Import .glb files, rename armatures and move the new objects
+        bpy.ops.import_scene.gltf(filepath=(folder+mount), disable_bone_shape=True)
+        fac_col = bpy.data.collections[import_faction]
+        for obj in bpy.context.selected_objects:
+            for other_col in obj.users_collection:
+                other_col.objects.unlink(obj)
+            fac_col.objects.link(obj)
         armature = bpy.data.objects["Armature"]
-        armature.name = mount.replace("_lod0.dae", "")
+        armature.name = mount.replace("_lod0.glb", "")
         armature.location = (x, y, z)
+        armature.show_in_front = False
+        armature.display_type = 'WIRE'
         
         #Check material name to determine texture mode. Rename materials
         material = bpy.data.materials.get("characterlod0__main")
@@ -448,7 +487,7 @@ def mount_importer(folder, dae_model, import_faction, x, y, z, upg_target):
                 material.name = main_texture.replace(".dds", "")
                 material_workflow(texture_path, mount, main_texture, main_normal, material)
             texture_flag = 0
-            for entry in dae_model['mount'][0][1]:
+            for entry in glb_model['mount'][0][1]:
                 if entry[0] in import_faction:
                     attachment_texture = entry[3]
                     attachment_normal = entry[4]
@@ -471,15 +510,15 @@ def mount_importer(folder, dae_model, import_faction, x, y, z, upg_target):
         armature.select_set(True)
         hide_variations()
         multi_textured_check()
-        for rider in dae_model['mount'][1]:
-            infantry_importer(folder, dae_model, import_faction, x+float(rider[0]), y+float(rider[2]), z+float(rider[1]), upg_target)
+        for rider in glb_model['mount'][1]:
+            infantry_importer(folder, glb_model, import_faction, x+float(rider[0]), y+float(rider[2]), z+float(rider[1]), upg_target)
         return(2)
 
 
-def engine_importer(folder, dae_model, import_faction, x, y, z, upg_target):
+def engine_importer(folder, glb_model, import_faction, x, y, z, upg_target):
     texture_path = folder+('textures//')
     #Define keywords
-    engine = dae_model['engine'][0]
+    engine = glb_model['engine'][0]
     #Print line if model doesn't exist
     file_check = Path(str(folder)+engine)
     if not file_check.exists():
@@ -487,11 +526,18 @@ def engine_importer(folder, dae_model, import_faction, x, y, z, upg_target):
         return(0)
     else:
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
-        #Import .dae files, rename armatures and move the new objects
-        bpy.ops.wm.collada_import(filepath=(folder+engine))
+        #Import .glb files, rename armatures and move the new objects
+        bpy.ops.import_scene.gltf(filepath=(folder+engine), disable_bone_shape=True)
+        fac_col = bpy.data.collections[import_faction]
+        for obj in bpy.context.selected_objects:
+            for other_col in obj.users_collection:
+                other_col.objects.unlink(obj)
+            fac_col.objects.link(obj)
         armature = bpy.data.objects["Armature"]
-        armature.name = engine.replace("_lod0.dae", "")
+        armature.name = engine.replace("_lod0.glb", "")
         armature.location = (x, y, z-1)
+        armature.show_in_front = False
+        armature.display_type = 'WIRE'
             
         for mat in bpy.data.materials:
             if "lod0__" in mat.name:
@@ -518,6 +564,19 @@ def engine_importer(folder, dae_model, import_faction, x, y, z, upg_target):
                 else:
                     print("Image found")
                     texture_image.image = bpy.data.images.load(texture_path+texture)
+                    #Linking nodes: colour -> shader; alpha -> shader
+                    new_link(shader_node.inputs[0], texture_image.outputs[0])
+                    new_link(shader_node.inputs[4], texture_image.outputs[1])
+                
+                rgb_curve = nodes.new("ShaderNodeRGBCurve")
+                rgb_curve.location = (-506, 124)
+                #Flip the green channel
+                curve_g = rgb_curve.mapping.curves[1]
+                curve_g.points[0].location = (0, 1)
+                curve_g.points[1].location = (1, 0)
+                normal_map = nodes.new("ShaderNodeNormalMap")
+                normal_map.location = (-206, 124)
+                
                 normal_image = nodes.new("ShaderNodeTexImage")
                 normal_image.location = (-836, 124)
                 #Check if texture file doesn't exist
@@ -530,32 +589,23 @@ def engine_importer(folder, dae_model, import_faction, x, y, z, upg_target):
                     else:
                         normal_image.image = bpy.data.images.load(texture_path+normal_texture)
                         normal_image.image.colorspace_settings.name = 'Non-Color'
+                        #Linking nodes: normal -> curves -> normal map -> shader
+                        new_link(rgb_curve.inputs[1], normal_image.outputs[0])
                 else:
                     normal_image.image = bpy.data.images.load(texture_path+normal_texture)
                     normal_image.image.colorspace_settings.name = 'Non-Color'
-                rgb_curve = nodes.new("ShaderNodeRGBCurve")
-                rgb_curve.location = (-506, 124)
-
-                #Flip the green channel
-                curve_g = rgb_curve.mapping.curves[1]
-                curve_g.points[0].location = (0, 1)
-                curve_g.points[1].location = (1, 0)
-                normal_map = nodes.new("ShaderNodeNormalMap")
-                normal_map.location = (-206, 124)
-                
-                #Linking nodes: colour -> shader; alpha -> shader; normal -> curves -> normal map -> shader
-                new_link(shader_node.inputs[0], texture_image.outputs[0])
-                new_link(shader_node.inputs[4], texture_image.outputs[1])
-                new_link(rgb_curve.inputs[1], normal_image.outputs[0])
+                    #Linking nodes: normal -> curves -> normal map -> shader
+                    new_link(rgb_curve.inputs[1], normal_image.outputs[0])
                 new_link(normal_map.inputs[1], rgb_curve.outputs[0])
                 new_link(shader_node.inputs[5], normal_map.outputs[0])
+
         
         bpy.ops.object.select_all(action='DESELECT')
         armature.select_set(True)
         hide_variations()
         multi_textured_check()
-        for rider in dae_model['engine'][1]:
-            infantry_importer(folder, dae_model, import_faction, x+float(rider[0]), y+float(rider[1]), z+float(rider[2]), upg_target)
+        for rider in glb_model['engine'][1]:
+            infantry_importer(folder, glb_model, import_faction, x+float(rider[0]), y+float(rider[1]), z+float(rider[2]), upg_target)
         return(2)
 
 
@@ -583,8 +633,9 @@ def find_first_object(current_material):
     for model in bpy.data.objects:
         #Only proceed if object is a mesh
         if model.type == 'MESH':
-            if model.data.materials[0] == current_material:
-                return(model)
+            if len(model.data.materials)!=0:
+                if model.data.materials[0] == current_material:
+                    return(model)
     return("None")
 
 
@@ -608,16 +659,9 @@ def material_workflow(texture_path, model, texture, normal_texture, material):
     else:
         print("Image found")
         texture_image.image = bpy.data.images.load(texture_path+texture)
-    
-    normal_image = nodes.new("ShaderNodeTexImage")
-    normal_image.location = (-836, 124)
-    #Check if texture file doesn't exist
-    file_check = Path(texture_path+normal_texture)
-    if not file_check.exists():
-        print("No texture file found:", normal_texture)
-    else:
-        normal_image.image = bpy.data.images.load(texture_path+normal_texture)
-        normal_image.image.colorspace_settings.name = 'Non-Color'
+        #Linking nodes: colour -> shader; alpha -> shader
+        new_link(shader_node.inputs[0], texture_image.outputs[0])
+        new_link(shader_node.inputs[4], texture_image.outputs[1])
     
     rgb_curve = nodes.new("ShaderNodeRGBCurve")
     rgb_curve.location = (-506, 124)
@@ -629,13 +673,20 @@ def material_workflow(texture_path, model, texture, normal_texture, material):
     normal_map = nodes.new("ShaderNodeNormalMap")
     normal_map.location = (-206, 124)
 
-    #Linking nodes: colour -> shader; alpha -> shader; normal -> curves -> normal map -> shader
-    new_link(shader_node.inputs[0], texture_image.outputs[0])
-    new_link(shader_node.inputs[4], texture_image.outputs[1])
-    new_link(rgb_curve.inputs[1], normal_image.outputs[0])
+    normal_image = nodes.new("ShaderNodeTexImage")
+    normal_image.location = (-836, 124)
+    #Check if texture file doesn't exist
+    file_check = Path(texture_path+normal_texture)
+    if not file_check.exists():
+        print("No texture file found:", normal_texture)
+    else:
+        normal_image.image = bpy.data.images.load(texture_path+normal_texture)
+        normal_image.image.colorspace_settings.name = 'Non-Color'
+        #Linking nodes: normal -> curves -> normal map -> shader
+        new_link(rgb_curve.inputs[1], normal_image.outputs[0])
     new_link(normal_map.inputs[1], rgb_curve.outputs[0])
     new_link(shader_node.inputs[5], normal_map.outputs[0])
-
+    
 
 #Add "Copy Transfer" constraint to all bones
 def transfer_armature(armature, obj_controller): 
@@ -719,24 +770,27 @@ def multi_textured_check():
     bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
 
 
-def renderer():
+def renderer(output_folder):
     #Read the list of imported units to use as file names
     with open(script_folder/('text/imported_units.pkl'), 'rb') as imported_units_input:
         imported_units = pickle.load(imported_units_input)
     bpy.ops.object.select_all(action='DESELECT')
     #Check if camera controller exists. If not, create controller and camera
     controller = bpy.context.scene.objects.get("Camera Controller")
-    if controller:
-        #Select the camera controller and reset the position
-        bpy.context.view_layer.objects.active = controller
-        controller.select_set(True)
-        bpy.context.scene.render.use_stamp_frame = False
-        controller.location[0] = 0
-        #Rename the output file, render and move the camera to the next unit
-        for item in imported_units:
-            bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("#%s_#.tga" % item["name"])
-            bpy.ops.render.render(use_viewport=True)
-            bpy.ops.transform.translate(value=(2, 0, 0))
-        #Reset camera location and output name
-        controller.location[0] = 0
-        bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("")
+    if not controller:
+        render_setup.render_setup(output_folder)
+        controller = bpy.context.scene.objects.get("Camera Controller")
+    #Select the camera controller and reset the position
+    bpy.context.view_layer.objects.active = controller
+    controller.select_set(True)
+    bpy.context.scene.render.use_stamp_frame = False
+    controller.location[0] = 0
+    #Change the output folder, rename the output file, render and move the camera to the next unit
+    bpy.data.scenes["Scene"].node_tree.nodes["File Output"].base_path = output_folder
+    for item in imported_units:
+        bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("#%s_#.tga" % item["name"])
+        bpy.ops.render.render(use_viewport=True)
+        bpy.ops.transform.translate(value=(2, 0, 0))
+    #Reset camera location and output name
+    controller.location[0] = 0
+    bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("")

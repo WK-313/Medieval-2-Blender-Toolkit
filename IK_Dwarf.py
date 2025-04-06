@@ -46,7 +46,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK Control Bones'].assign(bone)
     bone = arm.edit_bones.new('bone_pelvis')
     bone.head = 0.0000, 0.0000, 0.0000
-    bone.tail = 0.0000, 0.0114, 0.0000
+    bone.tail = 0.0000, -0.0000, 0.0114
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK Pelvis']]
@@ -70,7 +70,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK'].assign(bone)
     bone = arm.edit_bones.new('bone_rlowerleg')
     bone.head = 0.1160, 0.0141, -0.3027
-    bone.tail = 0.1160, 0.0254, -0.3027
+    bone.tail = 0.1160, 0.0141, -0.2914
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK calf right']]
@@ -78,7 +78,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Rlowerleg')
     bone.head = 0.1160, 0.0141, -0.3030
-    bone.tail = 0.1160, 0.0254, -0.3030
+    bone.tail = 0.1160, 0.0141, -0.2917
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK calf right']]
@@ -86,15 +86,15 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_rthigh')
     bone.head = 0.0952, 0.0000, 0.0008
-    bone.tail = 0.0952, 0.0114, 0.0008
+    bone.tail = 0.0952, -0.0000, 0.0122
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK thigh right']]
     bones['bone_rthigh'] = bone.name
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_RThigh')
-    bone.head = 0.0952, -0.0000, 0.0008
-    bone.tail = 0.0952, 0.0114, 0.0008
+    bone.head = 0.0952, 0.0000, 0.0008
+    bone.tail = 0.0952, -0.0000, 0.0122
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK thigh right']]
@@ -118,7 +118,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK'].assign(bone)
     bone = arm.edit_bones.new('bone_llowerleg')
     bone.head = -0.1143, 0.0227, -0.3024
-    bone.tail = -0.1143, 0.0340, -0.3024
+    bone.tail = -0.1143, 0.0227, -0.2911
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK calf left']]
@@ -126,7 +126,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Llowerleg')
     bone.head = -0.1143, 0.0227, -0.3024
-    bone.tail = -0.1143, 0.0340, -0.3024
+    bone.tail = -0.1143, 0.0227, -0.2911
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK calf left']]
@@ -134,7 +134,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_lthigh')
     bone.head = -0.0952, 0.0000, 0.0008
-    bone.tail = -0.0952, 0.0114, 0.0008
+    bone.tail = -0.0952, -0.0000, 0.0122
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK thigh left']]
@@ -142,7 +142,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_LThigh')
     bone.head = -0.0952, 0.0000, 0.0008
-    bone.tail = -0.0952, 0.0114, 0.0008
+    bone.tail = -0.0952, -0.0000, 0.0122
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK thigh left']]
@@ -158,7 +158,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK'].assign(bone)
     bone = arm.edit_bones.new('bone_abs')
     bone.head = 0.0000, 0.0000, 0.2125
-    bone.tail = 0.0000, 0.0114, 0.2125
+    bone.tail = 0.0000, -0.0000, 0.2239
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK Abs']]
@@ -174,7 +174,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK'].assign(bone)
     bone = arm.edit_bones.new('bone_torso')
     bone.head = -0.0003, 0.0000, 0.4240
-    bone.tail = -0.0003, 0.0114, 0.4240
+    bone.tail = -0.0003, -0.0000, 0.4354
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK Torso']]
@@ -182,7 +182,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_rclavical')
     bone.head = 0.0130, -0.0274, 0.5540
-    bone.tail = 0.0130, -0.0160, 0.5540
+    bone.tail = 0.0130, -0.0274, 0.5654
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_torso']]
@@ -190,7 +190,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_lclavical')
     bone.head = -0.0105, -0.0274, 0.5540
-    bone.tail = -0.0105, -0.0160, 0.5540
+    bone.tail = -0.0105, -0.0274, 0.5654
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_torso']]
@@ -198,7 +198,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Rclavical')
     bone.head = 0.0130, -0.0274, 0.5540
-    bone.tail = 0.0130, -0.0160, 0.5540
+    bone.tail = 0.0130, -0.0274, 0.5654
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_torso']]
@@ -206,7 +206,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Lclavical')
     bone.head = -0.0105, -0.0274, 0.5540
-    bone.tail = -0.0105, -0.0160, 0.5540
+    bone.tail = -0.0105, -0.0274, 0.5654
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_torso']]
@@ -222,7 +222,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK Control Bones'].assign(bone)
     bone = arm.edit_bones.new('bone_lhand')
     bone.head = -0.6543, -0.0117, 0.4202
-    bone.tail = -0.6543, -0.0004, 0.4202
+    bone.tail = -0.6543, -0.0117, 0.4315
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK frist  left']]
@@ -230,7 +230,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_bowoffset')
     bone.head = -0.6543, -0.0117, 0.4002
-    bone.tail = -0.6543, -0.0004, 0.4002
+    bone.tail = -0.6543, -0.0117, 0.4115
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_lhand']]
@@ -238,7 +238,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Weapon01')
     bone.head = -0.7304, -0.0114, 0.4032
-    bone.tail = -0.7304, -0.0001, 0.4032
+    bone.tail = -0.7304, -0.0114, 0.4145
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_lhand']]
@@ -246,7 +246,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Weapon02')
     bone.head = -0.9217, -0.0114, 0.4516
-    bone.tail = -0.9217, -0.0001, 0.4516
+    bone.tail = -0.9217, -0.0114, 0.4629
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_Weapon01']]
@@ -254,7 +254,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_weapon_group03')
     bone.head = -0.6543, -0.0117, 0.4202
-    bone.tail = -0.6543, -0.0004, 0.4202
+    bone.tail = -0.6543, -0.0117, 0.4315
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_lhand']]
@@ -262,7 +262,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_bowstring')
     bone.head = -0.4203, -0.0117, 0.4002
-    bone.tail = -0.4203, -0.0004, 0.4002
+    bone.tail = -0.4203, -0.0117, 0.4115
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK frist  left']]
@@ -270,7 +270,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Lhand')
     bone.head = -0.6543, -0.0117, 0.4202
-    bone.tail = -0.6543, -0.0004, 0.4202
+    bone.tail = -0.6543, -0.0117, 0.4315
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK frist  left']]
@@ -278,71 +278,71 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_shield')
     bone.head = -0.6266, -0.2587, 0.5004
-    bone.tail = -0.6266, -0.2473, 0.5004
+    bone.tail = -0.6266, -0.2587, 0.5118
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_Lhand']]
     bones['bone_shield'] = bone.name
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('IK frist right')
-    bone.head = 0.6544, -0.0117, 0.4203
-    bone.tail = 0.6544, 0.2970, 0.4203
+    bone.head = 0.7391, -0.0115, 0.3973
+    bone.tail = 0.7391, 0.2972, 0.3973
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK Torso']]
     bones['IK frist right'] = bone.name
     arm.collections['IK Control Bones'].assign(bone)
     bone = arm.edit_bones.new('bone_rhand')
-    bone.head = 0.6544, -0.0117, 0.4203
-    bone.tail = 0.6544, -0.0004, 0.4203
+    bone.head = 0.7391, -0.0115, 0.3973
+    bone.tail = 0.7391, -0.0115, 0.4086
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK frist right']]
     bones['bone_rhand'] = bone.name
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_sling')
-    bone.head = 0.7744, -0.0117, 0.4203
-    bone.tail = 0.7744, -0.0004, 0.4203
+    bone.head = 0.8591, -0.0115, 0.3973
+    bone.tail = 0.8591, -0.0115, 0.4086
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_rhand']]
     bones['bone_sling'] = bone.name
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_weapon_group01')
-    bone.head = 0.6544, -0.0117, 0.4203
-    bone.tail = 0.6544, -0.0004, 0.4203
+    bone.head = 0.7391, -0.0115, 0.3973
+    bone.tail = 0.7391, -0.0115, 0.4086
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_rhand']]
     bones['bone_weapon_group01'] = bone.name
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Rhand')
-    bone.head = 0.6544, -0.0117, 0.4203
-    bone.tail = 0.6544, -0.0004, 0.4203
+    bone.head = 0.7391, -0.0115, 0.3973
+    bone.tail = 0.7391, -0.0115, 0.4086
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK frist right']]
     bones['bone_Rhand'] = bone.name
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_weapon01')
-    bone.head = 0.7391, -0.0117, 0.3974
-    bone.tail = 0.7391, -0.0004, 0.3974
+    bone.head = 0.8238, -0.0115, 0.3744
+    bone.tail = 0.8238, -0.0115, 0.3857
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_Rhand']]
     bones['bone_weapon01'] = bone.name
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_weapon_group02')
-    bone.head = 0.7391, -0.0117, 0.3974
-    bone.tail = 0.7391, -0.0004, 0.3974
+    bone.head = 0.8238, -0.0115, 0.3744
+    bone.tail = 0.8238, -0.0115, 0.3857
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_weapon01']]
     bones['bone_weapon_group02'] = bone.name
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('Pole')
-    bone.head = 0.8239, -0.0118, 0.3973
-    bone.tail = 0.8239, 0.3706, 0.3973
+    bone.head = 0.9235, -0.0115, 0.3973
+    bone.tail = 0.9235, 0.3709, 0.3973
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK frist right']]
@@ -374,15 +374,15 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK'].assign(bone)
     bone = arm.edit_bones.new('IK lower arm right')
     bone.head = 0.4405, -0.0373, 0.4247
-    bone.tail = 0.6544, -0.0117, 0.4203
-    bone.roll = -0.0636
+    bone.tail = 0.7391, -0.0115, 0.3973
+    bone.roll = 0.0000
     bone.use_connect = True
     bone.parent = arm.edit_bones[bones['IK upper arm right']]
     bones['IK lower arm right'] = bone.name
     arm.collections['IK'].assign(bone)
     bone = arm.edit_bones.new('bone_relbow')
     bone.head = 0.4405, -0.0373, 0.4247
-    bone.tail = 0.4405, -0.0259, 0.4247
+    bone.tail = 0.4405, -0.0373, 0.4361
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK lower arm right']]
@@ -390,7 +390,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Relbow')
     bone.head = 0.4405, -0.0373, 0.4247
-    bone.tail = 0.4405, -0.0259, 0.4247
+    bone.tail = 0.4405, -0.0373, 0.4361
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK lower arm right']]
@@ -398,7 +398,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_rupperarm')
     bone.head = 0.1983, -0.0240, 0.4122
-    bone.tail = 0.1983, -0.0126, 0.4122
+    bone.tail = 0.1983, -0.0240, 0.4236
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK upper arm right']]
@@ -406,7 +406,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Rupperarm')
     bone.head = 0.1983, -0.0240, 0.4122
-    bone.tail = 0.1983, -0.0126, 0.4122
+    bone.tail = 0.1983, -0.0240, 0.4236
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK upper arm right']]
@@ -430,7 +430,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK'].assign(bone)
     bone = arm.edit_bones.new('bone_lelbow')
     bone.head = -0.4405, -0.0379, 0.4248
-    bone.tail = -0.4405, -0.0266, 0.4248
+    bone.tail = -0.4405, -0.0379, 0.4361
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK lower arm left']]
@@ -438,7 +438,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Lelbow')
     bone.head = -0.4405, -0.0379, 0.4248
-    bone.tail = -0.4405, -0.0266, 0.4248
+    bone.tail = -0.4405, -0.0379, 0.4361
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK lower arm left']]
@@ -446,7 +446,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_lupperarm')
     bone.head = -0.1983, -0.0240, 0.4122
-    bone.tail = -0.1983, -0.0126, 0.4122
+    bone.tail = -0.1983, -0.0240, 0.4236
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK upper arm left']]
@@ -454,7 +454,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Lupperarm')
     bone.head = -0.1983, -0.0240, 0.4122
-    bone.tail = -0.1983, -0.0126, 0.4122
+    bone.tail = -0.1983, -0.0240, 0.4236
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK upper arm left']]
@@ -470,15 +470,15 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK Control Bones'].assign(bone)
     bone = arm.edit_bones.new('bone_head')
     bone.head = -0.0004, 0.0000, 0.6590
-    bone.tail = -0.0004, 0.0114, 0.6590
+    bone.tail = -0.0004, -0.0000, 0.6704
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK Head']]
     bones['bone_head'] = bone.name
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_jaw')
-    bone.head = -0.0000, -0.0034, 0.6698
-    bone.tail = -0.0000, 0.0079, 0.6698
+    bone.head = 0.0000, -0.0034, 0.6698
+    bone.tail = 0.0000, -0.0034, 0.6811
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_head']]
@@ -486,7 +486,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_eyebrow')
     bone.head = 0.0013, -0.0745, 0.7768
-    bone.tail = 0.0013, -0.0631, 0.7768
+    bone.tail = 0.0013, -0.0745, 0.7882
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['bone_head']]
@@ -509,7 +509,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK Control Bones'].assign(bone)
     bone = arm.edit_bones.new('bone_lfoot')
     bone.head = -0.1419, -0.0175, -0.5787
-    bone.tail = -0.1419, -0.0062, -0.5787
+    bone.tail = -0.1419, -0.0175, -0.5674
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK angle left']]
@@ -517,7 +517,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Lfoot')
     bone.head = -0.1419, -0.0175, -0.5787
-    bone.tail = -0.1419, -0.0062, -0.5787
+    bone.tail = -0.1419, -0.0175, -0.5674
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK angle left']]
@@ -532,7 +532,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['IK Control Bones'].assign(bone)
     bone = arm.edit_bones.new('bone_rfoot')
     bone.head = 0.1420, -0.0173, -0.5799
-    bone.tail = 0.1420, -0.0060, -0.5799
+    bone.tail = 0.1420, -0.0173, -0.5686
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK angle right']]
@@ -540,7 +540,7 @@ def IKGenerator(name, x, y, z):
     arm.collections['Med2'].assign(bone)
     bone = arm.edit_bones.new('bone_Rfoot')
     bone.head = 0.1420, -0.0173, -0.5811
-    bone.tail = 0.1420, -0.0060, -0.5811
+    bone.tail = 0.1420, -0.0173, -0.5698
     bone.roll = 0.0000
     bone.use_connect = False
     bone.parent = arm.edit_bones[bones['IK angle right']]

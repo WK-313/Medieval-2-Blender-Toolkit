@@ -14,8 +14,9 @@ def layer_collection(name, _layer_collection=None):
         for l_col in _layer_collection.children:
             if rez := layer_collection(name=name, _layer_collection=l_col):
                 return rez
+
 def strat_importer(filepath):
-    dae_list = []
+    file_list = []
     bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
 
     filepath = Path(filepath)
@@ -31,15 +32,15 @@ def strat_importer(filepath):
         if test == None:
             new_col = bpy.data.collections.new(str(path).split('\\')[-1])
             bpy.data.collections.get(str(path).split('\\')[-2]).children.link(new_col)
-        #Get list of dae files
+        #Get list of glb files
         for name in files:
-            if (name[-3:] == 'dae'): dae_list.append(PurePath(path, name))
+            if (name[-3:] == 'glb'): file_list.append(PurePath(path, name))
 
     x = -21
     y = 0
     z = 0
     o = 0
-    for model in dae_list:
+    for model in file_list:
         if o == 15:
             y +=3
             x = -21
@@ -57,7 +58,7 @@ def strat_importer(filepath):
         empty_parent.name=str(model).split('\\')[-1].split('.')[0]
         empty_parent.rotation_euler[0]=pi/2
         
-        bpy.ops.wm.collada_import(filepath=(str(model)))
+        bpy.ops.import_scene.gltf(filepath=(str(model)), disable_bone_shape=True)
         bpy.context.view_layer.objects.active = empty_parent
         bpy.ops.object.parent_set(type='OBJECT', keep_transform=True)
         empty_parent.location=(x, y, z)
