@@ -594,10 +594,10 @@ def engine_importer(folder, glb_model, import_faction, x, y, z, upg_target):
                 else:
                     normal_image.image = bpy.data.images.load(texture_path+normal_texture)
                     normal_image.image.colorspace_settings.name = 'Non-Color'
-                    #Linking nodes: normal -> curves -> normal map -> shader
-                    new_link(rgb_curve.inputs[1], normal_image.outputs[0])
+                    #Linking nodes: normal map -> shader, normal -> curves -> normal_map
+                    new_link(shader_node.inputs[5], normal_map.outputs[0])
+                new_link(rgb_curve.inputs[1], normal_image.outputs[0])
                 new_link(normal_map.inputs[1], rgb_curve.outputs[0])
-                new_link(shader_node.inputs[5], normal_map.outputs[0])
 
         
         bpy.ops.object.select_all(action='DESELECT')

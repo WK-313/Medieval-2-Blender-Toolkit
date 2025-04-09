@@ -7,7 +7,8 @@ directories = {
     "directory_units": "C:\\Program Files",
     "directory_output": "C:\\Program Files",
     "directory_strat": "C:\\Program Files",
-    "directory_single_dae": "C:\\Program Files"
+    "directory_single_dae": "C:\\Program Files",
+    "directory_textures": "C:\\Program Files"
 }
 with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
     pickle.dump(directories, directories_output)

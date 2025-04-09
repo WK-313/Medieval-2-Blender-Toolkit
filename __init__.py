@@ -16,7 +16,7 @@ import sys
 import pickle
 from bpy.props import StringProperty, BoolProperty
 from bpy_extras.io_utils import ImportHelper
-from . import EDU_converter, strat_import, single_import
+from . import EDU_converter, strat_import, single_import, textures_to_assets
 from pathlib import Path
 script_folder = Path(__file__).parent
 
@@ -96,6 +96,17 @@ def Import_Single_Dae(directory):
     single_import.single_importer(bpy.path.abspath(directory))
 
 
+def Textures_to_Assets(directory):
+    # Save the directory
+    with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
+        directories = pickle.load(directories_output)
+        directories["directory_textures"] = directory
+    with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
+        pickle.dump(directories, directories_output)
+    # Run script
+    textures_to_assets.tex_to_asset(bpy.path.abspath(directory))
+
+
 class MEDIMPORTER_OT_Properties(bpy.types.PropertyGroup):
     with open(script_folder/('text/directories.pkl'), 'rb') as directories_list:
         try:
@@ -107,7 +118,8 @@ class MEDIMPORTER_OT_Properties(bpy.types.PropertyGroup):
                 "directory_units": "C:\\Program Files",
                 "directory_output": "C:\\Program Files",
                 "directory_strat": "C:\\Program Files",
-                "directory_single_dae": "C:\\Program Files"
+                "directory_single_dae": "C:\\Program Files",
+                "directory_textures": "C:\\Program Files"
                 }
             with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
                 pickle.dump(file_paths, directories_output)
@@ -116,6 +128,7 @@ class MEDIMPORTER_OT_Properties(bpy.types.PropertyGroup):
     directory_output: StringProperty(name = "Output directory", description = "Directory to save the unit cards to", default = file_paths["directory_output"], subtype = "DIR_PATH")
     directory_strat: StringProperty(name = "Strat folder", description = "Directory to get strat models from", default = file_paths["directory_strat"], subtype = "DIR_PATH")
     directory_single_dae: StringProperty(name = "Settlement .dae", description = "Directory to get strat models from", default = file_paths["directory_single_dae"], subtype = "FILE_PATH")
+    directory_textures: StringProperty(name = "Textures folder", description = "Directory to get textures from", default = file_paths["directory_textures"], subtype = "DIR_PATH")
 
     import_faction: bpy.props.EnumProperty(name = "Faction list", description = "Select Faction", items = Sort_Factions)
     import_faction_single: bpy.props.EnumProperty(name = "Faction list", description = "Select Faction", items = Sort_Factions)
@@ -264,6 +277,11 @@ class MEDIMPORTER_PT_Misc(bpy.types.Panel):
             col = self.layout.column(align=True)
             col.prop (context.scene.med2_tools, "directory_single_dae", text="")
             col.operator("med2toolkit.single_dae", text="Import Settlement")
+            layout=self.layout
+            layout.label(text = "Textures to assets")
+            col = self.layout.column(align=True)
+            col.prop (context.scene.med2_tools, "directory_textures", text="")
+            col.operator("med2toolkit.tex_to_asset", text="Convert textures to assets")
 
 
 class MEDIMPORTER_OT_Controller(bpy.types.Operator):
@@ -333,6 +351,16 @@ class MEDIMPORTER_OT_Single_Dae(bpy.types.Operator):
         return{"FINISHED"}
 
 
+class MEDIMPORTER_OT_Tex_to_Asset(bpy.types.Operator):
+    bl_idname = "med2toolkit.tex_to_asset"
+    bl_label = "Select Textures Folder"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        Textures_to_Assets(context.scene.med2_tools.directory_textures)
+        return{"FINISHED"}
+
+
 classes = [
     MEDIMPORTER_PT_Toolkit,
     MEDIMPORTER_OT_Sorter,
@@ -349,6 +377,7 @@ classes = [
     MEDIMPORTER_OT_Single_Importer,
     MEDIMPORTER_OT_Strat,
     MEDIMPORTER_OT_Single_Dae,
+    MEDIMPORTER_OT_Tex_to_Asset,
     ]
 
 def register():
