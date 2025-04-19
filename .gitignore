@@ -4,3 +4,4 @@ __pycache__/__init__.cpython-310.pyc
 __pycache__/EDU_converter.cpython-310.pyc
 /text
 *.pyc
+text/directories.pkl

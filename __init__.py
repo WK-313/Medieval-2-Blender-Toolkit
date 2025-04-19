@@ -15,9 +15,9 @@ import bpy.utils
 import sys
 import pickle
 from bpy.props import StringProperty, BoolProperty
-from bpy_extras.io_utils import ImportHelper
-from . import EDU_converter, strat_import, single_import, textures_to_assets
 from pathlib import Path
+from bpy_extras.io_utils import ImportHelper
+from . import EDU_converter, strat_import, single_import, textures_to_assets, bake_textures
 script_folder = Path(__file__).parent
 
 
@@ -107,6 +107,17 @@ def Textures_to_Assets(directory):
     textures_to_assets.tex_to_asset(bpy.path.abspath(directory))
 
 
+def Bake_textures(self, context):
+    # Settings
+    resolution = context.scene.med2_tools.bake_resolution
+    alpha_toggle = context.scene.med2_tools.bake_alpha
+    reset_uvs = context.scene.med2_tools.bake_reset_uv
+    rotation_toggle = context.scene.med2_tools.bake_uv_rotate
+    create_material = context.scene.med2_tools.bake_material
+    bake_type = context.scene.med2_tools.bake_type
+    bake_textures.bake_textures(resolution, alpha_toggle, reset_uvs, rotation_toggle, create_material, bake_type)
+
+
 class MEDIMPORTER_OT_Properties(bpy.types.PropertyGroup):
     with open(script_folder/('text/directories.pkl'), 'rb') as directories_list:
         try:
@@ -136,6 +147,12 @@ class MEDIMPORTER_OT_Properties(bpy.types.PropertyGroup):
     upg_model: bpy.props.IntProperty(name="Upgrade tier", description = "Select armour upgrade level", default = 0, min = 0, max = 3)
     upg_model_single: bpy.props.IntProperty(name="Upgrade tier", description = "Select armour upgrade level", default = 0, min = 0, max = 3)
     controller_type: bpy.props.EnumProperty(name="IK type", description = "Select armour upgrade level", items = [(entry, entry, "") for entry in ["IK_Infantry", "IK_Archer", "IK_Dwarf"]])
+    bake_resolution: bpy.props.IntProperty(name="Texture resolution", description = "Select baked texture size", default = 1024, min = 1, soft_max = 4096)
+    bake_alpha: bpy.props.BoolProperty(name="Texture Alpha", description = "Select whenever to use transparent background or not", default = False)
+    bake_reset_uv: bpy.props.BoolProperty(name="Automatic UVs", description = "Select whenever to use reset bake UVs or not", default = False)
+    bake_uv_rotate: bpy.props.BoolProperty(name="UV Rotation", description = "Select whenever to rotate UVs or to keep the original alignment", default = False)
+    bake_material: bpy.props.BoolProperty(name="Create Material", description = "Select whenever to use create material for baked textures or not", default = False)
+    bake_type: bpy.props.EnumProperty(name = "Bake Type", description = "Select Which textures to bake", items = [('Diffuse','Diffuse',''),('Normal','Normal',''),('Both','Both',''),('None','None','')])
 
 class MEDIMPORTER_PT_Toolkit(bpy.types.Panel):
     bl_idname = "MEDIMPORTER_PT_Toolkit"
@@ -241,6 +258,7 @@ class MEDIMPORTER_PT_Cards(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Med2 Toolkit"
+    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         if(context.mode == 'OBJECT'):
@@ -283,6 +301,28 @@ class MEDIMPORTER_PT_Misc(bpy.types.Panel):
             col.prop (context.scene.med2_tools, "directory_textures", text="")
             col.operator("med2toolkit.tex_to_asset", text="Convert textures to assets")
 
+class MEDIMPORTER_PT_Exp(bpy.types.Panel):
+    bl_idname = "MEDIMPORTER_PT_Exp"
+    bl_parent_id = "MEDIMPORTER_PT_Misc"
+    bl_label = "Experimental"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Med2 Toolkit"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+            if(context.mode == 'OBJECT'):
+                layout=self.layout
+                layout.label(text = "Bake textures")
+                col = self.layout.column(align=True)
+                col.prop (context.scene.med2_tools, "bake_resolution", text="Bake Resolution:")
+                col.prop (context.scene.med2_tools, "bake_alpha", text="Use alpha transparency:")
+                col.prop (context.scene.med2_tools, "bake_reset_uv", text="Automatic Bake UVs:")
+                col.prop (context.scene.med2_tools, "bake_uv_rotate", text="Lock UV Rotation:")
+                col.prop (context.scene.med2_tools, "bake_material", text="Generate Material:")
+                col.prop (context.scene.med2_tools, "bake_type", text="Type")
+                if context.object.type == 'MESH' and len(context.object.data.materials) != 0 and len(context.selected_objects) != 0:
+                    col.operator("med2toolkit.bake_textures", text="Bake selected textures")
 
 class MEDIMPORTER_OT_Controller(bpy.types.Operator):
     bl_idname = "med2toolkit.controller"
@@ -360,6 +400,14 @@ class MEDIMPORTER_OT_Tex_to_Asset(bpy.types.Operator):
         Textures_to_Assets(context.scene.med2_tools.directory_textures)
         return{"FINISHED"}
 
+class MEDIMPORTER_OT_Bake_textures(bpy.types.Operator):
+    bl_idname = "med2toolkit.bake_textures"
+    bl_label = "Select Textures Folder"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        Bake_textures(self, context)
+        return{"FINISHED"}
 
 classes = [
     MEDIMPORTER_PT_Toolkit,
@@ -369,6 +417,7 @@ classes = [
     MEDIMPORTER_PT_Importer,
     MEDIMPORTER_PT_Cards,
     MEDIMPORTER_PT_Misc,
+    MEDIMPORTER_PT_Exp,
     MEDIMPORTER_OT_Reader,
     MEDIMPORTER_OT_Importer,
     MEDIMPORTER_OT_Controller,
@@ -378,6 +427,7 @@ classes = [
     MEDIMPORTER_OT_Strat,
     MEDIMPORTER_OT_Single_Dae,
     MEDIMPORTER_OT_Tex_to_Asset,
+    MEDIMPORTER_OT_Bake_textures,
     ]
 
 def register():

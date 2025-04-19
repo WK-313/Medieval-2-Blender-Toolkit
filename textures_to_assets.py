@@ -28,7 +28,9 @@ def tex_to_asset(file_path):
 
         # Defining nodes
         shader_node = material.node_tree.nodes["Principled BSDF"]
+        shader_node.inputs['Metallic'].default_value = 0
         texture_image = nodes.new("ShaderNodeTexImage")
+        texture_image.name = 'Diffuse Texture'
         texture_image.location = (-506, 444)
         texture_image.image = bpy.data.images.load(file_path+texture)
         # Linking nodes: colour -> shader; alpha -> shader
@@ -44,6 +46,7 @@ def tex_to_asset(file_path):
         normal_map = nodes.new("ShaderNodeNormalMap")
         normal_map.location = (-206, 124)
         normal_image = nodes.new("ShaderNodeTexImage")
+        normal_image.name = 'Normal Texture'
         normal_image.location = (-836, 124)
         # Check Normal texture
         for suffix in normal_suffix:

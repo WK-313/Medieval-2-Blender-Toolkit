@@ -555,7 +555,9 @@ def engine_importer(folder, glb_model, import_faction, x, y, z, upg_target):
 
                 #Defining nodes
                 shader_node = material.node_tree.nodes["Principled BSDF"]
+                shader_node.inputs['Metallic'].default_value = 0
                 texture_image = nodes.new("ShaderNodeTexImage")
+                texture_image.name = 'Diffuse Texture'
                 texture_image.location = (-506, 444)
                 #Check if texture file doesn't exist
                 file_check = Path(texture_path+texture)
@@ -576,8 +578,8 @@ def engine_importer(folder, glb_model, import_faction, x, y, z, upg_target):
                 curve_g.points[1].location = (1, 0)
                 normal_map = nodes.new("ShaderNodeNormalMap")
                 normal_map.location = (-206, 124)
-                
                 normal_image = nodes.new("ShaderNodeTexImage")
+                normal_image.name = 'Normal Texture'
                 normal_image.location = (-836, 124)
                 #Check if texture file doesn't exist
                 file_check = Path(texture_path+normal_texture)
@@ -649,8 +651,10 @@ def material_workflow(texture_path, model, texture, normal_texture, material):
     
     #Defining nodes
     shader_node = material.node_tree.nodes["Principled BSDF"]
+    shader_node.inputs['Metallic'].default_value = 0
     
     texture_image = nodes.new("ShaderNodeTexImage")
+    texture_image.name = 'Diffuse Texture'
     texture_image.location = (-506, 444)
     #Check if texture file doesn't exist
     file_check = Path(texture_path+texture)
@@ -672,8 +676,8 @@ def material_workflow(texture_path, model, texture, normal_texture, material):
     
     normal_map = nodes.new("ShaderNodeNormalMap")
     normal_map.location = (-206, 124)
-
     normal_image = nodes.new("ShaderNodeTexImage")
+    normal_image.name = 'Normal Texture'
     normal_image.location = (-836, 124)
     #Check if texture file doesn't exist
     file_check = Path(texture_path+normal_texture)
