@@ -28,7 +28,7 @@ jobs:
     needs: Build
     steps:
       - name: Release addon
-        uses: blenderkit/blender-addon-release@main
+        uses: wk-313/blender-addon-release@main
         with:
           artifact_name: Medieval-2-Toolkit
           release_name: Medieval2Toolkit
