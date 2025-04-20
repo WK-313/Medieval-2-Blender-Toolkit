@@ -2,14 +2,13 @@ import bpy
 from pathlib import Path
 script_folder = Path(__file__).parent
 
-def render_setup(folder):
+def render_setup():
     bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection.children[0]
     #Create camera and controller
     bpy.context.scene.render.resolution_x = 480
     bpy.context.scene.render.resolution_y = 640
     bpy.context.scene.render.film_transparent = True
     bpy.context.scene.render.image_settings.file_format = 'TARGA'
-    bpy.context.scene.render.filepath = folder+"/unit cards/"
     bpy.ops.object.camera_add(enter_editmode=False, align='VIEW', location=(0.016065, 2.67329, 1.633482), rotation=(1.4926, 0.0133, 3.146288))
     camera = bpy.context.object
     camera.data.ortho_scale = 1.2
@@ -48,8 +47,7 @@ def render_setup(folder):
     compositor = bpy.context.scene.node_tree
     compositor.nodes.clear()
     new_link = compositor.links.new
-    
-    #Rescaling
+    # Rescaling
     render_input = compositor.nodes.new(type="CompositorNodeRLayers")
     render_input.location = (-950, 342)
     blur = compositor.nodes.new(type="CompositorNodeBilateralblur")
@@ -60,7 +58,7 @@ def render_setup(folder):
     transform = compositor.nodes.new(type="CompositorNodeTransform")
     transform.location = (-450, 342)
     transform.inputs[4].default_value = 0.1
-    #Layout and links
+    # Layout and links
     frame1 = compositor.nodes.new(type="NodeFrame")
     frame1.label = "rescale"
     frame1.use_custom_color = True
@@ -70,8 +68,7 @@ def render_setup(folder):
     transform.parent = frame1
     new_link(blur.inputs[0], render_input.outputs[0])
     new_link(transform.inputs[0], blur.outputs[0])
-    
-    #Colour adjust
+    # Colour adjust
     brightness = compositor.nodes.new(type="CompositorNodeBrightContrast")
     brightness.location = (-230, 342)
     brightness.inputs[1].default_value = 0
@@ -83,7 +80,7 @@ def render_setup(folder):
     exposure.inputs[1].default_value = 0
     rgb_curve = compositor.nodes.new(type="CompositorNodeCurveRGB")
     rgb_curve.location = (370, 342)
-    #Layout and links
+    # Layout and links
     frame2 = compositor.nodes.new(type="NodeFrame")
     frame2.label = "Colour Adjust"
     frame2.use_custom_color = True
@@ -96,15 +93,14 @@ def render_setup(folder):
     new_link(gamma.inputs[0], brightness.outputs[0])
     new_link(exposure.inputs[0], gamma.outputs[0])
     new_link(rgb_curve.inputs[1], exposure.outputs[0])
-    
-    #Sharpen
+    # Sharpen
     diamond = compositor.nodes.new(type="CompositorNodeFilter")
     diamond.location = (650, 342)
     diamond.filter_type = 'SHARPEN_DIAMOND'
     diamond.inputs[0].default_value = 0.2
     hue = compositor.nodes.new(type="CompositorNodeHueSat")
     hue.location = (810, 342)
-    #Layout and links
+    # Layout and links
     frame3 = compositor.nodes.new(type="NodeFrame")
     frame3.label = "Sharpen"
     frame3.use_custom_color = True
@@ -113,8 +109,7 @@ def render_setup(folder):
     hue.parent = frame3
     new_link(diamond.inputs[1], rgb_curve.outputs[0])
     new_link(hue.inputs[0], diamond.outputs[0])
-    
-    #Border size
+    # Border size
     reference = compositor.nodes.new(type="CompositorNodeImage")
     reference.location = (1040, 342)
     background = bpy.data.images.load(filepath=str(script_folder)+"/images/unit card sample.png")
@@ -125,7 +120,7 @@ def render_setup(folder):
     alpha.inputs[0].default_value = 1
     mix = compositor.nodes.new(type="CompositorNodeMixRGB")
     mix.location = (1380, 342)
-    #Layout and links
+    # Layout and links
     frame4 = compositor.nodes.new(type="NodeFrame")
     frame4.label = "Border Size"
     frame4.use_custom_color = True
@@ -137,13 +132,12 @@ def render_setup(folder):
     new_link(alpha.inputs[2], hue.outputs[0])
     new_link(mix.inputs[1], alpha.outputs[0])
     new_link(mix.inputs[2], hue.outputs[0])
-    
-    #Final + Preview
+    # Final + Preview
     output = compositor.nodes.new(type="CompositorNodeOutputFile")
     output.location = (1600, 342)
     view = compositor.nodes.new(type="CompositorNodeViewer")
     view.location = (1600, 222)
-    #Layout and links
+    # Layout and links
     frame5 = compositor.nodes.new(type="NodeFrame")
     frame5.label = "Final + Preview"
     output.parent = frame5

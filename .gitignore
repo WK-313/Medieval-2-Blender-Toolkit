@@ -5,3 +5,7 @@ __pycache__/EDU_converter.cpython-310.pyc
 /text
 *.pyc
 text/directories.pkl
+text/master_dictionary.pkl
+text/available_factions.pkl
+text/directories.pkl
+text/imported_units.pkl

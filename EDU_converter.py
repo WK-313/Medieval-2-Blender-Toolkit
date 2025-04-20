@@ -49,21 +49,31 @@ def unit_reader(mod_folder):
     unit_mount = ["sample_mount"]
     unit_model = ["sample_model"]
     unit_owners = ["sample_faction"]
-    unit_card_dir = ["sample_folder"]
-    flag = 0
+    info_card_dir = {}
+    unit_card_dir = {}
+    info_flag = 0
+    unit_flag = 0
     # if dictionary line, start a new group
     for line in edu_lines:
         if("dictionary" in line):
-            unit_dictionary = {"name": unit_name, "engine": unit_engine, "mount": unit_mount, "model": unit_model, "factions": unit_owners, "card": unit_card_dir}
+            if info_flag != 1:
+                for faction in unit_owners:
+                    info_card_dir.update({faction: faction})
+            if unit_flag != 1:
+                for faction in unit_owners:
+                    unit_card_dir.update({faction: faction})
+            unit_dictionary = {"name": unit_name, "engine": unit_engine, "mount": unit_mount, "model": unit_model, "factions": unit_owners, "info": info_card_dir, "card": unit_card_dir}
             master_dictionary.append(unit_dictionary)
             unit_name = "missing"
             unit_engine = ["missing"]
             unit_mount = ["missing"]
             unit_model = []
-            unit_owners = ["No Faction"]
-            unit_card_dir = []
+            unit_owners = ["No_Faction"]
+            info_card_dir = {}
+            unit_card_dir = {}
             riders = []
-            flag = 0
+            info_flag = 0
+            unit_flag = 0
             unit_name = line.split()[1]
         # if mount line, search for the mount name and get model
         elif("mount" in line.split()):
@@ -116,12 +126,20 @@ def unit_reader(mod_folder):
         elif("era 0" in line):
             unit_owners = line.replace(",", "").split()[2:]
         #  if card_pic_dir line, get the entry to use in the image output directory
+        elif("info_pic_dir" in line):
+            info_flag = 1
+            info_card_dir.update({'info_card_dir': line.split()[1]})
         elif("card_pic_dir" in line):
-            flag = 1
-            unit_card_dir.append(line.split()[1])
-        elif("recruit_priority_offset" in line and flag != 1):
-            unit_card_dir = unit_owners
-    unit_dictionary = {"name": unit_name, "engine": unit_engine, "mount": unit_mount, "model": unit_model, "factions": unit_owners, "card": unit_card_dir}
+            unit_flag = 1
+            unit_card_dir.update({'unit_card_dir': line.split()[1]})
+        elif("recruit_priority_offset" in line):
+            if info_flag != 1:
+                for faction in unit_owners:
+                    info_card_dir.update({faction: faction})
+            if unit_flag != 1:
+                for faction in unit_owners:
+                    unit_card_dir.update({faction: faction})
+    unit_dictionary = {"name": unit_name, "engine": unit_engine, "mount": unit_mount, "model": unit_model, "factions": unit_owners, "info": info_card_dir, "card": unit_card_dir}
     master_dictionary.append(unit_dictionary)
     return(master_dictionary)
 
@@ -136,7 +154,7 @@ def sort_factions(mod_folder):
         if ("faction" in line.split()):
             line = line.split()[-1]
             available_factions_list.append(line)
-    available_factions_list.append("No Faction")
+    available_factions_list.append("No_Faction")
     with open(script_folder/('text/available_factions.pkl'), 'wb') as available_factions_output:
         pickle.dump(available_factions_list, available_factions_output)
     return("Finished")
@@ -254,11 +272,6 @@ def find_model(master_dictionary, bmdb_list, model_list):
 
 
 def importer(model_folder, import_faction, x ,y ,z, upg_target):
-    #Check for camera collection. Create if missing
-    test = bpy.data.collections.get("Camera")
-    if test == None:
-        new_col = bpy.data.collections.new("Camera")
-        bpy.context.scene.collection.children.link(new_col)
     #Check if faction has a collection. Create if not
     test = bpy.data.collections.get(import_faction)
     if test == None:
@@ -288,18 +301,19 @@ def importer(model_folder, import_faction, x ,y ,z, upg_target):
         pickle.dump(imported_units, imported_units_output)
     print("Succesfully imported", int(x/2), "units.\n")
     bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection
-    #Check if camera controller exists. If not, create controller and camera
-    controller = bpy.context.scene.objects.get("Camera Controller")
-    if not controller:
-        render_setup.render_setup(model_folder)
+    #Check for camera collection. Create if missing
+    if bpy.context.scene.med2_tools.camera_toggle == True:
+        test = bpy.data.collections.get("Camera")
+        if test == None:
+            new_col = bpy.data.collections.new("Camera")
+            bpy.context.scene.collection.children.link(new_col)
+        #Check if camera controller exists. If not, create controller and camera
+        controller = bpy.context.scene.objects.get("Camera Controller")
+        if not controller:
+            render_setup.render_setup()
 
 
 def single_importer(model_folder, import_faction, import_unit, x ,y ,z, upg_target):
-    #Check for camera collection. Create if missing
-    test = bpy.data.collections.get("Camera")
-    if test == None:
-        new_col = bpy.data.collections.new("Camera")
-        bpy.context.scene.collection.children.link(new_col)
     #Check if faction has a collection. Create if not
     test = bpy.data.collections.get(import_faction)
     if test == None:
@@ -323,10 +337,16 @@ def single_importer(model_folder, import_faction, import_unit, x ,y ,z, upg_targ
             break
     if x >0: print("Succesfully imported", import_unit)
     bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection
-    #Check if camera controller exists. If not, create controller and camera
-    controller = bpy.context.scene.objects.get("Camera Controller")
-    if not controller:
-        render_setup.render_setup(model_folder)
+    #Check for camera collection. Create if missing
+    if bpy.context.scene.med2_tools.camera_toggle == True:
+        test = bpy.data.collections.get("Camera")
+        if test == None:
+            new_col = bpy.data.collections.new("Camera")
+            bpy.context.scene.collection.children.link(new_col)
+        #Check if camera controller exists. If not, create controller and camera
+        controller = bpy.context.scene.objects.get("Camera Controller")
+        if not controller:
+            render_setup.render_setup()
 
 
 def infantry_importer(folder, glb_model, import_faction, x, y, z, upg_target):
@@ -350,14 +370,21 @@ def infantry_importer(folder, glb_model, import_faction, x, y, z, upg_target):
             main_texture = entry[1]
             main_normal = entry[2]
     #Print line if model doesn't exist
-    file_check = Path(str(folder)+model)
+    if bpy.context.scene.med2_tools.unit_import_type == 'Collada':
+        model = model.replace('.glb', '.dae')
+        file_check = Path(str(folder)+model)
+    else:
+        file_check = Path(str(folder)+model)
     if not file_check.exists():
         print("No model file found:\n"+model)
         return(0)
     else:
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
         #Import .glb files, rename armatures and move the new objects
-        bpy.ops.import_scene.gltf(filepath=(folder+model), disable_bone_shape=True)
+        if bpy.context.scene.med2_tools.unit_import_type == 'Collada':
+            bpy.ops.wm.collada_import(filepath=(folder+model))
+        else:
+            bpy.ops.import_scene.gltf(filepath=(folder+model), disable_bone_shape=True)
         fac_col = bpy.data.collections[import_faction]
         for obj in bpy.context.selected_objects:
             for other_col in obj.users_collection:
@@ -437,7 +464,8 @@ def infantry_importer(folder, glb_model, import_faction, x, y, z, upg_target):
                 material_workflow(texture_path, model, main_texture, main_normal, material)
         bpy.ops.object.select_all(action='DESELECT')
         armature.select_set(True)
-        hide_variations()
+        if bpy.context.scene.med2_tools.hide_toggle:
+            hide_variations()
         multi_textured_check()
         return(2)
 
@@ -458,14 +486,21 @@ def mount_importer(folder, glb_model, import_faction, x, y, z, upg_target):
             main_texture = entry[1]
             main_normal = entry[2]
     #Print line if model doesn't exist
-    file_check = Path(str(folder)+mount)
+    if bpy.context.scene.med2_tools.unit_import_type == 'Collada':
+        mount = mount.replace('.glb', '.dae')
+        file_check = Path(str(folder)+mount)
+    else:
+        file_check = Path(str(folder)+mount)
     if not file_check.exists():
-        print("No mount file found:\n"+mount)
+        print("No model file found:\n"+mount)
         return(0)
     else:
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
         #Import .glb files, rename armatures and move the new objects
-        bpy.ops.import_scene.gltf(filepath=(folder+mount), disable_bone_shape=True)
+        if bpy.context.scene.med2_tools.unit_import_type == 'Collada':
+            bpy.ops.wm.collada_import(filepath=(folder+mount))
+        else:
+            bpy.ops.import_scene.gltf(filepath=(folder+mount), disable_bone_shape=True)
         fac_col = bpy.data.collections[import_faction]
         for obj in bpy.context.selected_objects:
             for other_col in obj.users_collection:
@@ -508,7 +543,8 @@ def mount_importer(folder, glb_model, import_faction, x, y, z, upg_target):
                 material_workflow(texture_path, mount, main_texture, main_normal, material)
         bpy.ops.object.select_all(action='DESELECT')
         armature.select_set(True)
-        hide_variations()
+        if bpy.context.scene.med2_tools.hide_toggle:
+            hide_variations()
         multi_textured_check()
         for rider in glb_model['mount'][1]:
             infantry_importer(folder, glb_model, import_faction, x+float(rider[0]), y+float(rider[2]), z+float(rider[1]), upg_target)
@@ -520,14 +556,21 @@ def engine_importer(folder, glb_model, import_faction, x, y, z, upg_target):
     #Define keywords
     engine = glb_model['engine'][0]
     #Print line if model doesn't exist
-    file_check = Path(str(folder)+engine)
+    if bpy.context.scene.med2_tools.unit_import_type == 'Collada':
+        engine = engine.replace('.glb', '.dae')
+        file_check = Path(str(folder)+engine)
+    else:
+        file_check = Path(str(folder)+engine)
     if not file_check.exists():
-        print("No mount file found:\n"+engine)
+        print("No model file found:\n"+engine)
         return(0)
     else:
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
         #Import .glb files, rename armatures and move the new objects
-        bpy.ops.import_scene.gltf(filepath=(folder+engine), disable_bone_shape=True)
+        if bpy.context.scene.med2_tools.unit_import_type == 'Collada':
+            bpy.ops.wm.collada_import(filepath=(folder+engine))
+        else:
+            bpy.ops.import_scene.gltf(filepath=(folder+engine), disable_bone_shape=True)
         fac_col = bpy.data.collections[import_faction]
         for obj in bpy.context.selected_objects:
             for other_col in obj.users_collection:
@@ -604,7 +647,8 @@ def engine_importer(folder, glb_model, import_faction, x, y, z, upg_target):
         
         bpy.ops.object.select_all(action='DESELECT')
         armature.select_set(True)
-        hide_variations()
+        if bpy.context.scene.med2_tools.hide_toggle:
+            hide_variations()
         multi_textured_check()
         for rider in glb_model['engine'][1]:
             infantry_importer(folder, glb_model, import_faction, x+float(rider[0]), y+float(rider[1]), z+float(rider[2]), upg_target)
@@ -774,7 +818,7 @@ def multi_textured_check():
     bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
 
 
-def renderer(output_folder):
+def renderer(output_folder, faction, card_type):
     #Read the list of imported units to use as file names
     with open(script_folder/('text/imported_units.pkl'), 'rb') as imported_units_input:
         imported_units = pickle.load(imported_units_input)
@@ -782,7 +826,7 @@ def renderer(output_folder):
     #Check if camera controller exists. If not, create controller and camera
     controller = bpy.context.scene.objects.get("Camera Controller")
     if not controller:
-        render_setup.render_setup(output_folder)
+        render_setup.render_setup()
         controller = bpy.context.scene.objects.get("Camera Controller")
     #Select the camera controller and reset the position
     bpy.context.view_layer.objects.active = controller
@@ -791,10 +835,22 @@ def renderer(output_folder):
     controller.location[0] = 0
     #Change the output folder, rename the output file, render and move the camera to the next unit
     bpy.data.scenes["Scene"].node_tree.nodes["File Output"].base_path = output_folder
-    for item in imported_units:
-        bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("#%s_#.tga" % item["name"])
-        bpy.ops.render.render(use_viewport=True)
-        bpy.ops.transform.translate(value=(2, 0, 0))
+    if card_type == 'Unit Cards':
+        for item in imported_units:
+            if 'unit_card_dir' in item["card"]:
+                bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("units/%s/#%s_#.tga" % (item["card"]["unit_card_dir"], item["name"]))
+            else:
+                bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("units/%s/#%s_#.tga" % (item["card"][faction], item["name"]))
+            bpy.ops.render.render(use_viewport=True)
+            bpy.ops.transform.translate(value=(2, 0, 0))
+    else:
+        for item in imported_units:
+            if 'info_card_dir' in item["card"]:
+                bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("unit_info/%s/%s_info_#.tga" % (item["info"]["info_card_dir"], item["name"]))
+            else:
+                bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("unit_info/%s/%s_info_#.tga" % (item["info"][faction], item["name"]))
+            bpy.ops.render.render(use_viewport=True)
+            bpy.ops.transform.translate(value=(2, 0, 0))
     #Reset camera location and output name
     controller.location[0] = 0
     bpy.data.scenes["Scene"].node_tree.nodes["File Output"].file_slots[0].path = ("")

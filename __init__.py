@@ -20,7 +20,6 @@ from bpy_extras.io_utils import ImportHelper
 from . import EDU_converter, strat_import, single_import, textures_to_assets, bake_textures
 script_folder = Path(__file__).parent
 
-
 def Read_Mod(directory):
     # Save the directory
     with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
@@ -31,7 +30,6 @@ def Read_Mod(directory):
     # Run script
     EDU_converter.mod_reader(bpy.path.abspath(directory))
 
-
 def Import_Faction(import_faction, directory, upg_model):
     # Save the directory
     with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
@@ -41,7 +39,6 @@ def Import_Faction(import_faction, directory, upg_model):
         pickle.dump(directories, directories_output)
     # Run script
     EDU_converter.importer(bpy.path.abspath(directory), import_faction, 0, 0, 1, upg_model)
-
 
 def Import_Unit(import_faction, import_unit, directory, upg_model):
     # Save the directory
@@ -73,7 +70,6 @@ def Sort_By_Faction(self, context):
             faction_units.append(entry)
     return(faction_units)
 
-
 def Import_Strat(directory):
     # Save the directory
     with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
@@ -83,7 +79,6 @@ def Import_Strat(directory):
         pickle.dump(directories, directories_output)
     # Run script
     strat_import.strat_importer(bpy.path.abspath(directory))
-
 
 def Import_Single_Dae(directory):
     # Save the directory
@@ -136,9 +131,14 @@ class MEDIMPORTER_OT_Properties(bpy.types.PropertyGroup):
                 pickle.dump(file_paths, directories_output)
     directory_mod: StringProperty(name = "Mod data folder", description = "Directory to read mod data from", default = file_paths["directory_mod"], subtype = "DIR_PATH")
     directory_units: StringProperty(name = "Units folder", description = "Directory to get unit models from", default = file_paths["directory_units"], subtype = "DIR_PATH")
+    unit_import_type: bpy.props.EnumProperty(name = "File Format", description = "Select to render info or unit cards", items = [('GLTF','GLTF',''),('Collada','Collada','')])
+    camera_toggle: bpy.props.BoolProperty(name="Render setup", description = "Select whenever to create default render setup or not", default = True)
+    hide_toggle: bpy.props.BoolProperty(name="Hide Variations", description = "Select whenever to hide variations or not", default = True)
+    card_type: bpy.props.EnumProperty(name = "Card Type", description = "Select to render info or unit cards", items = [('Unit Cards','Unit Cards',''),('Info Cards','Info Cards','')])
     directory_output: StringProperty(name = "Output directory", description = "Directory to save the unit cards to", default = file_paths["directory_output"], subtype = "DIR_PATH")
-    directory_strat: StringProperty(name = "Strat folder", description = "Directory to get strat models from", default = file_paths["directory_strat"], subtype = "DIR_PATH")
-    directory_single_dae: StringProperty(name = "Settlement .dae", description = "Directory to get strat models from", default = file_paths["directory_single_dae"], subtype = "FILE_PATH")
+    directory_strat: StringProperty(name = "Strat folder", description = "Directory to get models from", default = file_paths["directory_strat"], subtype = "DIR_PATH")
+    bulk_import_type: bpy.props.EnumProperty(name = "File Format", description = "Select to render info or unit cards", items = [('GLTF','GLTF',''),('Collada','Collada','')])
+    directory_single_dae: StringProperty(name = "Import File", description = "File to import", default = file_paths["directory_single_dae"], subtype = "FILE_PATH")
     directory_textures: StringProperty(name = "Textures folder", description = "Directory to get textures from", default = file_paths["directory_textures"], subtype = "DIR_PATH")
 
     import_faction: bpy.props.EnumProperty(name = "Faction list", description = "Select Faction", items = Sort_Factions)
@@ -160,11 +160,9 @@ class MEDIMPORTER_PT_Toolkit(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Med2 Toolkit"
-
     def draw(self, context):
         if(context.mode == 'OBJECT'):
             col = self.layout.column(align=True)
-
 
 class MEDIMPORTER_PT_Mod_Data(bpy.types.Panel):
     bl_idname = "MEDIMPORTER_PT_Mod_Data"
@@ -173,19 +171,16 @@ class MEDIMPORTER_PT_Mod_Data(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Med2 Toolkit"
-
     def draw(self, context):
         if(context.mode == 'OBJECT'):
             col = self.layout.column(align=True)
             col.prop (context.scene.med2_tools, "directory_mod", text="")
             col.operator ("med2toolkit.reader", text="Read Mod Data")
 
-
 class MEDIMPORTER_OT_Sorter(bpy.types.Operator):
     bl_idname = "med2toolkit.sorter"
     bl_label = "Select Mod Data Folder"
     bl_options = {"REGISTER", "UNDO"}
-
     def execute(self, context):
         Sort_Factions(self, context)
         Sort_By_Faction(self, context)
@@ -196,61 +191,55 @@ class MEDIMPORTER_OT_Reader(bpy.types.Operator):
     bl_idname = "med2toolkit.reader"
     bl_label = "Select Mod Data Folder"
     bl_options = {"REGISTER", "UNDO"}
-
     def execute(self, context):
         Read_Mod(context.scene.med2_tools.directory_mod)
         return{"FINISHED"}
 
-
 class MEDIMPORTER_PT_Importer(bpy.types.Panel):
     bl_idname = "MEDIMPORTER_PT_Faction_Importer"
     bl_parent_id = "MEDIMPORTER_PT_Toolkit"
-    bl_label = "Import Units"
+    bl_label = "Unit Importer"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Med2 Toolkit"
-
     def draw(self, context):
         if(context.mode == 'OBJECT'):
             layout=self.layout
             col = self.layout.column(align=True)
             col.prop (context.scene.med2_tools, "directory_units", text="")
-            layout.label(text = "Import Faction")
+            col.prop (context.scene.med2_tools, "unit_import_type", text="Format:", icon = 'NODE_COMPOSITING')
+            col.prop (context.scene.med2_tools, "camera_toggle", text="Render Setup:")
+            col.prop (context.scene.med2_tools, "hide_toggle", text="Hide Variations:")
+            layout.label(text = "Import: Faction")
             col = self.layout.column(align=True)
             col.prop (context.scene.med2_tools, "import_faction", text="")
             col.prop (context.scene.med2_tools, "upg_model", text="Armour upgrade level:")
             col.operator ("med2toolkit.importer", text="Import Faction")
-            layout.label(text = "Import Single Unit")
+            layout.label(text = "Import: Single Unit")
             col = self.layout.column(align=True)
             col.prop (context.scene.med2_tools, "import_faction_single", text="")
             col.prop (context.scene.med2_tools, "import_unit", text="")
             col.prop (context.scene.med2_tools, "upg_model_single", text="Armour upgrade level:")
             col.operator ("med2toolkit.singe_importer", text="Import Unit")
 
-
 class MEDIMPORTER_OT_Importer(bpy.types.Operator):
     bl_idname = "med2toolkit.importer"
     bl_label = "Select Models Folder"
     bl_options = {"REGISTER", "UNDO"}
-
     def execute(self, context):
         inputs = context.scene.med2_tools
         Import_Faction(context.scene.med2_tools.import_faction, context.scene.med2_tools.directory_units, context.scene.med2_tools.upg_model)
         return{"FINISHED"}
 
-
 class MEDIMPORTER_OT_Single_Importer(bpy.types.Operator):
     bl_idname = "med2toolkit.singe_importer"
     bl_label = "Select Models Folder"
     bl_options = {"REGISTER", "UNDO"}
-
     def execute(self, context):
         inputs = context.scene.med2_tools
         Import_Unit(context.scene.med2_tools.import_faction_single, context.scene.med2_tools.import_unit, context.scene.med2_tools.directory_units, context.scene.med2_tools.upg_model_single)
         return{"FINISHED"}
  
-
-
 class MEDIMPORTER_PT_Cards(bpy.types.Panel):
     bl_idname = "MEDIMPORTER_PT_Cards"
     bl_parent_id = "MEDIMPORTER_PT_Toolkit"
@@ -259,14 +248,16 @@ class MEDIMPORTER_PT_Cards(bpy.types.Panel):
     bl_region_type = 'UI'
     bl_category = "Med2 Toolkit"
     bl_options = {'DEFAULT_CLOSED'}
-
     def draw(self, context):
         if(context.mode == 'OBJECT'):
             layout=self.layout
-            layout.label(text = "Output Path:")
             col = self.layout.column(align=True)
-            col.prop (context.scene.med2_tools, "directory_output", text="")
             col.operator("med2toolkit.variations", text="Randomize Variations")
+            layout=self.layout
+            layout.label(text = "Output:")
+            col = self.layout.column(align=True)
+            col.prop (context.scene.med2_tools, "card_type", text="")
+            col.prop (context.scene.med2_tools, "directory_output", text="")
             col.operator("med2toolkit.rendered", text="Render Unit Cards")
 
 class MEDIMPORTER_PT_Misc(bpy.types.Panel):
@@ -277,7 +268,6 @@ class MEDIMPORTER_PT_Misc(bpy.types.Panel):
     bl_region_type = 'UI'
     bl_category = "Med2 Toolkit"
     bl_options = {'DEFAULT_CLOSED'}
-
     def draw(self, context):
         if(context.mode == 'OBJECT'):
             layout=self.layout
@@ -286,15 +276,16 @@ class MEDIMPORTER_PT_Misc(bpy.types.Panel):
             col.prop (context.scene.med2_tools, "controller_type", text="")
             col.operator("med2toolkit.controller", text="Generate IK controller")
             layout=self.layout
-            layout.label(text = "Import Strat Models")
+            layout.label(text = "Bulk Import")
             col = self.layout.column(align=True)
+            col.prop (context.scene.med2_tools, "bulk_import_type", text="Format:", icon = 'NODE_COMPOSITING')
             col.prop (context.scene.med2_tools, "directory_strat", text="")
-            col.operator("med2toolkit.strat", text="Import strat models")
+            col.operator("med2toolkit.strat", text="Import files")
             layout=self.layout
-            layout.label(text = "Import Settlement")
+            layout.label(text = "Import Single File")
             col = self.layout.column(align=True)
             col.prop (context.scene.med2_tools, "directory_single_dae", text="")
-            col.operator("med2toolkit.single_dae", text="Import Settlement")
+            col.operator("med2toolkit.single_dae", text="Import")
             layout=self.layout
             layout.label(text = "Textures to assets")
             col = self.layout.column(align=True)
@@ -303,26 +294,25 @@ class MEDIMPORTER_PT_Misc(bpy.types.Panel):
 
 class MEDIMPORTER_PT_Exp(bpy.types.Panel):
     bl_idname = "MEDIMPORTER_PT_Exp"
-    bl_parent_id = "MEDIMPORTER_PT_Misc"
+    bl_parent_id = "MEDIMPORTER_PT_Toolkit"
     bl_label = "Experimental"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Med2 Toolkit"
     bl_options = {'DEFAULT_CLOSED'}
-
     def draw(self, context):
-            if(context.mode == 'OBJECT'):
-                layout=self.layout
-                layout.label(text = "Bake textures")
-                col = self.layout.column(align=True)
-                col.prop (context.scene.med2_tools, "bake_resolution", text="Bake Resolution:")
-                col.prop (context.scene.med2_tools, "bake_alpha", text="Use alpha transparency:")
-                col.prop (context.scene.med2_tools, "bake_reset_uv", text="Automatic Bake UVs:")
-                col.prop (context.scene.med2_tools, "bake_uv_rotate", text="Lock UV Rotation:")
-                col.prop (context.scene.med2_tools, "bake_material", text="Generate Material:")
-                col.prop (context.scene.med2_tools, "bake_type", text="Type")
-                if context.object.type == 'MESH' and len(context.object.data.materials) != 0 and len(context.selected_objects) != 0:
-                    col.operator("med2toolkit.bake_textures", text="Bake selected textures")
+        if(context.mode == 'OBJECT'):
+            layout=self.layout
+            layout.label(text = "Bake textures")
+            col = self.layout.column(align=True)
+            col.prop (context.scene.med2_tools, "bake_resolution", text="Bake Resolution:")
+            col.prop (context.scene.med2_tools, "bake_alpha", text="Use alpha transparency:")
+            col.prop (context.scene.med2_tools, "bake_reset_uv", text="Automatic Bake UVs:")
+            col.prop (context.scene.med2_tools, "bake_uv_rotate", text="Lock UV Rotation:")
+            col.prop (context.scene.med2_tools, "bake_material", text="Generate Material:")
+            col.prop (context.scene.med2_tools, "bake_type", text="Type")
+            if context.object.type == 'MESH' and len(context.object.data.materials) != 0 and len(context.selected_objects) != 0:
+                col.operator("med2toolkit.bake_textures", text="Bake selected textures")
 
 class MEDIMPORTER_OT_Controller(bpy.types.Operator):
     bl_idname = "med2toolkit.controller"
@@ -333,11 +323,9 @@ class MEDIMPORTER_OT_Controller(bpy.types.Operator):
         if len(context.selected_objects) == 0: return False
         elif len(context.selected_objects) > 1: return False
         return context.object.select_get() and context.object.type == 'ARMATURE'
-
     def execute(self, context):
         EDU_converter.create_controller(context.scene.med2_tools.controller_type)
         return{"FINISHED"}  
-
 
 
 class MEDIMPORTER_OT_Randomizer(bpy.types.Operator):
@@ -348,17 +336,14 @@ class MEDIMPORTER_OT_Randomizer(bpy.types.Operator):
     def poll(cls, context):
         if len(context.selected_objects) == 0: return False
         return context.object.select_get() and context.object.type == 'ARMATURE'
-
     def execute(self, context):
         EDU_converter.hide_variations()
         return{"FINISHED"}  
-
 
 class MEDIMPORTER_OT_Renderer(bpy.types.Operator):
     bl_idname = "med2toolkit.rendered"
     bl_label = "Render unit cards"
     bl_options = {"REGISTER", "UNDO"}
-
     def execute(self, context):
         # Save the directory
         with open(script_folder/('text/directories.pkl'), 'rb') as directories_output:
@@ -367,25 +352,21 @@ class MEDIMPORTER_OT_Renderer(bpy.types.Operator):
         with open(script_folder/('text/directories.pkl'), 'wb') as directories_output:
             pickle.dump(directories, directories_output)
         # Run script
-        EDU_converter.renderer(context.scene.med2_tools.directory_output)
+        EDU_converter.renderer(context.scene.med2_tools.directory_output, context.scene.med2_tools.import_faction, context.scene.med2_tools.card_type)
         return{"FINISHED"}
-
 
 class MEDIMPORTER_OT_Strat(bpy.types.Operator):
     bl_idname = "med2toolkit.strat"
     bl_label = "Select Models Folder"
     bl_options = {"REGISTER", "UNDO"}
-
     def execute(self, context):
         Import_Strat(context.scene.med2_tools.directory_strat)
         return{"FINISHED"}
-
 
 class MEDIMPORTER_OT_Single_Dae(bpy.types.Operator):
     bl_idname = "med2toolkit.single_dae"
     bl_label = "Select .dae File"
     bl_options = {"REGISTER", "UNDO"}
-
     def execute(self, context):
         Import_Single_Dae(context.scene.med2_tools.directory_single_dae)
         return{"FINISHED"}
@@ -395,7 +376,6 @@ class MEDIMPORTER_OT_Tex_to_Asset(bpy.types.Operator):
     bl_idname = "med2toolkit.tex_to_asset"
     bl_label = "Select Textures Folder"
     bl_options = {"REGISTER", "UNDO"}
-
     def execute(self, context):
         Textures_to_Assets(context.scene.med2_tools.directory_textures)
         return{"FINISHED"}
@@ -404,7 +384,6 @@ class MEDIMPORTER_OT_Bake_textures(bpy.types.Operator):
     bl_idname = "med2toolkit.bake_textures"
     bl_label = "Select Textures Folder"
     bl_options = {"REGISTER", "UNDO"}
-
     def execute(self, context):
         Bake_textures(self, context)
         return{"FINISHED"}
