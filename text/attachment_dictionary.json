@@ -1,0 +1,2037 @@
+{
+  "camel_harad": {
+    "Model": "mount_camel_harad",
+    "Crew": [
+      [
+        "0.0",
+        "-0.23",
+        "0.60"
+      ]
+    ]
+  },
+  "camel": {
+    "Model": "mount_camel",
+    "Crew": [
+      [
+        "0.0",
+        "-0.23",
+        "0.60"
+      ]
+    ]
+  },
+  "warg_camel": {
+    "Model": "mount_warg_camel",
+    "Crew": [
+      [
+        "0.0",
+        "-0.23",
+        "0.48"
+      ]
+    ]
+  },
+  "warg_camel2": {
+    "Model": "mount_warg_camel",
+    "Crew": [
+      [
+        "0.0",
+        "-0.23",
+        "0.55"
+      ]
+    ]
+  },
+  "armored_warg_camel": {
+    "Model": "mount_armored_warg",
+    "Crew": [
+      [
+        "0.0",
+        "-0.23",
+        "0.48"
+      ]
+    ]
+  },
+  "caragor": {
+    "Model": "mount_caragor",
+    "Crew": [
+      [
+        "0.0",
+        "-0.23",
+        "0.55"
+      ]
+    ]
+  },
+  "sabertooth": {
+    "Model": "mount_sabertooth",
+    "Crew": [
+      [
+        "0.0",
+        "-0.23",
+        "0.55"
+      ]
+    ]
+  },
+  "eastern armoured horse": {
+    "Model": "mount_eastern_armoured_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "lindon horse": {
+    "Model": "mount_lindon_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "bear": {
+    "Model": "bear",
+    "Crew": [
+      [
+        "0.0",
+        "0.45",
+        "0.43"
+      ]
+    ]
+  },
+  "barded horse": {
+    "Model": "mount_barded_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "swan horse": {
+    "Model": "mount_belfalas",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "barded horse2": {
+    "Model": "mount_barded_horse2",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "barded horse3": {
+    "Model": "mount_barded_horse3",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "sauron": {
+    "Model": "mount_sauron",
+    "Crew": [
+      [
+        "0.05",
+        "1.37",
+        "-10.00"
+      ],
+      [
+        "-0.3",
+        "0.4",
+        "-1.52"
+      ],
+      [
+        "0.3",
+        "-.35",
+        "-1.52"
+      ]
+    ]
+  },
+  "balrog": {
+    "Model": "balrog",
+    "Crew": [
+      [
+        "0.05",
+        "1.37",
+        "-10.00"
+      ],
+      [
+        "-0.3",
+        "0.4",
+        "-1.52"
+      ],
+      [
+        "0.3",
+        "-.35",
+        "-1.52"
+      ]
+    ]
+  },
+  "black_spidersa": {
+    "Model": "black_spidersa",
+    "Crew": [
+      [
+        "0.05",
+        "1.37",
+        "1.35"
+      ],
+      [
+        "-0.3",
+        "0.4",
+        "1.22"
+      ],
+      [
+        "0.3",
+        "-.35",
+        "1.22"
+      ]
+    ]
+  },
+  "elephant": {
+    "Model": "ents",
+    "Crew": [
+      [
+        "3.5",
+        "4.15",
+        "4.2"
+      ],
+      [
+        "0.5",
+        "0.95",
+        "4.1"
+      ],
+      [
+        "-3.5",
+        "-4.9",
+        "4.25"
+      ]
+    ]
+  },
+  "stone giant": {
+    "Model": "stone_giant",
+    "Crew": [
+      [
+        "3.5",
+        "4.15",
+        "4.2"
+      ],
+      [
+        "0.5",
+        "0.95",
+        "4.1"
+      ],
+      [
+        "-3.5",
+        "-4.9",
+        "4.25"
+      ]
+    ]
+  },
+  "stone_giant_new": {
+    "Model": "stone_giant_new",
+    "Crew": [
+      [
+        "0",
+        "0",
+        "3"
+      ],
+      [
+        "0",
+        "0",
+        "-0.5"
+      ]
+    ]
+  },
+  "mailed horse2": {
+    "Model": "mount_mailed_horse2",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "mailed horse2x": {
+    "Model": "mount_mailed_horse2x",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "northern heavy horse": {
+    "Model": "northern_heavy_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "simple horse": {
+    "Model": "mount_simple_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "elven horse": {
+    "Model": "mount_elven_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "merchant horse": {
+    "Model": "mount_merchant_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "eastern horse": {
+    "Model": "mount_eastern_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "brotherhood horse": {
+    "Model": "mount_brotherhood_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "nazgul horse": {
+    "Model": "mount_nazgul_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "gondor horse": {
+    "Model": "mount_gondor_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "mount arthedain bodyguard": {
+    "Model": "mount_arthedain_bodyguard",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "mount arthedain bodyguard2": {
+    "Model": "mount_arthedain_bodyguard2",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "eorlingas horse": {
+    "Model": "mount_eorlingas_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "khand armoured horse": {
+    "Model": "mount_khand_armoured_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "wild mount": {
+    "Model": "wild_mount",
+    "Crew": [
+      [
+        "0.0",
+        "0.75",
+        "0.31"
+      ]
+    ]
+  },
+  "goat mount": {
+    "Model": "goat_mount",
+    "Crew": [
+      [
+        "0.0",
+        "0.68",
+        "0.36"
+      ]
+    ]
+  },
+  "gor_bombplatform": {
+    "Model": "gor_bombplatform",
+    "Crew": [
+      [
+        "2.75",
+        "-1",
+        "-1"
+      ],
+      [
+        "2.5",
+        "1.25",
+        "-1"
+      ],
+      [
+        "0",
+        "1.75",
+        "-1"
+      ],
+      [
+        "-2.5",
+        "1.25",
+        "-1"
+      ],
+      [
+        "-2.75",
+        "-1",
+        "-1"
+      ]
+    ]
+  },
+  "boar": {
+    "Model": "mount_boar",
+    "Crew": [
+      [
+        "0.0",
+        "0.50",
+        "0.45"
+      ]
+    ]
+  },
+  "pony mount": {
+    "Model": "mount_pony",
+    "Crew": [
+      [
+        "0.0",
+        "0.36",
+        "0.36"
+      ]
+    ]
+  },
+  "mount_rhinox": {
+    "Model": "mount_rhinox",
+    "Crew": [
+      [
+        "0.0",
+        "0.80",
+        "0.95"
+      ]
+    ]
+  },
+  "super eorlingas horse": {
+    "Model": "mount_eorlingas_horse",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.38"
+      ]
+    ]
+  },
+  "eagle": {
+    "Model": "mount_eagle",
+    "Crew": [
+      [
+        "0.00",
+        "0.78",
+        "0.52"
+      ]
+    ]
+  },
+  "drake_broodlings": {
+    "Model": "drake_broodlings",
+    "Crew": [
+      [
+        "0.05",
+        "1.37",
+        "1.35"
+      ],
+      [
+        "-0.02",
+        "0.18",
+        "0.7"
+      ]
+    ]
+  },
+  "elephant_cannon": {
+    "Model": "mount_elephant_cannon",
+    "Crew": [
+      [
+        "0.0",
+        "3.8",
+        "2.35"
+      ],
+      [
+        "0.2",
+        "0.5",
+        "6.18"
+      ],
+      [
+        "-0.55",
+        "-0.2",
+        "6.18"
+      ],
+      [
+        ".55",
+        "-0.2",
+        "6.18"
+      ],
+      [
+        "-2.35",
+        "-0.2",
+        "1.65"
+      ],
+      [
+        "-2.35",
+        "1.0",
+        "1.65"
+      ],
+      [
+        "2.35",
+        "-0.2",
+        "1.65"
+      ],
+      [
+        "2.35",
+        "1.0",
+        "1.65"
+      ],
+      [
+        "-1.3",
+        "-0.6",
+        "3.5"
+      ],
+      [
+        "-1.4",
+        "1.3",
+        "3.5"
+      ],
+      [
+        "1.3",
+        "-0.6",
+        "3.5"
+      ],
+      [
+        "1.4",
+        "1.3",
+        "3.5"
+      ],
+      [
+        "0.0",
+        "-1.6",
+        "3.5"
+      ],
+      [
+        "0.0",
+        "2.4",
+        "3.5"
+      ]
+    ]
+  },
+  "scythedchariot_sel": {
+    "Model": "banzai_mount_scythed_chariot_seleucid",
+    "Crew": [
+      [
+        "0.0",
+        "0.6",
+        "-0.9"
+      ],
+      [
+        "0.5",
+        "-0.4",
+        "-0.9"
+      ],
+      [
+        "-0.5",
+        "-0.4",
+        "-0.9"
+      ]
+    ]
+  },
+  "rhov_chariot": {
+    "Model": "rhov_chariot",
+    "Crew": [
+      [
+        "0.0",
+        "0.6",
+        "-0.9"
+      ],
+      [
+        "0.5",
+        "-0.4",
+        "-0.9"
+      ],
+      [
+        "-0.5",
+        "-0.4",
+        "-0.9"
+      ]
+    ]
+  },
+  "shire_chariot": {
+    "Model": "shire_chariot",
+    "Crew": [
+      [
+        "0.0",
+        "0.6",
+        "-1.05"
+      ],
+      [
+        "1.0",
+        "0.2",
+        "-1.05"
+      ],
+      [
+        "-1.0",
+        "0.2",
+        "-1.05"
+      ],
+      [
+        "0.0",
+        "-0.4",
+        "-0.15"
+      ]
+    ]
+  },
+  "fast pony": {
+    "Model": "mount_fast_pony",
+    "Crew": [
+      [
+        "0.0",
+        "0.70",
+        "0.2"
+      ]
+    ]
+  },
+  "dwarven_chariot_sel": {
+    "Model": "banzai_mount_scythed_chariot_seleuci3",
+    "Crew": [
+      [
+        "0.0",
+        "0.6",
+        "-1.05"
+      ],
+      [
+        "1.0",
+        "0.2",
+        "-1.05"
+      ],
+      [
+        "-1.0",
+        "0.2",
+        "-1.05"
+      ],
+      [
+        "0.0",
+        "-0.4",
+        "-0.15"
+      ]
+    ]
+  },
+  "gorgoroth_beast": {
+    "Model": "mount_gorgoroth_beast",
+    "Crew": [
+      [
+        "-0.1",
+        "1.95",
+        "1.5"
+      ],
+      [
+        "-0.08",
+        "0.6",
+        "1.72"
+      ],
+      [
+        "0.08",
+        "-.6",
+        "1.62"
+      ],
+      [
+        "1.2",
+        "0.6",
+        "1.12"
+      ],
+      [
+        "1.3",
+        "-.6",
+        "1.02"
+      ],
+      [
+        "-1.2",
+        "0.6",
+        "1.12"
+      ],
+      [
+        "-1.3",
+        "-.6",
+        "1.02"
+      ]
+    ]
+  },
+  "mount wolf": {
+    "Model": "mount_wolf",
+    "Crew": [
+      [
+        "0.05",
+        "1.37",
+        "1.52"
+      ],
+      [
+        "0.25",
+        "1.27",
+        "1.72"
+      ],
+      [
+        "0.45",
+        "1.47",
+        "1.92"
+      ]
+    ]
+  },
+  "huge_bombard": {
+    "Model": "siege_engines/siege_dragoncannon_lod0.glb",
+    "Crew": [
+      [
+        "2.5",
+        "5",
+        "0"
+      ],
+      [
+        "-2.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "rocket_launcher": {
+    "Model": "siege_engines/rocket_launcher.glb",
+    "Crew": [
+      [
+        "0.75",
+        "1.5",
+        "0"
+      ],
+      [
+        "-0.75",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "fireworks_cart": {
+    "Model": "siege_engines/fireworks_cart_lod0.glb",
+    "Crew": [
+      [
+        "0.75",
+        "1.5",
+        "0"
+      ],
+      [
+        "-0.75",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "monster_ribault": {
+    "Model": "siege_engines/siege_monster_ribault.glb",
+    "Crew": [
+      [
+        "1.0",
+        "1.5",
+        "0"
+      ],
+      [
+        "-1.0",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "culverin": {
+    "Model": "siege_engines/culverin.glb",
+    "Crew": [
+      [
+        "0.6",
+        "0.1",
+        "0"
+      ],
+      [
+        "-0.6",
+        "0.1",
+        "0"
+      ]
+    ]
+  },
+  "serpentine": {
+    "Model": "siege_engines/siege_serpentine.glb",
+    "Crew": [
+      [
+        "0.5",
+        "1.5",
+        "0"
+      ],
+      [
+        "-0.5",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "southern_catapult": {
+    "Model": "siege_engines/dwarven_catapult.glb",
+    "Crew": [
+      [
+        "2.0",
+        "1.5",
+        "0"
+      ],
+      [
+        "-2.0",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "northern_catapult": {
+    "Model": "siege_engines/catapult.glb",
+    "Crew": [
+      [
+        "2.0",
+        "1.5",
+        "0"
+      ],
+      [
+        "-2.0",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "mesoamerican_catapult": {
+    "Model": "siege_engines/catapult.glb",
+    "Crew": [
+      [
+        "2.0",
+        "1.5",
+        "0"
+      ],
+      [
+        "-2.0",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "greek_catapult": {
+    "Model": "siege_engines/catapult.glb",
+    "Crew": [
+      [
+        "2.0",
+        "1.5",
+        "0"
+      ],
+      [
+        "-2.0",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "middle_eastern_catapult": {
+    "Model": "siege_engines/catapult.glb",
+    "Crew": [
+      [
+        "2.0",
+        "1.5",
+        "0"
+      ],
+      [
+        "-2.0",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "gondor_catapult": {
+    "Model": "siege_engines/catapult.glb",
+    "Crew": [
+      [
+        "2.0",
+        "1.5",
+        "0"
+      ],
+      [
+        "-2.0",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "eastern_catapult": {
+    "Model": "siege_engines/mordor_catapult.glb",
+    "Crew": [
+      [
+        "2.0",
+        "1.5",
+        "0"
+      ],
+      [
+        "-2.0",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "ibombard": {
+    "Model": "siege_engines/ibombard.glb",
+    "Crew": [
+      [
+        "0.7",
+        "1.5",
+        "0"
+      ],
+      [
+        "-0.7",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "bombard": {
+    "Model": "siege_engines/siege_bombard.glb",
+    "Crew": [
+      [
+        "0.7",
+        "1.5",
+        "0"
+      ],
+      [
+        "-0.7",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "mortar": {
+    "Model": "siege_engines/siege_mortar.glb",
+    "Crew": [
+      [
+        "0.6",
+        "1.5",
+        "0"
+      ],
+      [
+        "-0.6",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "basilisk": {
+    "Model": "siege_engines/basilisk_idle.glb",
+    "Crew": [
+      [
+        "1.0",
+        "5",
+        "0"
+      ],
+      [
+        "-1.0",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "southern_ballista": {
+    "Model": "siege_engines/siege_ballista.glb",
+    "Crew": [
+      [
+        "1.7",
+        "5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "windlance": {
+    "Model": "siege_engines/dale_ballista_lod0.glb",
+    "Crew": [
+      [
+        "1.7",
+        "5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "northern_ballista": {
+    "Model": "siege_engines/siege_ballista.glb",
+    "Crew": [
+      [
+        "1.7",
+        "5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "mesoamerican_ballista": {
+    "Model": "siege_engines/siege_ballista.glb",
+    "Crew": [
+      [
+        "1.7",
+        "5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "greek_ballista": {
+    "Model": "siege_engines/siege_ballista.glb",
+    "Crew": [
+      [
+        "1.7",
+        "5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "middle_eastern_ballista": {
+    "Model": "siege_engines/siege_ballista.glb",
+    "Crew": [
+      [
+        "1.7",
+        "5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "gondor_ballista": {
+    "Model": "siege_engines/siege_ballista.glb",
+    "Crew": [
+      [
+        "1.7",
+        "5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "erebor_ballista": {
+    "Model": "siege_engines/erebor_ballista_lod0.glb",
+    "Crew": [
+      [
+        "1.9",
+        "5",
+        "0"
+      ],
+      [
+        "-1.9",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "isengard_ballista": {
+    "Model": "siege_engines/isengard_ballista.glb",
+    "Crew": [
+      [
+        "1.9",
+        "5",
+        "0"
+      ],
+      [
+        "-1.9",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "orcs_ballista": {
+    "Model": "siege_engines/mordor_ballista.glb",
+    "Crew": [
+      [
+        "1.7",
+        "5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "great_bombard": {
+    "Model": "siege_engines/grand_bombard_rig.glb",
+    "Crew": [
+      [
+        "0.5",
+        "5",
+        "0"
+      ],
+      [
+        "-0.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "southern_trebuchet": {
+    "Model": "siege_engines/siege_trebuchet.glb",
+    "Crew": [
+      [
+        "1.5",
+        "5",
+        "0"
+      ],
+      [
+        "-1.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "northern_trebuchet": {
+    "Model": "siege_engines/siege_trebuchet.glb",
+    "Crew": [
+      [
+        "1.5",
+        "5",
+        "0"
+      ],
+      [
+        "-1.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "mesoamerican_trebuchet": {
+    "Model": "siege_engines/siege_trebuchet.glb",
+    "Crew": [
+      [
+        "1.5",
+        "5",
+        "0"
+      ],
+      [
+        "-1.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "greek_trebuchet": {
+    "Model": "siege_engines/siege_trebuchet.glb",
+    "Crew": [
+      [
+        "1.5",
+        "5",
+        "0"
+      ],
+      [
+        "-1.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "middle_eastern_trebuchet": {
+    "Model": "siege_engines/siege_trebuchet.glb",
+    "Crew": [
+      [
+        "1.5",
+        "5",
+        "0"
+      ],
+      [
+        "-1.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "gondor_trebuchet": {
+    "Model": "siege_engines/siege_gondor_trebuchet.glb",
+    "Crew": [
+      [
+        "1.5",
+        "5",
+        "0"
+      ],
+      [
+        "-1.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "eastern_trebuchet": {
+    "Model": "siege_engines/siege_trebuchet.glb",
+    "Crew": [
+      [
+        "1.5",
+        "5",
+        "0"
+      ],
+      [
+        "-1.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "mangonel": {
+    "Model": "siege_engines/mangonel.glb",
+    "Crew": [
+      [
+        "1.5",
+        "5",
+        "0"
+      ],
+      [
+        "-1.5",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "cannon": {
+    "Model": "siege_engines/siege_cannon.glb",
+    "Crew": [
+      [
+        "0.5",
+        "1.5",
+        "0"
+      ],
+      [
+        "-0.5",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "ribault": {
+    "Model": "siege_engines/small_ribault.glb",
+    "Crew": [
+      [
+        "1",
+        "5",
+        "0"
+      ],
+      [
+        "-1",
+        "5",
+        "0"
+      ]
+    ]
+  },
+  "great_cross": {
+    "Model": "siege_engines/great_cross_standard.glb",
+    "Crew": [
+      [
+        "1.7",
+        "1.5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "great_standart_milan": {
+    "Model": "siege_engines/great_bell_tower_standard_milan.glb",
+    "Crew": [
+      [
+        "1.6",
+        "1.5",
+        "0"
+      ],
+      [
+        "-1.6",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "dol_guldur_tower": {
+    "Model": "siege_engines/dol_guldur_tower_lod0.glb",
+    "Crew": [
+      [
+        "1.6",
+        "1.5",
+        "0"
+      ],
+      [
+        "-1.6",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "great_standart_venice": {
+    "Model": "siege_engines/great_bell_tower_standard_venice.glb",
+    "Crew": [
+      [
+        "1.6",
+        "1.5",
+        "0"
+      ],
+      [
+        "-1.6",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "siege_tower": {
+    "Model": "siege_engines/dwarven_small_siege_tower.glb",
+    "Crew": [
+      [
+        "3.6",
+        "7.2",
+        "0"
+      ],
+      [
+        "-3.6",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "northmen_siege_tower": {
+    "Model": "siege_engines/siege_tower_small.glb",
+    "Crew": [
+      [
+        "3.6",
+        "7.2",
+        "0"
+      ],
+      [
+        "-3.6",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "meso_siege_tower": {
+    "Model": "siege_engines/siege_tower_small.glb",
+    "Crew": [
+      [
+        "3.6",
+        "7.2",
+        "0"
+      ],
+      [
+        "-3.6",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "elven_siege_tower": {
+    "Model": "siege_engines/elven_small_siege_tower.glb",
+    "Crew": [
+      [
+        "3.6",
+        "7.2",
+        "0"
+      ],
+      [
+        "-3.6",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "eastern_siege_tower": {
+    "Model": "siege_engines/siege_tower_small.glb",
+    "Crew": [
+      [
+        "3.6",
+        "7.2",
+        "0"
+      ],
+      [
+        "-3.6",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "gondor_siege_tower": {
+    "Model": "siege_engines/siege_tower_small.glb",
+    "Crew": [
+      [
+        "3.6",
+        "7.2",
+        "0"
+      ],
+      [
+        "-3.6",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "mordor_siege_tower": {
+    "Model": "siege_engines/mordor_tower_small.glb",
+    "Crew": [
+      [
+        "3.6",
+        "7.2",
+        "0"
+      ],
+      [
+        "-3.6",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "middle_tower": {
+    "Model": "siege_engines/dwarven_high_siege_tower.glb",
+    "Crew": [
+      [
+        "4",
+        "7.2",
+        "0"
+      ],
+      [
+        "-4",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "northmen_middle_tower": {
+    "Model": "siege_engines/siege_tower_town_high.glb",
+    "Crew": [
+      [
+        "4",
+        "7.2",
+        "0"
+      ],
+      [
+        "-4",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "meso_middle_tower": {
+    "Model": "siege_engines/siege_tower_town_high.glb",
+    "Crew": [
+      [
+        "4",
+        "7.2",
+        "0"
+      ],
+      [
+        "-4",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "elven_middle_tower": {
+    "Model": "siege_engines/elven_high_siege_tower.glb",
+    "Crew": [
+      [
+        "4",
+        "7.2",
+        "0"
+      ],
+      [
+        "-4",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "eastern_middle_tower": {
+    "Model": "siege_engines/siege_tower_town_high.glb",
+    "Crew": [
+      [
+        "4",
+        "7.2",
+        "0"
+      ],
+      [
+        "-4",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "gondor_middle_tower": {
+    "Model": "siege_engines/siege_tower_town_high.glb",
+    "Crew": [
+      [
+        "4",
+        "7.2",
+        "0"
+      ],
+      [
+        "-4",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "mordor_middle_tower": {
+    "Model": "siege_engines/mordor_tower_town_high.glb",
+    "Crew": [
+      [
+        "4",
+        "7.2",
+        "0"
+      ],
+      [
+        "-4",
+        "7.2",
+        "0"
+      ]
+    ]
+  },
+  "heliopolis": {
+    "Model": "siege_engines/dwarven_big_siege_tower.glb",
+    "Crew": [
+      [
+        "3.0",
+        "12.5",
+        "0"
+      ],
+      [
+        "-3.0",
+        "12.5",
+        "0"
+      ]
+    ]
+  },
+  "northmen_heliopolis": {
+    "Model": "siege_engines/siege_tower_big.glb",
+    "Crew": [
+      [
+        "3.0",
+        "12.5",
+        "0"
+      ],
+      [
+        "-3.0",
+        "12.5",
+        "0"
+      ]
+    ]
+  },
+  "meso_heliopolis": {
+    "Model": "siege_engines/siege_tower_big.glb",
+    "Crew": [
+      [
+        "3.0",
+        "12.5",
+        "0"
+      ],
+      [
+        "-3.0",
+        "12.5",
+        "0"
+      ]
+    ]
+  },
+  "elven_heliopolis": {
+    "Model": "siege_engines/elven_big_siege_tower.glb",
+    "Crew": [
+      [
+        "3.0",
+        "12.5",
+        "0"
+      ],
+      [
+        "-3.0",
+        "12.5",
+        "0"
+      ]
+    ]
+  },
+  "eastern_heliopolis": {
+    "Model": "siege_engines/siege_tower_big.glb",
+    "Crew": [
+      [
+        "3.0",
+        "12.5",
+        "0"
+      ],
+      [
+        "-3.0",
+        "12.5",
+        "0"
+      ]
+    ]
+  },
+  "gondor_heliopolis": {
+    "Model": "siege_engines/siege_tower_big.glb",
+    "Crew": [
+      [
+        "3.0",
+        "12.5",
+        "0"
+      ],
+      [
+        "-3.0",
+        "12.5",
+        "0"
+      ]
+    ]
+  },
+  "mordor_heliopolis": {
+    "Model": "siege_engines/mordor_tower_big.glb",
+    "Crew": [
+      [
+        "3.0",
+        "12.5",
+        "0"
+      ],
+      [
+        "-3.0",
+        "12.5",
+        "0"
+      ]
+    ]
+  },
+  "southern_ram": {
+    "Model": "siege_engines/ram_model_v2.glb",
+    "Crew": [
+      [
+        "1.0",
+        "5.0",
+        "0"
+      ],
+      [
+        "-1.0",
+        "5.0",
+        "0"
+      ]
+    ]
+  },
+  "northmen_ram": {
+    "Model": "siege_engines/ram_model_v2.glb",
+    "Crew": [
+      [
+        "1.0",
+        "5.0",
+        "0"
+      ],
+      [
+        "-1.0",
+        "5.0",
+        "0"
+      ]
+    ]
+  },
+  "mesoamerican_ram": {
+    "Model": "siege_engines/ram_model_v2.glb",
+    "Crew": [
+      [
+        "1.0",
+        "5.0",
+        "0"
+      ],
+      [
+        "-1.0",
+        "5.0",
+        "0"
+      ]
+    ]
+  },
+  "greek_ram": {
+    "Model": "siege_engines/elven_ram.glb",
+    "Crew": [
+      [
+        "1.0",
+        "5.0",
+        "0"
+      ],
+      [
+        "-1.0",
+        "5.0",
+        "0"
+      ]
+    ]
+  },
+  "middle_eastern_ram": {
+    "Model": "siege_engines/ram_model_v2.glb",
+    "Crew": [
+      [
+        "1.0",
+        "5.0",
+        "0"
+      ],
+      [
+        "-1.0",
+        "5.0",
+        "0"
+      ]
+    ]
+  },
+  "gondor_ram": {
+    "Model": "siege_engines/ram_model_v2.glb",
+    "Crew": [
+      [
+        "1.0",
+        "5.0",
+        "0"
+      ],
+      [
+        "-1.0",
+        "5.0",
+        "0"
+      ]
+    ]
+  },
+  "mordor_ram": {
+    "Model": "siege_engines/ram_mordor_med.glb",
+    "Crew": [
+      [
+        "2.0",
+        "5.0",
+        "0"
+      ],
+      [
+        "-2.0",
+        "5.0",
+        "0"
+      ]
+    ]
+  },
+  "southern_town_ladder": {
+    "Model": "siege_engines/siege_ladder_small.glb",
+    "Crew": [
+      [
+        "1.0",
+        "11.7",
+        "0"
+      ],
+      [
+        "-1.0",
+        "11.7",
+        "0"
+      ]
+    ]
+  },
+  "northern_town_ladder": {
+    "Model": "siege_engines/siege_ladder_small.glb",
+    "Crew": [
+      [
+        "1.0",
+        "11.7",
+        "0"
+      ],
+      [
+        "-1.0",
+        "11.7",
+        "0"
+      ]
+    ]
+  },
+  "mesoamerican_town_ladder": {
+    "Model": "siege_engines/siege_ladder_small.glb",
+    "Crew": [
+      [
+        "1.0",
+        "11.7",
+        "0"
+      ],
+      [
+        "-1.0",
+        "11.7",
+        "0"
+      ]
+    ]
+  },
+  "greek_town_ladder": {
+    "Model": "siege_engines/siege_ladder_small.glb",
+    "Crew": [
+      [
+        "1.0",
+        "11.7",
+        "0"
+      ],
+      [
+        "-1.0",
+        "11.7",
+        "0"
+      ]
+    ]
+  },
+  "middle_eastern_town_ladder": {
+    "Model": "siege_engines/siege_ladder_small.glb",
+    "Crew": [
+      [
+        "1.0",
+        "11.7",
+        "0"
+      ],
+      [
+        "-1.0",
+        "11.7",
+        "0"
+      ]
+    ]
+  },
+  "gondor_town_ladder": {
+    "Model": "siege_engines/siege_ladder_small.glb",
+    "Crew": [
+      [
+        "1.0",
+        "11.7",
+        "0"
+      ],
+      [
+        "-1.0",
+        "11.7",
+        "0"
+      ]
+    ]
+  },
+  "eastern_town_ladder": {
+    "Model": "siege_engines/siege_ladder_isengard_small.glb",
+    "Crew": [
+      [
+        "1.0",
+        "11.7",
+        "0"
+      ],
+      [
+        "-1.0",
+        "11.7",
+        "0"
+      ]
+    ]
+  },
+  "southern_medium_ladder": {
+    "Model": "siege_engines/siege_ladder_medium.glb",
+    "Crew": [
+      [
+        "0.5",
+        "13.12",
+        "0"
+      ],
+      [
+        "-0.5",
+        "13.12",
+        "0"
+      ]
+    ]
+  },
+  "northern_medium_ladder": {
+    "Model": "siege_engines/siege_ladder_medium.glb",
+    "Crew": [
+      [
+        "0.5",
+        "13.12",
+        "0"
+      ],
+      [
+        "-0.5",
+        "13.12",
+        "0"
+      ]
+    ]
+  },
+  "mesoamerican_medium_ladder": {
+    "Model": "siege_engines/siege_ladder_medium.glb",
+    "Crew": [
+      [
+        "0.5",
+        "13.12",
+        "0"
+      ],
+      [
+        "-0.5",
+        "13.12",
+        "0"
+      ]
+    ]
+  },
+  "greek_medium_ladder": {
+    "Model": "siege_engines/siege_ladder_medium.glb",
+    "Crew": [
+      [
+        "0.5",
+        "13.12",
+        "0"
+      ],
+      [
+        "-0.5",
+        "13.12",
+        "0"
+      ]
+    ]
+  },
+  "middle_eastern_medium_ladder": {
+    "Model": "siege_engines/siege_ladder_medium.glb",
+    "Crew": [
+      [
+        "0.5",
+        "13.12",
+        "0"
+      ],
+      [
+        "-0.5",
+        "13.12",
+        "0"
+      ]
+    ]
+  },
+  "gondor_medium_ladder": {
+    "Model": "siege_engines/siege_ladder_medium.glb",
+    "Crew": [
+      [
+        "0.5",
+        "13.12",
+        "0"
+      ],
+      [
+        "-0.5",
+        "13.12",
+        "0"
+      ]
+    ]
+  },
+  "eastern_medium_ladder": {
+    "Model": "siege_engines/siege_ladder_isengard_medium.glb",
+    "Crew": [
+      [
+        "0.5",
+        "13.12",
+        "0"
+      ],
+      [
+        "-0.5",
+        "13.12",
+        "0"
+      ]
+    ]
+  },
+  "great_cross_jerusalem": {
+    "Model": "siege_engines/great_cross_standard_jerusalem.glb",
+    "Crew": [
+      [
+        "1.7",
+        "1.5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "1.5",
+        "0"
+      ]
+    ]
+  },
+  "great_cross_antioch": {
+    "Model": "siege_engines/great_cross_standard_antioch.glb",
+    "Crew": [
+      [
+        "1.7",
+        "1.5",
+        "0"
+      ],
+      [
+        "-1.7",
+        "1.5",
+        "0"
+      ]
+    ]
+  }
+}

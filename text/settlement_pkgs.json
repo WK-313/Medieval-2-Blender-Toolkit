@@ -1,0 +1,1820 @@
+{
+  "dains_halls_a.worldpkgdesc": {
+    "name": "dain's halls",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\castles\\castle\\dains_halls_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\castles\\castle\\dains_halls_a.worldpkgdesc"
+  },
+  "Iron_Hills.worldpkgdesc": {
+    "name": "iron_hills",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\castles\\fortress\\iron_hills.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\castles\\fortress\\Iron_Hills.worldpkgdesc"
+  },
+  "Moria.worldpkgdesc": {
+    "name": "kaza_dum",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\castles\\large_castle\\moria.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\castles\\large_castle\\Moria.worldpkgdesc"
+  },
+  "Zagh_Kala.worldpkgdesc": {
+    "name": "zagh_kala",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\castles\\wooden_castle\\zagh_kala.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\castles\\wooden_castle\\Zagh_Kala.worldpkgdesc"
+  },
+  "buzra_dum_a.worldpkgdesc": {
+    "name": "buzra-dm",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\settlements\\city\\buzra_dum_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\settlements\\city\\buzra_dum_a.worldpkgdesc"
+  },
+  "erebor_a.worldpkgdesc": {
+    "name": "erebor",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\settlements\\huge_city\\erebor_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\settlements\\huge_city\\erebor_a.worldpkgdesc"
+  },
+  "thorins_halls.worldpkgdesc": {
+    "name": "thorin's halls",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\settlements\\large_city\\thorins_halls.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\settlements\\large_city\\thorins_halls.worldpkgdesc"
+  },
+  "dwarven_large_town_a.worldpkgdesc": {
+    "name": "dwarven_large_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\settlements\\large_town\\dwarven_large_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\settlements\\large_town\\dwarven_large_town_a.worldpkgdesc"
+  },
+  "dwarven_town_a.worldpkgdesc": {
+    "name": "dwarven_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\settlements\\town\\dwarven_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\settlements\\town\\dwarven_town_a.worldpkgdesc"
+  },
+  "dwarven_village_a.worldpkgdesc": {
+    "name": "dwarven_village_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\dwarves\\settlements\\village\\dwarven_village_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\dwarves\\settlements\\village\\dwarven_village_a.worldpkgdesc"
+  },
+  "mithlond.worldpkgdesc": {
+    "name": "mithlond",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\castles\\castle\\mithlond.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\castles\\castle\\mithlond.worldpkgdesc"
+  },
+  "elven_fort_a.worldpkgdesc": {
+    "name": "ost_in_edhil_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\unique_settlements\\ost_in_edhil\\ost_in_edhil_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\castles\\fort\\elven_fort_a.worldpkgdesc"
+  },
+  "barad_eithel_a.worldpkgdesc": {
+    "name": "barad eithel",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\castles\\fortress\\barad_eithel_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\castles\\fortress\\barad_eithel_a.worldpkgdesc"
+  },
+  "thranduils_halls_a.worldpkgdesc": {
+    "name": "elvenking's halls",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\castles\\large_castle\\thranduils_halls_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\castles\\large_castle\\thranduils_halls_a.worldpkgdesc"
+  },
+  "rivendell_a.worldpkgdesc": {
+    "name": "rivendell_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\castles\\wooden_castle\\rivendell_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\castles\\wooden_castle\\rivendell_a.worldpkgdesc"
+  },
+  "elven_city_a.worldpkgdesc": {
+    "name": "elven_city_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\settlements\\city\\elven_city_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\settlements\\city\\elven_city_a.worldpkgdesc"
+  },
+  "barad_eithel_b.worldpkgdesc": {
+    "name": "barad eithel citadel",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\settlements\\huge_city\\barad_eithel_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\settlements\\huge_city\\barad_eithel_b.worldpkgdesc"
+  },
+  "caras_galadhon.worldpkgdesc": {
+    "name": "caras galadhon",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\settlements\\large_city\\caras_galadhon.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\settlements\\large_city\\caras_galadhon.worldpkgdesc"
+  },
+  "elven_large_town_a.worldpkgdesc": {
+    "name": "elven_large_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\settlements\\large_town\\elven_large_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\settlements\\large_town\\elven_large_town_a.worldpkgdesc"
+  },
+  "elven_town_a.worldpkgdesc": {
+    "name": "elven_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\settlements\\town\\elven_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\settlements\\town\\elven_town_a.worldpkgdesc"
+  },
+  "elven_village_a.worldpkgdesc": {
+    "name": "elven_village_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\elves\\settlements\\village\\elven_village_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\elves\\settlements\\village\\elven_village_a.worldpkgdesc"
+  },
+  "gobel_mirlond.worldpkgdesc": {
+    "name": "gobel mirlond",
+    "type": "settlement",
+    "world": "\\data\\settlements\\evil_men\\castles\\castle\\gobel_mirlond.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\evil_men\\castles\\castle\\gobel_mirlond.worldpkgdesc"
+  },
+  "lest.worldpkgdesc": {
+    "name": "lest",
+    "type": "settlement",
+    "world": "\\data\\settlements\\evil_men\\castles\\large_castle\\lest.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\evil_men\\castles\\large_castle\\lest.worldpkgdesc"
+  },
+  "caldun.worldpkgdesc": {
+    "name": "caldun",
+    "type": "settlement",
+    "world": "\\data\\settlements\\evil_men\\castles\\stone_keep\\caldun.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\evil_men\\castles\\stone_keep\\caldun.worldpkgdesc"
+  },
+  "caras_falathrim.worldpkgdesc": {
+    "name": "caras falathrim",
+    "type": "settlement",
+    "world": "\\data\\settlements\\evil_men\\settlements\\city\\caras_falathrim.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\evil_men\\settlements\\city\\caras_falathrim.worldpkgdesc"
+  },
+  "faen_obel.worldpkgdesc": {
+    "name": "faen'obel",
+    "type": "settlement",
+    "world": "\\data\\settlements\\evil_men\\settlements\\huge_city\\faen_obel.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\evil_men\\settlements\\huge_city\\faen_obel.worldpkgdesc"
+  },
+  "evil_men_large_town_a.worldpkgdesc": {
+    "name": "evil_men_large_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\evil_men\\settlements\\large_town\\evil_men_large_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\evil_men\\settlements\\large_town\\evil_men_large_town_a.worldpkgdesc"
+  },
+  "evil_men_town_a.worldpkgdesc": {
+    "name": "evil_men_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\evil_men\\settlements\\town\\evil_men_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\evil_men\\settlements\\town\\evil_men_town_a.worldpkgdesc"
+  },
+  "evil_men_village_a.worldpkgdesc": {
+    "name": "evil_men_village_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\evil_men\\settlements\\village\\evil_men_village_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\evil_men\\settlements\\village\\evil_men_village_a.worldpkgdesc"
+  },
+  "north_tharbad.worldpkgdesc": {
+    "name": "north tharbad",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\castles\\castle\\north_tharbad.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\castles\\castle\\north_tharbad.worldpkgdesc"
+  },
+  "amon_sul_ruins.worldpkgdesc": {
+    "name": "amon sl ruins",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\castles\\fort\\amon_sul_ruins.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\castles\\fort\\amon_sul_ruins.worldpkgdesc"
+  },
+  "minas_ithil.worldpkgdesc": {
+    "name": "minas ithil",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\castles\\fortress\\minas_ithil.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\castles\\fortress\\minas_ithil.worldpkgdesc"
+  },
+  "repaired_osgiliath_w.worldpkgdesc": {
+    "name": "repaired west osgiliath",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\castles\\large_castle\\repaired_osgiliath_w.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\castles\\large_castle\\repaired_osgiliath_w.worldpkgdesc"
+  },
+  "Cair_Andros.worldpkgdesc": {
+    "name": "cair andros",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\castles\\stone_keep\\cair_andros.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\castles\\stone_keep\\Cair_Andros.worldpkgdesc"
+  },
+  "ruined_osgiliath_w.worldpkgdesc": {
+    "name": "ruined west osgiliath",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\castles\\wooden_castle\\ruined_osgiliath_w.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\castles\\wooden_castle\\ruined_osgiliath_w.worldpkgdesc"
+  },
+  "gondor_city_a.worldpkgdesc": {
+    "name": "gondor_city_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\settlements\\city\\gondor_city_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\settlements\\city\\gondor_city_a.worldpkgdesc"
+  },
+  "minas_tirith_a.worldpkgdesc": {
+    "name": "minas_tirith_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\settlements\\huge_city\\minas_tirith_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\settlements\\huge_city\\minas_tirith_a.worldpkgdesc"
+  },
+  "Fornost.worldpkgdesc": {
+    "name": "fornost",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\settlements\\large_city\\fornost.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\settlements\\large_city\\Fornost.worldpkgdesc"
+  },
+  "gondor_large_town_a.worldpkgdesc": {
+    "name": "gondor_large_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\settlements\\large_town\\gondor_large_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\settlements\\large_town\\gondor_large_town_a.worldpkgdesc"
+  },
+  "gondor_town_a.worldpkgdesc": {
+    "name": "gondor_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\settlements\\town\\gondor_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\settlements\\town\\gondor_town_a.worldpkgdesc"
+  },
+  "gondor_village_a.worldpkgdesc": {
+    "name": "gondor_village_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\gondor\\settlements\\village\\gondor_village_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\gondor\\settlements\\village\\gondor_village_a.worldpkgdesc"
+  },
+  "amon_sul.worldpkgdesc": {
+    "name": "amon sl",
+    "type": "settlement",
+    "world": "\\data\\settlements\\middle_men\\castles\\castle\\amon_sul.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\middle_men\\castles\\castle\\amon_sul.worldpkgdesc"
+  },
+  "hornburg.worldpkgdesc": {
+    "name": "hornburg",
+    "type": "settlement",
+    "world": "\\data\\settlements\\middle_men\\castles\\large_castle\\hornburg.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\middle_men\\castles\\large_castle\\hornburg.worldpkgdesc"
+  },
+  "agamour.worldpkgdesc": {
+    "name": "agamour",
+    "type": "settlement",
+    "world": "\\data\\settlements\\middle_men\\castles\\stone_keep\\agamour.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\middle_men\\castles\\stone_keep\\agamour.worldpkgdesc"
+  },
+  "edoras.worldpkgdesc": {
+    "name": "edoras",
+    "type": "settlement",
+    "world": "\\data\\settlements\\middle_men\\castles\\wooden_castle\\edoras.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\middle_men\\castles\\wooden_castle\\edoras.worldpkgdesc"
+  },
+  "pelargir.worldpkgdesc": {
+    "name": "pelargir",
+    "type": "settlement",
+    "world": "\\data\\settlements\\middle_men\\settlements\\large_city\\pelargir.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\middle_men\\settlements\\large_city\\pelargir.worldpkgdesc"
+  },
+  "dol_amroth.worldpkgdesc": {
+    "name": "dol amroth",
+    "type": "settlement",
+    "world": "\\data\\settlements\\middle_men\\settlements\\huge_city\\dol_amroth.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\middle_men\\settlements\\huge_city\\dol_amroth.worldpkgdesc"
+  },
+  "middle_men_large_town_a.worldpkgdesc": {
+    "name": "middle_men_large_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\middle_men\\settlements\\large_town\\middle_men_large_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\middle_men\\settlements\\large_town\\middle_men_large_town_a.worldpkgdesc"
+  },
+  "middle_men_town_a.worldpkgdesc": {
+    "name": "middle_men_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\middle_men\\settlements\\town\\middle_men_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\middle_men\\settlements\\town\\middle_men_town_a.worldpkgdesc"
+  },
+  "hobbiton_a.worldpkgdesc": {
+    "name": "hobbiton",
+    "type": "settlement",
+    "world": "\\data\\settlements\\middle_men\\settlements\\village\\hobbiton_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\middle_men\\settlements\\village\\hobbiton_a.worldpkgdesc"
+  },
+  "south_tharbad.worldpkgdesc": {
+    "name": "south tharbad",
+    "type": "settlement",
+    "world": "\\data\\settlements\\northmen\\castles\\castle\\south_tharbad.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\northmen\\castles\\castle\\south_tharbad.worldpkgdesc"
+  },
+  "esgaroth_a.worldpkgdesc": {
+    "name": "esgaroth",
+    "type": "settlement",
+    "world": "\\data\\settlements\\northmen\\castles\\stone_keep\\esgaroth_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\northmen\\castles\\stone_keep\\esgaroth_a.worldpkgdesc"
+  },
+  "dor_rhunen.worldpkgdesc": {
+    "name": "dor rhunen",
+    "type": "settlement",
+    "world": "\\data\\settlements\\northmen\\settlements\\city\\dor_rhunen.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\northmen\\settlements\\city\\dor_rhunen.worldpkgdesc"
+  },
+  "dale.worldpkgdesc": {
+    "name": "dale",
+    "type": "settlement",
+    "world": "\\data\\settlements\\northmen\\settlements\\huge_city\\dale.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\northmen\\settlements\\huge_city\\dale.worldpkgdesc"
+  },
+  "Caras_Sant.worldpkgdesc": {
+    "name": "caras sant",
+    "type": "settlement",
+    "world": "\\data\\settlements\\northmen\\settlements\\large_city\\caras_sant.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\northmen\\settlements\\large_city\\Caras_Sant.worldpkgdesc"
+  },
+  "northmen_large_town_a.worldpkgdesc": {
+    "name": "northmen_large_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\northmen\\settlements\\large_town\\northmen_large_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\northmen\\settlements\\large_town\\northmen_large_town_a.worldpkgdesc"
+  },
+  "northmen_town_a.worldpkgdesc": {
+    "name": "northmen_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\northmen\\settlements\\town\\northmen_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\northmen\\settlements\\town\\northmen_town_a.worldpkgdesc"
+  },
+  "northmen_village_a.worldpkgdesc": {
+    "name": "northmen_village_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\northmen\\settlements\\village\\northmen_village_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\northmen\\settlements\\village\\northmen_village_a.worldpkgdesc"
+  },
+  "dol_guldur.worldpkgdesc": {
+    "name": "dol guldur",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\castles\\castle\\dol_guldur.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\castles\\castle\\dol_guldur.worldpkgdesc"
+  },
+  "minas_morgul.worldpkgdesc": {
+    "name": "minas morgul",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\castles\\fortress\\minas_morgul.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\castles\\fortress\\minas_morgul.worldpkgdesc"
+  },
+  "gundabad_a.worldpkgdesc": {
+    "name": "gundabad",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\castles\\large_castle\\gundabad_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\castles\\large_castle\\gundabad_a.worldpkgdesc"
+  },
+  "Cirith_Ungol.worldpkgdesc": {
+    "name": "cirith ungol",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\castles\\stone_keep\\cirith_ungol.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\castles\\stone_keep\\Cirith_Ungol.worldpkgdesc"
+  },
+  "goblin_town.worldpkgdesc": {
+    "name": "goblin-town",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\castles\\wooden_castle\\goblin_town.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\castles\\wooden_castle\\goblin_town.worldpkgdesc"
+  },
+  "isengard.worldpkgdesc": {
+    "name": "isengard",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\settlements\\city\\isengard.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\settlements\\city\\isengard.worldpkgdesc"
+  },
+  "barad_dur_a.worldpkgdesc": {
+    "name": "barad-dr",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\settlements\\huge_city\\barad_dur_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\settlements\\huge_city\\barad_dur_a.worldpkgdesc"
+  },
+  "carn_dum_a.worldpkgdesc": {
+    "name": "carn dm",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\settlements\\large_city\\carn_dum_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\settlements\\large_city\\carn_dum_a.worldpkgdesc"
+  },
+  "orc_large_town_a.worldpkgdesc": {
+    "name": "orc_large_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\settlements\\large_town\\orc_large_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\settlements\\large_town\\orc_large_town_a.worldpkgdesc"
+  },
+  "orc_town_a.worldpkgdesc": {
+    "name": "orc_town_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\settlements\\town\\orc_town_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\settlements\\town\\orc_town_a.worldpkgdesc"
+  },
+  "orc_village_a.worldpkgdesc": {
+    "name": "orc_village_a",
+    "type": "settlement",
+    "world": "\\data\\settlements\\orcs\\settlements\\village\\orc_village_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\orcs\\settlements\\village\\orc_village_a.worldpkgdesc"
+  },
+  "Arnor_Camp_01.worldpkgdesc": {
+    "name": "arnor_camp_01",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\arnor_camp_01\\arnor_camp_01.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Arnor_Camp_01\\Arnor_Camp_01.worldpkgdesc"
+  },
+  "Arnor_Camp_02.worldpkgdesc": {
+    "name": "arnor_camp_02",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\arnor_camp_02\\arnor_camp_02.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Arnor_Camp_02\\Arnor_Camp_02.worldpkgdesc"
+  },
+  "Arnor_Camp_03.worldpkgdesc": {
+    "name": "arnor_camp_03",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\arnor_camp_03\\arnor_camp_03.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Arnor_Camp_03\\Arnor_Camp_03.worldpkgdesc"
+  },
+  "Arnor_Ruins_01.worldpkgdesc": {
+    "name": "arnor_ruins_01",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\arnor_ruins_01\\arnor_ruins_01.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Arnor_Ruins_01\\Arnor_Ruins_01.worldpkgdesc"
+  },
+  "Arnor_Ruins_02.worldpkgdesc": {
+    "name": "arnor_ruins_02",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\arnor_ruins_02\\arnor_ruins_02.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Arnor_Ruins_02\\Arnor_Ruins_02.worldpkgdesc"
+  },
+  "Arnor_ruin_statue.worldpkgdesc": {
+    "name": "arnor_ruin_statue",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\arnor_ruin_statue\\arnor_ruin_statue.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Arnor_ruin_statue\\Arnor_ruin_statue.worldpkgdesc"
+  },
+  "barbarian_armourer.worldpkgdesc": {
+    "name": "barbarian_armourer",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_armourer\\barbarian_armourer.worldcategorysmithdbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_armourer\\barbarian_armourer.worldpkgdesc"
+  },
+  "barbarian_bardic_circle.worldpkgdesc": {
+    "name": "barbarian_bardic_circle",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_bardic_circle3\\barbarian_bardic_circle.worldcategorytheaterdbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_bardic_circle3\\barbarian_bardic_circle.worldpkgdesc"
+  },
+  "barbarian_blacksmith.worldpkgdesc": {
+    "name": "barbarian_blacksmith",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_blacksmith\\barbarian_blacksmith.worldcategorysmithyculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_blacksmith\\barbarian_blacksmith.worldpkgdesc"
+  },
+  "barbarian_drink_hall.worldpkgdesc": {
+    "name": "barbarian_drink_hall",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_drink_hall\\barbarian_drink_hall.worldcategorychurchculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_drink_hall\\barbarian_drink_hall.worldpkgdesc"
+  },
+  "barbarian_drink_hall_wd.worldpkgdesc": {
+    "name": "barbarian_drink_hall",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_drink_hall\\barbarian_drink_hall.worldcategorychurchculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_drink_hall\\barbarian_drink_hall_wd.worldpkgdesc"
+  },
+  "barbarian_great_market.worldpkgdesc": {
+    "name": "barbarian_great_market",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_great_market\\barbarian_great_market.worldcategorymarketdbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_great_market3\\barbarian_great_market.worldpkgdesc"
+  },
+  "barbarian_high_king_hall.worldpkgdesc": {
+    "name": "barbarian_high_king_hall",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_high_king_hall3\\barbarian_high_king_hall.worldcategorybarracksdbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_high_king_hall3\\barbarian_high_king_hall.worldpkgdesc"
+  },
+  "barbarian_marketplace.worldpkgdesc": {
+    "name": "barbarian_marketplace",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_marketplace\\barbarian_marketplace.worldcategorymarketculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_marketplace\\barbarian_marketplace.worldpkgdesc"
+  },
+  "barbarian_mead_hall.worldpkgdesc": {
+    "name": "barbarian_mead_hall",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_mead_hall\\barbarian_mead_hall.worldcategorytavernculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_mead_hall\\barbarian_mead_hall.worldpkgdesc"
+  },
+  "barbarian_sacred_archway.worldpkgdesc": {
+    "name": "barbarian_sacred_archway",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_sacred_archway\\barbarian_sacred_archway.worldcategorytempledbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_sacred_archway\\barbarian_sacred_archway.worldpkgdesc"
+  },
+  "barbarian_sacred_grove.worldpkgdesc": {
+    "name": "barbarian_sacred_grove",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_sacred_grove\\barbarian_sacred_grove.worldcategorytempledbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_sacred_grove\\barbarian_sacred_grove.worldpkgdesc"
+  },
+  "barbarian_shrine.worldpkgdesc": {
+    "name": "barbarian_shrine",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_shrine\\barbarian_shrine.worldcategorytempledbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_shrine\\barbarian_shrine.worldpkgdesc"
+  },
+  "barbarian_smith_workshop.worldpkgdesc": {
+    "name": "barbarian_smith_workshop",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_smith_workshop\\barbarian_smith_workshop.worldcategorysmithyculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_smith_workshop\\barbarian_smith_workshop.worldpkgdesc"
+  },
+  "barbarian_stables.worldpkgdesc": {
+    "name": "barbarian_stables",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_stables\\barbarian_stables.worldcategorygenericculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_stables\\barbarian_stables.worldpkgdesc"
+  },
+  "barbarian_stone_henge.worldpkgdesc": {
+    "name": "barbarian_stone_henge",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_stone_henge\\barbarian_stone_henge.worldcategorytempledbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_stone_henge\\barbarian_stone_henge.worldpkgdesc"
+  },
+  "barbarian_tavern.worldpkgdesc": {
+    "name": "barbarian_tavern",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_tavern\\barbarian_tavern.worldcategorytavernculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_tavern\\barbarian_tavern.worldpkgdesc"
+  },
+  "barbarian_temple_of_viking_large_temple.worldpkgdesc": {
+    "name": "'barbarian_temple_of_viking_large_temple",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_sacred_archway\\barbarian_sacred_archway.worldcategorytempledbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_temple_of_viking_large_temple2\\barbarian_temple_of_viking_large_temple.worldpkgdesc"
+  },
+  "barbarian_temple_of_viking_shrine.worldpkgdesc": {
+    "name": "!barbarian_temple_of_viking_shrine",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_shrine\\barbarian_shrine.worldcategorytempledbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_temple_of_viking_shrine\\barbarian_temple_of_viking_shrine.worldpkgdesc"
+  },
+  "barbarian_temple_of_viking_temple.worldpkgdesc": {
+    "name": "!barbarian_temple_of_viking_temple",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_sacred_grove\\barbarian_sacred_grove.worldcategorytempledbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_temple_of_viking_temple\\barbarian_temple_of_viking_temple.worldpkgdesc"
+  },
+  "barbarian_trader.worldpkgdesc": {
+    "name": "barbarian_trader",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_trader\\barbarian_trader.worldcategorymarketculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_trader\\barbarian_trader.worldpkgdesc"
+  },
+  "barbarian_warlord_hall.worldpkgdesc": {
+    "name": "barbarian_warlord_hall",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_warlord_hall\\barbarian_warlord_hall.worldcategorypalacedbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_warlord_hall\\barbarian_warlord_hall.worldpkgdesc"
+  },
+  "barbarian_warlord_stables.worldpkgdesc": {
+    "name": "barbarian_warlord_stables",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_warlord_stables\\barbarian_warlord_stables.worldcategorystablesdbmculturenorthern_european.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\barbarian_warlord_stables\\barbarian_warlord_stables.worldpkgdesc"
+  },
+  "barbarian_warrior_hold.worldpkgdesc": {
+    "name": "barbarian_warrior_hold",
+    "type": "techtree",
+    "world": "\\data\\settlements\\techtree\\barbarian\\barbarian_warrior_hold\\barbarian_warrior_hold.worldcategorygenericculturemesoamerican.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\techtree\\barbarian\\barbarian_warrior_hold\\barbarian_warrior_hold.worldpkgdesc"
+  },
+  "corsair_fire_test_a.worldpkgdesc": {
+    "name": "corsair_fire-test-a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\corsair_fire_test_a\\corsair_fire_test_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\corsair_fire_test_a\\corsair_fire_test_a.worldpkgdesc"
+  },
+  "corsair_ship_a.worldpkgdesc": {
+    "name": "corsair_ship_a",
+    "type": "ambient",
+    "world": "\\data\\settlements\\gondor\\ambient_settlements\\corsair_ship\\corsair_ship_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\corsair_ship_a\\corsair_ship_a.worldpkgdesc"
+  },
+  "corsair_ship_a_wd.worldpkgdesc": {
+    "name": "corsair_ship_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\corsair_ship_a\\corsair_ship_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\corsair_ship_a\\corsair_ship_a_wd.worldpkgdesc"
+  },
+  "docked_elven_ship_a.worldpkgdesc": {
+    "name": "docked_elven_ship_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\docked_elven_ship_a\\docked_elven_ship_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\docked_elven_ship_a\\docked_elven_ship_a.worldpkgdesc"
+  },
+  "dwarven _scaffold_a.worldpkgdesc": {
+    "name": "dwarven _scaffold_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven _scaffold_a\\dwarven _scaffold_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven _scaffold_a\\dwarven _scaffold_a.worldpkgdesc"
+  },
+  "dwarven_archway_a.worldpkgdesc": {
+    "name": "dwarven_archway_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_archway_a\\dwarven_archway_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_archway_a\\dwarven_archway_a.worldpkgdesc"
+  },
+  "dwarven_back_a.worldpkgdesc": {
+    "name": "dwarven_back_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_back_a\\dwarven_back_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_back_a\\dwarven_back_a.worldpkgdesc"
+  },
+  "dwarven_back_c.worldpkgdesc": {
+    "name": "dwarven_back_c",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_back_c\\dwarven_back_c.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_back_c\\dwarven_back_c.worldpkgdesc"
+  },
+  "dwarven_bridge_a.worldpkgdesc": {
+    "name": "dwarven_bridge_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_bridge_a\\dwarven_bridge_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_bridge_a\\dwarven_bridge_a.worldpkgdesc"
+  },
+  "dwarven_building_A.worldpkgdesc": {
+    "name": "dwarven_building_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_building_a\\dwarven_building_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_building_a\\dwarven_building_A.worldpkgdesc"
+  },
+  "dwarven_building_B.worldpkgdesc": {
+    "name": "dwarven_building_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_building_b\\dwarven_building_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_building_B\\dwarven_building_B.worldpkgdesc"
+  },
+  "dwarven_building_C.worldpkgdesc": {
+    "name": "dwarven_building_c",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_building_c\\dwarven_building_c.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_building_C\\dwarven_building_C.worldpkgdesc"
+  },
+  "dwarven_building_D.worldpkgdesc": {
+    "name": "dwarven_building_d",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_building_d\\dwarven_building_d.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_building_D\\dwarven_building_D.worldpkgdesc"
+  },
+  "dwarven_citadel_A.worldpkgdesc": {
+    "name": "dwarven_citadel_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_citadel_a\\dwarven_citadel_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_citadel_A\\dwarven_citadel_A.worldpkgdesc"
+  },
+  "dwarven_emerald_statue_A.worldpkgdesc": {
+    "name": "dwarven_emerald_statue_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_emerald_statue_a\\dwarven_emerald_statue_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_emerald_statue_A\\dwarven_emerald_statue_A.worldpkgdesc"
+  },
+  "dwarven_fence_A.worldpkgdesc": {
+    "name": "dwarven_fence_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_fence_a\\dwarven_fence_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_fence_A\\dwarven_fence_A.worldpkgdesc"
+  },
+  "dwarven_intersection_A.worldpkgdesc": {
+    "name": "dwarven_intersection_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_intersection_a\\dwarven_intersection_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_intersection_A\\dwarven_intersection_A.worldpkgdesc"
+  },
+  "dwarven_pillars_A.worldpkgdesc": {
+    "name": "lava5_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\lava5\\lava5_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_pillars_A\\dwarven_pillars_A.worldpkgdesc"
+  },
+  "dwarven_pillars_A_wd.worldpkgdesc": {
+    "name": "dwarven_pillars_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_pillars_a\\dwarven_pillars_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_pillars_A\\dwarven_pillars_A_wd.worldpkgdesc"
+  },
+  "dwarven_pillar_E.worldpkgdesc": {
+    "name": "dwarven_pillar_e",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_pillar_e\\dwarven_pillar_e.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_pillar_E\\dwarven_pillar_E.worldpkgdesc"
+  },
+  "dwarven_roof_A.worldpkgdesc": {
+    "name": "dwarven_roof_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_roof_a\\dwarven_roof_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_roof_A\\dwarven_roof_A.worldpkgdesc"
+  },
+  "dwarven_staircase_A.worldpkgdesc": {
+    "name": "dwarven_staircase_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_staircase_a\\dwarven_staircase_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_staircase_A\\dwarven_staircase_A.worldpkgdesc"
+  },
+  "dwarven_statue_A.worldpkgdesc": {
+    "name": "dwarven_statue_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_statue_a\\dwarven_statue_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_statue_A\\dwarven_statue_A.worldpkgdesc"
+  },
+  "dwarven_statue_B.worldpkgdesc": {
+    "name": "dwarven_statue_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_statue_b\\dwarven_statue_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_statue_B\\dwarven_statue_B.worldpkgdesc"
+  },
+  "dwarven_statue_C.worldpkgdesc": {
+    "name": "dwarven_statue_c",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_statue_c\\dwarven_statue_c.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_statue_C\\dwarven_statue_C.worldpkgdesc"
+  },
+  "dwarven_statue_D.worldpkgdesc": {
+    "name": "dwarven_statue_d",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_statue_d\\dwarven_statue_d.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_statue_D\\dwarven_statue_D.worldpkgdesc"
+  },
+  "dwarven_statue_E.worldpkgdesc": {
+    "name": "dwarven_statue_e",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_statue_e\\dwarven_statue_e.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_statue_E\\dwarven_statue_E.worldpkgdesc"
+  },
+  "dwarven_statue_F.worldpkgdesc": {
+    "name": "dwarven_statue_f",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_statue_f\\dwarven_statue_f.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_statue_F\\dwarven_statue_F.worldpkgdesc"
+  },
+  "dwarven_tower_A.worldpkgdesc": {
+    "name": "dwarven_tower_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_tower_a\\dwarven_tower_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_tower_A\\dwarven_tower_A.worldpkgdesc"
+  },
+  "dwarven_tower_c.worldpkgdesc": {
+    "name": "dwarven_tower_c",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_tower_c\\dwarven_tower_c.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_tower_c\\dwarven_tower_c.worldpkgdesc"
+  },
+  "dwarven_tower_D.worldpkgdesc": {
+    "name": "dwarven_tower_d",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_tower_d\\dwarven_tower_d.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_tower_D\\dwarven_tower_D.worldpkgdesc"
+  },
+  "dwarven_tower_E.worldpkgdesc": {
+    "name": "dwarven_tower_e",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_tower_e\\dwarven_tower_e.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_tower_E\\dwarven_tower_E.worldpkgdesc"
+  },
+  "dwarven_walled_path_A.worldpkgdesc": {
+    "name": "dwarven_walled_path_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_walled_path_a\\dwarven_walled_path_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_walled_path_A\\dwarven_walled_path_A.worldpkgdesc"
+  },
+  "dwarven_wall_A.worldpkgdesc": {
+    "name": "dwarven_wall_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_wall_a\\dwarven_wall_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven_wall_A\\dwarven_wall_A.worldpkgdesc"
+  },
+  "Dwarven_wall_B.worldpkgdesc": {
+    "name": "dwarven_wall_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven_wall_b\\dwarven_wall_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Dwarven_wall_B\\Dwarven_wall_B.worldpkgdesc"
+  },
+  "dwarven__barracks_A.worldpkgdesc": {
+    "name": "dwarven__barracks_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarven__barracks_a\\dwarven__barracks_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarven__barracks_A\\dwarven__barracks_A.worldpkgdesc"
+  },
+  "dwarve_tower_G.worldpkgdesc": {
+    "name": "dwarven_tower_g",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\dwarve_tower_g\\dwarve_tower_g.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\dwarve_tower_G\\dwarve_tower_G.worldpkgdesc"
+  },
+  "East_building_piece.worldpkgdesc": {
+    "name": "east_building_piece",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\east_building_piece\\east_building_piece.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\East_building_piece\\East_building_piece.worldpkgdesc"
+  },
+  "East_Harbour.worldpkgdesc": {
+    "name": "east_harbour",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\east_harbour\\east_harbour.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\East_Harbour\\East_Harbour.worldpkgdesc"
+  },
+  "East_Temple.worldpkgdesc": {
+    "name": "east_temple",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\east_temple\\east_temple.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\East_Temple\\East_Temple.worldpkgdesc"
+  },
+  "elven_arch_tower_a.worldpkgdesc": {
+    "name": "elven_arch_tower_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_arch_tower_a\\elven_arch_tower_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_arch_tower_a\\elven_arch_tower_a.worldpkgdesc"
+  },
+  "elven_barracks_a.worldpkgdesc": {
+    "name": "elven_barracks_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_barracks_a\\elven_barracks_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_barracks_a\\elven_barracks_a.worldpkgdesc"
+  },
+  "elven_big_gatehouse.worldpkgdesc": {
+    "name": "elven_big_gatehouse",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_big_gatehouse\\elven_big_gatehouse.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_big_gatehouse\\elven_big_gatehouse.worldpkgdesc"
+  },
+  "elven_big_house_a.worldpkgdesc": {
+    "name": "elven_big_house_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_big_house_a\\elven_big_house_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_big_house_a\\elven_big_house_a.worldpkgdesc"
+  },
+  "elven_crane_a.worldpkgdesc": {
+    "name": "elven_crane_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_crane_a\\elven_crane_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_crane_a\\elven_crane_a.worldpkgdesc"
+  },
+  "elven_fortress.worldpkgdesc": {
+    "name": "elven_fortress",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_fortress\\elven_fortress.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_fortress\\elven_fortress.worldpkgdesc"
+  },
+  "elven_gatehouse_a.worldpkgdesc": {
+    "name": "elven_gatehouse_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_gatehouse_a\\elven_gatehouse_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_gatehouse_a\\elven_gatehouse_a.worldpkgdesc"
+  },
+  "elven_medium_tower_a.worldpkgdesc": {
+    "name": "elven_medium_tower_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_medium_tower_a\\elven_medium_tower_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_medium_tower_a\\elven_medium_tower_a.worldpkgdesc"
+  },
+  "elven_palace_a.worldpkgdesc": {
+    "name": "elven_palace_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_palace_a\\elven_palace_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_palace_a\\elven_palace_a.worldpkgdesc"
+  },
+  "elven_royal_tower.worldpkgdesc": {
+    "name": "elven_royal_tower",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_royal_tower\\elven_royal_tower.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_royal_tower\\elven_royal_tower.worldpkgdesc"
+  },
+  "elven_ship_a.worldpkgdesc": {
+    "name": "elven_ship_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_ship_a\\elven_ship_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_ship_a\\elven_ship_a.worldpkgdesc"
+  },
+  "elven_ship_b.worldpkgdesc": {
+    "name": "elven_ship_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_ship_b\\elven_ship_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_ship_b\\elven_ship_b.worldpkgdesc"
+  },
+  "elven_ship_c.worldpkgdesc": {
+    "name": "elven_ship_c",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_ship_c\\elven_ship_c.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_ship_c\\elven_ship_c.worldpkgdesc"
+  },
+  "elven_ship_d.worldpkgdesc": {
+    "name": "elven_ship_d",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_ship_d\\elven_ship_d.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_ship_d\\elven_ship_d.worldpkgdesc"
+  },
+  "elven_stable.worldpkgdesc": {
+    "name": "elven_stable",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_stable\\elven_stable.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_stable\\elven_stable.worldpkgdesc"
+  },
+  "elven_statue_a.worldpkgdesc": {
+    "name": "elven_statue_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_statue_a\\elven_statue_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_statue_a\\elven_statue_a.worldpkgdesc"
+  },
+  "elven_statue_b.worldpkgdesc": {
+    "name": "elven_statue_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_statue_b\\elven_statue_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_statue_b\\elven_statue_b.worldpkgdesc"
+  },
+  "elven_statue_c.worldpkgdesc": {
+    "name": "elven_statue_c",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_statue_c\\elven_statue_c.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_statue_c\\elven_statue_c.worldpkgdesc"
+  },
+  "elven_statue_d.worldpkgdesc": {
+    "name": "elven_statue_d",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_statue_d\\elven_statue_d.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_statue_d\\elven_statue_d.worldpkgdesc"
+  },
+  "elven_statue_e.worldpkgdesc": {
+    "name": "elven_statue_e",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_statue_e\\elven_statue_e.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_statue_e\\elven_statue_e.worldpkgdesc"
+  },
+  "elven_statue_f.worldpkgdesc": {
+    "name": "elven_statue_f",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_statue_f\\elven_statue_f.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_statue_f\\elven_statue_f.worldpkgdesc"
+  },
+  "elven_temple_a.worldpkgdesc": {
+    "name": "elven_temple_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_temple_a\\elven_temple_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_temple_a\\elven_temple_a.worldpkgdesc"
+  },
+  "elven_temple_a_wd.worldpkgdesc": {
+    "name": "elven_temple_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_temple_a\\elven_temple_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_temple_a\\elven_temple_a_wd.worldpkgdesc"
+  },
+  "elven_temple_b.worldpkgdesc": {
+    "name": "elven_temple_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_temple_b\\elven_temple_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_temple_b\\elven_temple_b.worldpkgdesc"
+  },
+  "elven_temple_small_a.worldpkgdesc": {
+    "name": "elven_temple_small_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_temple_small_a\\elven_temple_small_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_temple_small_a\\elven_temple_small_a.worldpkgdesc"
+  },
+  "elven_tower_c.worldpkgdesc": {
+    "name": "elven_tower_c",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_tower_c\\elven_tower_c.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_tower_c\\elven_tower_c.worldpkgdesc"
+  },
+  "elven_tower_house_a.worldpkgdesc": {
+    "name": "elven_tower_house_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_tower_house_a\\elven_tower_house_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_tower_house_a\\elven_tower_house_a.worldpkgdesc"
+  },
+  "elven_townhall.worldpkgdesc": {
+    "name": "elven_townhall",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_townhall\\elven_townhall.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_townhall\\elven_townhall.worldpkgdesc"
+  },
+  "elven_wall_a.worldpkgdesc": {
+    "name": "elven_wall_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_wall_a\\elven_wall_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_wall_a\\elven_wall_a.worldpkgdesc"
+  },
+  "elven_wall_b.worldpkgdesc": {
+    "name": "elven_wall_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\elven_wall_b\\elven_wall_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\elven_wall_b\\elven_wall_b.worldpkgdesc"
+  },
+  "fire_basket_a.worldpkgdesc": {
+    "name": "fire_basket_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\fire_basket_a\\fire_basket_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\fire_basket_a\\fire_basket_a.worldpkgdesc"
+  },
+  "Gold_pile_A.worldpkgdesc": {
+    "name": "gold_pile_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\gold_pile_a\\gold_pile_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Gold_pile_A\\Gold_pile_A.worldpkgdesc"
+  },
+  "guldur_keep.worldpkgdesc": {
+    "name": "guldur_keep",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\guldur_keep\\guldur_keep.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\guldur_keep\\guldur_keep.worldpkgdesc"
+  },
+  "guldur_prison.worldpkgdesc": {
+    "name": "guldur_prison",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\guldur_prison\\guldur_prison.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\guldur_prison\\guldur_prison.worldpkgdesc"
+  },
+  "guldur_ruin_L.worldpkgdesc": {
+    "name": "guldur_ruin_l",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\guldur_ruin_l\\guldur_ruin_l.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\guldur_ruin_L\\guldur_ruin_L.worldpkgdesc"
+  },
+  "guldur_ruin_T.worldpkgdesc": {
+    "name": "guldur_ruin_t",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\guldur_ruin_t\\guldur_ruin_t.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\guldur_ruin_T\\guldur_ruin_T.worldpkgdesc"
+  },
+  "guldur_stronghold.worldpkgdesc": {
+    "name": "guldur_stronghold",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\guldur_stronghold\\guldur_stronghold.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\guldur_stronghold\\guldur_stronghold.worldpkgdesc"
+  },
+  "guldur_tower.worldpkgdesc": {
+    "name": "guldur_tower",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\guldur_tower\\guldur_tower.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\guldur_tower\\guldur_tower.worldpkgdesc"
+  },
+  "hal_barbarian_barricade.worldpkgdesc": {
+    "name": "hal_barbarian_barricade",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_barbarian_barricade\\hal_barbarian_barricade.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_barbarian_barricade\\hal_barbarian_barricade.worldpkgdesc"
+  },
+  "hal_burnt_stump.worldpkgdesc": {
+    "name": "hal_burnt_stump",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_burnt_stump\\hal_burnt_stump.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_burnt_stump\\hal_burnt_stump.worldpkgdesc"
+  },
+  "hal_cocooned_body_1_.worldpkgdesc": {
+    "name": "hal_cocooned_body_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_cocooned_body_1\\hal_cocooned_body_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_cocooned_body_1\\hal_cocooned_body_1_.worldpkgdesc"
+  },
+  "hal_cocooned_body_2.worldpkgdesc": {
+    "name": "hal_cocooned_body_2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_cocooned_body_2\\hal_cocooned_body_2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_cocooned_body_2\\hal_cocooned_body_2.worldpkgdesc"
+  },
+  "hal_crypt_ruin.worldpkgdesc": {
+    "name": "hal_crypt_ruin",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_crypt_ruin\\hal_crypt_ruin.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_crypt_ruin\\hal_crypt_ruin.worldpkgdesc"
+  },
+  "hal_dead_tree_1.worldpkgdesc": {
+    "name": "hal_dead_tree_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_dead_tree_1\\hal_dead_tree_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_dead_tree_1\\hal_dead_tree_1.worldpkgdesc"
+  },
+  "hal_dead_tree_2.worldpkgdesc": {
+    "name": "hal_dead_tree_2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_dead_tree_2\\hal_dead_tree_2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_dead_tree_2\\hal_dead_tree_2.worldpkgdesc"
+  },
+  "hal_dead_tree_3.worldpkgdesc": {
+    "name": "hal_dead_tree_3",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_dead_tree_3\\hal_dead_tree_3.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_dead_tree_3\\hal_dead_tree_3.worldpkgdesc"
+  },
+  "hal_dead_tree_4.worldpkgdesc": {
+    "name": "hal_dead_tree_4",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_dead_tree_4\\hal_dead_tree_4.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_dead_tree_4\\hal_dead_tree_4.worldpkgdesc"
+  },
+  "hal_dragon_statue.worldpkgdesc": {
+    "name": "hal_dragon_statue",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_dragon_statue\\hal_dragon_statue.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_dragon_statue\\hal_dragon_statue.worldpkgdesc"
+  },
+  "hal_dwarven_ruin_1.worldpkgdesc": {
+    "name": "hal_dwarven_ruin_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_dwarven_ruin_1\\hal_dwarven_ruin_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_dwarven_ruin_1\\hal_dwarven_ruin_1.worldpkgdesc"
+  },
+  "hal_elf_lamp_tree_1.worldpkgdesc": {
+    "name": "hal_elf_lamp_tree_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elf_lamp_tree_1\\hal_elf_lamp_tree_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elf_lamp_tree_1\\hal_elf_lamp_tree_1.worldpkgdesc"
+  },
+  "hal_elf_lamp_tree_2.worldpkgdesc": {
+    "name": "hal_elf_lamp_tree_2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elf_lamp_tree_2\\hal_elf_lamp_tree_2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elf_lamp_tree_2\\hal_elf_lamp_tree_2.worldpkgdesc"
+  },
+  "hal_elf_lamp_tree_3.worldpkgdesc": {
+    "name": "hal_elf_lamp_tree_3",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elf_lamp_tree_3\\hal_elf_lamp_tree_3.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elf_lamp_tree_3\\hal_elf_lamp_tree_3.worldpkgdesc"
+  },
+  "hal_elf_lamp_tree_4.worldpkgdesc": {
+    "name": "hal_elf_lamp_tree_4",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elf_lamp_tree_4\\hal_elf_lamp_tree_4.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elf_lamp_tree_4\\hal_elf_lamp_tree_4.worldpkgdesc"
+  },
+  "hal_elf_lord_statue.worldpkgdesc": {
+    "name": "hal_elf_lord_statue",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elf_lord_statue\\hal_elf_lord_statue.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elf_lord_statue\\hal_elf_lord_statue.worldpkgdesc"
+  },
+  "hal_elf_maiden_statue.worldpkgdesc": {
+    "name": "hal_elf_maiden_statue",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elf_maiden_statue\\hal_elf_maiden_statue.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elf_maiden_statue\\hal_elf_maiden_statue.worldpkgdesc"
+  },
+  "hal_elven_arch_ruin.worldpkgdesc": {
+    "name": "hal_elven_arch_ruin",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_arch_ruin\\hal_elven_arch_ruin.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_arch_ruin\\hal_elven_arch_ruin.worldpkgdesc"
+  },
+  "hal_elven_arch_wall_ruin.worldpkgdesc": {
+    "name": "hal_elven_arch_wall_ruin",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_arch_wall_ruin\\hal_elven_arch_wall_ruin.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_arch_wall_ruin\\hal_elven_arch_wall_ruin.worldpkgdesc"
+  },
+  "hal_elven_barn.worldpkgdesc": {
+    "name": "hal_elven_barn",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_barn\\hal_elven_barn.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_barn\\hal_elven_barn.worldpkgdesc"
+  },
+  "hal_elven_battle_tower.worldpkgdesc": {
+    "name": "hal_elven_battle_tower",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_battle_tower\\hal_elven_battle_tower.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_battle_tower\\hal_elven_battle_tower.worldpkgdesc"
+  },
+  "hal_elven_domed_ruin.worldpkgdesc": {
+    "name": "hal_elven_domed_ruin",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_domed_ruin\\hal_elven_domed_ruin.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_domed_ruin\\hal_elven_domed_ruin.worldpkgdesc"
+  },
+  "hal_elven_domed_ruin_2.worldpkgdesc": {
+    "name": "hal_elven_domed_ruin_2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_domed_ruin_2\\hal_elven_domed_ruin_2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_domed_ruin_2\\hal_elven_domed_ruin_2.worldpkgdesc"
+  },
+  "hal_elven_ruined_archway.worldpkgdesc": {
+    "name": "hal_elven_ruined_archway",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_ruined_archway\\hal_elven_ruined_archway.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_ruined_archway\\hal_elven_ruined_archway.worldpkgdesc"
+  },
+  "hal_elven_ruin_arch_tower.worldpkgdesc": {
+    "name": "hal_elven_ruin_arch_tower",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_ruin_arch_tower\\hal_elven_ruin_arch_tower.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_ruin_arch_tower\\hal_elven_ruin_arch_tower.worldpkgdesc"
+  },
+  "hal_elven_ruin_chunk.worldpkgdesc": {
+    "name": "hal_elven_ruin_chunk",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_ruin_chunk\\hal_elven_ruin_chunk.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_ruin_chunk\\hal_elven_ruin_chunk.worldpkgdesc"
+  },
+  "hal_elven_ruin_square.worldpkgdesc": {
+    "name": "hal_elven_ruin_square",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_ruin_square\\hal_elven_ruin_square.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_ruin_square\\hal_elven_ruin_square.worldpkgdesc"
+  },
+  "hal_elven_tree_ruin.worldpkgdesc": {
+    "name": "hal_elven_tree_ruin",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_elven_tree_ruin\\hal_elven_tree_ruin.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_elven_tree_ruin\\hal_elven_tree_ruin.worldpkgdesc"
+  },
+  "hal_ent_moot.worldpkgdesc": {
+    "name": "hal_ent_moot",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_ent_moot\\hal_ent_moot.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_ent_moot\\hal_ent_moot.worldpkgdesc"
+  },
+  "hal_feast_table_1.worldpkgdesc": {
+    "name": "hal_feast_table_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_feast_table_1\\hal_feast_table_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_feast_table_1\\hal_feast_table_1.worldpkgdesc"
+  },
+  "hal_goblin_cave.worldpkgdesc": {
+    "name": "hal_goblin_cave",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_goblin_cave\\hal_goblin_cave.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_goblin_cave\\hal_goblin_cave.worldpkgdesc"
+  },
+  "hal_goblin_funnel_tent.worldpkgdesc": {
+    "name": "hal_goblin_funnel_tent",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_goblin_funnel_tent\\hal_goblin_funnel_tent.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_goblin_funnel_tent\\hal_goblin_funnel_tent.worldpkgdesc"
+  },
+  "hal_guldur_tower_ruin.worldpkgdesc": {
+    "name": "hal_guldur_tower_ruin",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_guldur_tower_ruin\\hal_guldur_tower_ruin.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_guldur_tower_ruin\\hal_guldur_tower_ruin.worldpkgdesc"
+  },
+  "hal_harad_tent.worldpkgdesc": {
+    "name": "hal_harad_tent",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_harad_tent\\hal_harad_tent.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_harad_tent\\hal_harad_tent.worldpkgdesc"
+  },
+  "hal_harad_watchtower.worldpkgdesc": {
+    "name": "hal_harad_watchtower",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_harad_watchtower\\hal_harad_watchtower.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_harad_watchtower\\hal_harad_watchtower.worldpkgdesc"
+  },
+  "hal_hay_bale.worldpkgdesc": {
+    "name": "hal_hay_bale",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_hay_bale\\hal_hay_bale.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_hay_bale\\hal_hay_bale.worldpkgdesc"
+  },
+  "hal_horse_statue_gate.worldpkgdesc": {
+    "name": "hal_horse_statue_gate",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_horse_statue_gate\\hal_horse_statue_gate.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_horse_statue_gate\\hal_horse_statue_gate.worldpkgdesc"
+  },
+  "hal_isen_warg_pit.worldpkgdesc": {
+    "name": "hal_isen_warg_pit",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_isen_warg_pit\\hal_isen_warg_pit.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_isen_warg_pit\\hal_isen_warg_pit.worldpkgdesc"
+  },
+  "hal_lamp_post.worldpkgdesc": {
+    "name": "hal_lamp_post",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_lamp_post\\hal_lamp_post.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_lamp_post\\hal_lamp_post.worldpkgdesc"
+  },
+  "hal_large_ruin_chunk.worldpkgdesc": {
+    "name": "hal_large_ruin_chunk",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_large_ruin_chunk\\hal_large_ruin_chunk.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_large_ruin_chunk\\hal_large_ruin_chunk.worldpkgdesc"
+  },
+  "hal_light_house.worldpkgdesc": {
+    "name": "hal_light_house",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_light_house\\hal_light_house.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_light_house\\hal_light_house.worldpkgdesc"
+  },
+  "hal_meat_rack.worldpkgdesc": {
+    "name": "hal_meat_rack",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_meat_rack\\hal_meat_rack.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_meat_rack\\hal_meat_rack.worldpkgdesc"
+  },
+  "hal_old_forest_tree_1.worldpkgdesc": {
+    "name": "hal_old_forest_tree_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_old_forest_tree_1\\hal_old_forest_tree_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_old_forest_tree_1\\hal_old_forest_tree_1.worldpkgdesc"
+  },
+  "hal_orc_scaffolding.worldpkgdesc": {
+    "name": "hal_orc_scaffolding",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_orc_scaffolding\\hal_orc_scaffolding.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_orc_scaffolding\\hal_orc_scaffolding.worldpkgdesc"
+  },
+  "hal_pumpkins.worldpkgdesc": {
+    "name": "hal_pumpkins",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_pumpkins\\hal_pumpkins.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_pumpkins\\hal_pumpkins.worldpkgdesc"
+  },
+  "hal_pumpkin_man.worldpkgdesc": {
+    "name": "hal_pumpkin_man",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_pumpkin_man\\hal_pumpkin_man.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_pumpkin_man\\hal_pumpkin_man.worldpkgdesc"
+  },
+  "hal_rustic_fence.worldpkgdesc": {
+    "name": "hal_rustic_fence",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_rustic_fence\\hal_rustic_fence.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_rustic_fence\\hal_rustic_fence.worldpkgdesc"
+  },
+  "hal_shipwright.worldpkgdesc": {
+    "name": "hal_shipwright",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_shipwright\\hal_shipwright.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_shipwright\\hal_shipwright.worldpkgdesc"
+  },
+  "hal_skeleton_body_pile_1.worldpkgdesc": {
+    "name": "hal_skeleton_body_pile_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_skeleton_body_pile_1\\hal_skeleton_body_pile_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_skeleton_body_pile_1\\hal_skeleton_body_pile_1.worldpkgdesc"
+  },
+  "hal_skeleton_body_pile_2.worldpkgdesc": {
+    "name": "hal_skeleton_body_pile_2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_skeleton_body_pile_2\\hal_skeleton_body_pile_2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_skeleton_body_pile_2\\hal_skeleton_body_pile_2.worldpkgdesc"
+  },
+  "hal_skeleton_flat.worldpkgdesc": {
+    "name": "hal_skeleton_flat",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_skeleton_flat\\hal_skeleton_flat.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_skeleton_flat\\hal_skeleton_flat.worldpkgdesc"
+  },
+  "hal_skull_pile_1.worldpkgdesc": {
+    "name": "hal_skull_pile_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_skull_pile_1\\hal_skull_pile_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_skull_pile_1\\hal_skull_pile_1.worldpkgdesc"
+  },
+  "hal_skull_pile_2.worldpkgdesc": {
+    "name": "hal_skull_pile_2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_skull_pile_2\\hal_skull_pile_2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_skull_pile_2\\hal_skull_pile_2.worldpkgdesc"
+  },
+  "hal_spider_lair.worldpkgdesc": {
+    "name": "hal_spider_lair",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_spider_lair\\hal_spider_lair.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_spider_lair\\hal_spider_lair.worldpkgdesc"
+  },
+  "hal_spider_web1.worldpkgdesc": {
+    "name": "hal_spider_web_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_spider_web_1\\hal_spider_web1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_spider_web_1\\hal_spider_web1.worldpkgdesc"
+  },
+  "hal_spider_web_2_square.worldpkgdesc": {
+    "name": "hal_spider_web_2_square",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_spider_web_2_square\\hal_spider_web_2_square.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_spider_web_2_square\\hal_spider_web_2_square.worldpkgdesc"
+  },
+  "hal_spider_web_3_square.worldpkgdesc": {
+    "name": "hal_spider_web_3_square",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_spider_web_3_square\\hal_spider_web_3_square.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_spider_web_3_square\\hal_spider_web_3_square.worldpkgdesc"
+  },
+  "hal_spider_web_cone.worldpkgdesc": {
+    "name": "hal_spider_web_cone",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_spider_web_cone\\hal_spider_web_cone.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_spider_web_cone\\hal_spider_web_cone.worldpkgdesc"
+  },
+  "hal_spider_web_layered.worldpkgdesc": {
+    "name": "hal_spider_web_layered",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_spider_web_layered\\hal_spider_web_layered.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_spider_web_layered\\hal_spider_web_layered.worldpkgdesc"
+  },
+  "hal_spider_web_tri.worldpkgdesc": {
+    "name": "hal_spider_web_tri",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_spider_web_tri\\hal_spider_web_tri.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_spider_web_tri\\hal_spider_web_tri.worldpkgdesc"
+  },
+  "hal_stair_pillar_trees.worldpkgdesc": {
+    "name": "hal_stair_pillar_trees",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_stair_pillar_trees\\hal_stair_pillar_trees.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_stair_pillar_trees\\hal_stair_pillar_trees.worldpkgdesc"
+  },
+  "hal_stone_pillar.worldpkgdesc": {
+    "name": "hal_stone_pillar",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_stone_pillar\\hal_stone_pillar.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_stone_pillar\\hal_stone_pillar.worldpkgdesc"
+  },
+  "hal_table_set.worldpkgdesc": {
+    "name": "hal_table_set",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_table_set\\hal_table_set.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_table_set\\hal_table_set.worldpkgdesc"
+  },
+  "hal_vertical_barricade.worldpkgdesc": {
+    "name": "hal_vertical_barricade",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_vertical_barricade\\hal_vertical_barricade.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_vertical_barricade\\hal_vertical_barricade.worldpkgdesc"
+  },
+  "hal_vertical_barricade_2.worldpkgdesc": {
+    "name": "hal_vertical_barricade_2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_vertical_barricade_2\\hal_vertical_barricade_2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_vertical_barricade_2\\hal_vertical_barricade_2.worldpkgdesc"
+  },
+  "hal_webbed_stump_1.worldpkgdesc": {
+    "name": "hal_webbed_stump_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_webbed_stump_1\\hal_webbed_stump_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_webbed_stump_1\\hal_webbed_stump_1.worldpkgdesc"
+  },
+  "hal_webbed_stump_2.worldpkgdesc": {
+    "name": "hal_webbed_stump_2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_webbed_stump_2\\hal_webbed_stump_2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_webbed_stump_2\\hal_webbed_stump_2.worldpkgdesc"
+  },
+  "hal_wildman_hunt_lodge.worldpkgdesc": {
+    "name": "hal_wildman_hunt_lodge",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_wildman_hunt_lodge\\hal_wildman_hunt_lodge.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_wildman_hunt_lodge\\hal_wildman_hunt_lodge.worldpkgdesc"
+  },
+  "hal_wildman_hunt_lodge_2.worldpkgdesc": {
+    "name": "hal_wildman_hunt_lodge_2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_wildman_hunt_lodge_2\\hal_wildman_hunt_lodge_2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_wildman_hunt_lodge_2\\hal_wildman_hunt_lodge_2.worldpkgdesc"
+  },
+  "hal_wildman_hunt_lodge_3.worldpkgdesc": {
+    "name": "hal_wildman_hunt_lodge_3",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\hal_wildman_hunt_lodge_3\\hal_wildman_hunt_lodge_3.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\hal_wildman_hunt_lodge_3\\hal_wildman_hunt_lodge_3.worldpkgdesc"
+  },
+  "Ice_Block_01_a.worldpkgdesc": {
+    "name": "ice_block_01_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\ice_block_01_a\\ice_block_01_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Ice_Block_01_a\\Ice_Block_01_a.worldpkgdesc"
+  },
+  "Ice_Block_02_a.worldpkgdesc": {
+    "name": "ice_block_02_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\ice_block_02_a\\ice_block_02_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Ice_Block_02_a\\Ice_Block_02_a.worldpkgdesc"
+  },
+  "Ice_Block_03_a.worldpkgdesc": {
+    "name": "ice_block_03_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\ice_block_03_a\\ice_block_03_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Ice_Block_03_a\\Ice_Block_03_a.worldpkgdesc"
+  },
+  "isen_tower.worldpkgdesc": {
+    "name": "isengard_tower",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\isengard_tower\\isen_tower.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\isengard_tower\\isen_tower.worldpkgdesc"
+  },
+  "isen_fence.worldpkgdesc": {
+    "name": "isen_fence",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\isen_fence\\isen_fence.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\isen_fence\\isen_fence.worldpkgdesc"
+  },
+  "isen_pit_a.worldpkgdesc": {
+    "name": "isen_pit_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\isen_pit_a\\isen_pit_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\isen_pit_a\\isen_pit_a.worldpkgdesc"
+  },
+  "orc_pit_a.worldpkgdesc": {
+    "name": "orc_pit_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_pit_a\\orc_pit_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_pit_a\\orc_pit_a.worldpkgdesc"
+  },
+  "isen_wall_straight.worldpkgdesc": {
+    "name": "wbgoblintent_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\wbgoblintent_1\\wbgoblintent_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\isen_wall_straight\\isen_wall_straight.worldpkgdesc"
+  },
+  "KUROS_WINTER_a.worldpkgdesc": {
+    "name": "kuros_winter",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\kuros_winter\\kuros_winter_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\KUROS_WINTER\\KUROS_WINTER_a.worldpkgdesc"
+  },
+  "large_elven_tower_a.worldpkgdesc": {
+    "name": "large_elven_tower_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\large_elven_tower_a\\large_elven_tower_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\large_elven_tower_a\\large_elven_tower_a.worldpkgdesc"
+  },
+  "large_elven_tower_b.worldpkgdesc": {
+    "name": "large_elven_tower_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\large_elven_tower_b\\large_elven_tower_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\large_elven_tower_b\\large_elven_tower_b.worldpkgdesc"
+  },
+  "large_elven_tower_c.worldpkgdesc": {
+    "name": "large_elven_tower_c",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\large_elven_tower_c\\large_elven_tower_c.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\large_elven_tower_c\\large_elven_tower_c.worldpkgdesc"
+  },
+  "Laurelin.worldpkgdesc": {
+    "name": "laurelin",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\laurelin\\laurelin.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Trees of the Sun and Moon\\Laurelin\\Laurelin.worldpkgdesc"
+  },
+  "mumak_corpse_a.worldpkgdesc": {
+    "name": "mumak_corpse_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\mumak_corpse_a\\mumak_corpse_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\mumak_corpse_a\\mumak_corpse_a.worldpkgdesc"
+  },
+  "orc_scaffold_c.worldpkgdesc": {
+    "name": "orc_scaffold_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_scaffold_a\\orc_scaffold_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_scaffold_a\\orc_scaffold_c.worldpkgdesc"
+  },
+  "orc_banner_mor.worldpkgdesc": {
+    "name": "orc_banner_mor",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_banner_mor\\orc_banner_mor.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_banner_mor\\orc_banner_mor.worldpkgdesc"
+  },
+  "orc_camp_a.worldpkgdesc": {
+    "name": "orc_camp_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_camp_a\\orc_camp_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_camp_a\\orc_camp_a.worldpkgdesc"
+  },
+  "orc_scaffold_a.worldpkgdesc": {
+    "name": "orc_scaffold_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_scaffold_a\\orc_scaffold_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_scaffold_a\\wk\\orc_scaffold_a.worldpkgdesc"
+  },
+  "orc_fence.worldpkgdesc": {
+    "name": "orc_fence",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_fence\\orc_fence.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_fence\\orc_fence.worldpkgdesc"
+  },
+  "orc_rune_altar.worldpkgdesc": {
+    "name": "orc_rune_altar",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_rune_altar\\orc_rune_altar.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_rune_altar\\orc_rune_altar.worldpkgdesc"
+  },
+  "orc_scaffold_e.worldpkgdesc": {
+    "name": "orc_scaffold_e",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_scaffold\\orc_scaffold_e.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_scaffold\\orc_scaffold_e.worldpkgdesc"
+  },
+  "orc_scaffold_f.worldpkgdesc": {
+    "name": "orc_scaffold_f",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_scaffold\\orc_scaffold_f.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_scaffold\\orc_scaffold_f.worldpkgdesc"
+  },
+  "orc_scaffold_g.worldpkgdesc": {
+    "name": "orc_scaffold_g",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_scaffold\\orc_scaffold_g.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_scaffold\\orc_scaffold_g.worldpkgdesc"
+  },
+  "orc_scaffold_b.worldpkgdesc": {
+    "name": "orc_scaffold_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_scaffold_a\\orc_scaffold_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_scaffold_a\\orc_scaffold_b.worldpkgdesc"
+  },
+  "orc_scaffold_sq.worldpkgdesc": {
+    "name": "orc_scaffold_sq",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_scaffold_sq\\orc_scaffold_sq.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_scaffold_sq\\orc_scaffold_sq.worldpkgdesc"
+  },
+  "orc_tent_a.worldpkgdesc": {
+    "name": "orc_tent_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_tent_a\\orc_tent_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_tent_asmall\\orc_tent_a.worldpkgdesc"
+  },
+  "orc_tent_b.worldpkgdesc": {
+    "name": "orc_tent_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_tent_b\\orc_tent_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_tent_b\\orc_tent_b.worldpkgdesc"
+  },
+  "orc_tent_b_wd.worldpkgdesc": {
+    "name": "orc_tent_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_tent_b\\orc_tent_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_tent_b\\orc_tent_b_wd.worldpkgdesc"
+  },
+  "orc_tower_a.worldpkgdesc": {
+    "name": "orc_tower_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_tower_a\\orc_tower_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_tower_a\\orc_tower_a.worldpkgdesc"
+  },
+  "orc_tower_b.worldpkgdesc": {
+    "name": "orc_tower_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_tower_b\\orc_tower_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_tower_b\\orc_tower_b.worldpkgdesc"
+  },
+  "orc_yurt.worldpkgdesc": {
+    "name": "orc_yurt",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\orc_yurt\\orc_yurt.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\orc_yurt\\orc_yurt.worldpkgdesc"
+  },
+  "osgiliath_temple_a.worldpkgdesc": {
+    "name": "osgiliath_temple_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\osgiliath_temple_a\\osgiliath_temple_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\osgiliath_temple_a\\osgiliath_temple_a.worldpkgdesc"
+  },
+  "ruinorc.worldpkgdesc": {
+    "name": "ruinorc",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\ruinorc\\ruinorc.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\ruinorc\\ruinorc.worldpkgdesc"
+  },
+  "sauron_stat.worldpkgdesc": {
+    "name": "sauron_stat",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\sauron_stat\\sauron_stat.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\sauron_stat\\sauron_stat.worldpkgdesc"
+  },
+  "sauron_statue_a.worldpkgdesc": {
+    "name": "sauron_statue_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\sauron_statue_a\\sauron_statue_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\sauron_statue_a\\sauron_statue_a.worldpkgdesc"
+  },
+  "ships_esgharoth_A.worldpkgdesc": {
+    "name": "ships_esgharoth_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\ships_esgharoth_a\\ships_esgharoth_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\ships_esgharoth_A\\ships_esgharoth_A.worldpkgdesc"
+  },
+  "skull_sign_a.worldpkgdesc": {
+    "name": "skull_sign_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\skull_sign\\skull_sign_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\skull_sign\\skull_sign_a.worldpkgdesc"
+  },
+  "skull_sign_b.worldpkgdesc": {
+    "name": "skull_sign_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\skull_sign\\skull_sign_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\skull_sign\\skull_sign_b.worldpkgdesc"
+  },
+  "staircase_B.worldpkgdesc": {
+    "name": "staircase_b",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\staircase_b\\staircase_b.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\staircase_B\\staircase_B.worldpkgdesc"
+  },
+  "Telperion.worldpkgdesc": {
+    "name": "telperion",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\telperion\\telperion.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Trees of the Sun and Moon\\Telperion\\Telperion.worldpkgdesc"
+  },
+  "Texture_Test.worldpkgdesc": {
+    "name": "texture_test",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\texture_test\\texture_test.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Texture_Test\\Texture_Test.worldpkgdesc"
+  },
+  "troll_cage_a.worldpkgdesc": {
+    "name": "troll_cage_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\troll_cage_a\\troll_cage_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\troll_cage_a\\troll_cage_a.worldpkgdesc"
+  },
+  "underground_generic_a.worldpkgdesc": {
+    "name": "underground_generic_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\underground_generic_a\\underground_generic_a.world.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\underground_generic_a\\underground_generic_a.worldpkgdesc"
+  },
+  "uruk_pit.worldpkgdesc": {
+    "name": "uruk_pit",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\uruk_pit\\uruk_pit.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\uruk_pit\\uruk_pit.worldpkgdesc"
+  },
+  "Valley_Ice_01.worldpkgdesc": {
+    "name": "valley_ice_01",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\valley_ice_01\\valley_ice_01.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Valley_Ice_01\\Valley_Ice_01.worldpkgdesc"
+  },
+  "Valley_Ice_02.worldpkgdesc": {
+    "name": "valley_ice_02",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\valley_ice_02\\valley_ice_02.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Valley_Ice_02\\Valley_Ice_02.worldpkgdesc"
+  },
+  "Valley_Ice_03.worldpkgdesc": {
+    "name": "valley_ice_03",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\valley_ice_03\\valley_ice_03.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Valley_Ice_03\\Valley_Ice_03.worldpkgdesc"
+  },
+  "Valley_Ice_04.worldpkgdesc": {
+    "name": "valley_ice_04",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\valley_ice_04\\valley_ice_04.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Valley_Ice_04\\Valley_Ice_04.worldpkgdesc"
+  },
+  "Valley_Ice_05.worldpkgdesc": {
+    "name": "valley_ice_05",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\valley_ice_05\\valley_ice_05.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\Valley_Ice_05\\Valley_Ice_05.worldpkgdesc"
+  },
+  "wagons_barrels_A.worldpkgdesc": {
+    "name": "wagons_barrels_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\wagons_barrels_a\\wagons_barrels_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\wagons_barrels_A\\wagons_barrels_A.worldpkgdesc"
+  },
+  "war_wagons_ref_a.worldpkgdesc": {
+    "name": "war_wagons_ref_a",
+    "type": "fieldfortification",
+    "world": "\\data\\settlements\\tar_assets\\war_wagons_ref_a\\war_wagons_ref_a.worldtypelarge.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\war_wagons_ref_a\\war_wagons_ref_a.worldpkgdesc"
+  },
+  "wbgoblintent_1.worldpkgdesc": {
+    "name": "wbgoblintent_1",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\wbgoblintent_1\\wbgoblintent_1.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\wbgoblintent_1\\wbgoblintent_1.worldpkgdesc"
+  },
+  "wildman_hut2.worldpkgdesc": {
+    "name": "wildman_hut2",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\wildman_hut2\\wildman_hut2.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\wildman_hut2\\wildman_hut2.worldpkgdesc"
+  },
+  "work_weel_A.worldpkgdesc": {
+    "name": "work_weel_a",
+    "type": "ambientmisc",
+    "world": "\\data\\settlements\\tar_assets\\work_weel_a\\work_weel_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\tar_assets\\work_weel_A\\work_weel_A.worldpkgdesc"
+  },
+  "osgiliath_east_a.worldpkgdesc": {
+    "name": "ruined east osgiliath",
+    "type": "settlement",
+    "world": "\\data\\settlements\\unique_settlements\\campaign\\custom\\castles\\osgiliath_east\\osgiliath_east_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\Unique_Settlements\\campaign\\custom\\castles\\Osgiliath_East\\osgiliath_east_a.worldpkgdesc"
+  },
+  "osgiliath_east_repaired_a.worldpkgdesc": {
+    "name": "repaired east osgiliath",
+    "type": "settlement",
+    "world": "\\data\\settlements\\unique_settlements\\campaign\\custom\\castles\\osgiliath_east_repaired\\osgiliath_east_repaired_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\Unique_Settlements\\campaign\\custom\\castles\\Osgiliath_East_Repaired\\osgiliath_east_repaired_a.worldpkgdesc"
+  },
+  "weathertop_a.worldpkgdesc": {
+    "name": "amon sl",
+    "type": "settlement",
+    "world": "\\data\\settlements\\unique_settlements\\campaign\\custom\\castles\\weathertop\\weathertop_a.world",
+    "folder": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods\\Third_Age_Reforged\\data\\settlements\\Unique_Settlements\\campaign\\custom\\castles\\weathertop\\weathertop_a.worldpkgdesc"
+  }
+}
