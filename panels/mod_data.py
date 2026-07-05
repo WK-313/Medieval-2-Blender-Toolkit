@@ -71,7 +71,9 @@ class MED2_TOOLKIT_OT_Properties(bpy.types.PropertyGroup):
                 "directory_mod_list": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
                 "directory_mod_data": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
                 "directory_models": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
-                "directory_settlements": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods"
+                "directory_settlements": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
+                "directory_unit_export": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
+                "directory_iwte_task_template": ""
                 }
             with open(script_folder/('text/directories.json'), 'w') as directories_output:
                 json.dump(file_paths, directories_output, indent=2)
@@ -82,6 +84,8 @@ class MED2_TOOLKIT_OT_Properties(bpy.types.PropertyGroup):
     directory_mod_data: StringProperty(name = "Mod data path", description = "Directory to read mod data from", default = file_paths["directory_mod_data"], subtype = "DIR_PATH")
     directory_models: StringProperty(name = "Unit output path", description = "Directory to save extracted unit models", default = file_paths["directory_models"], subtype = "DIR_PATH")
     directory_settlements: StringProperty(name = "Settlement output path", description = "Directory to save extracted settlement models", default = file_paths["directory_settlements"], subtype = "DIR_PATH")
+    directory_unit_export: StringProperty(name = "Unit export output path", description = "Directory to save exported unit GLB/textures", default = file_paths["directory_unit_export"], subtype = "DIR_PATH")
+    directory_iwte_task_template: StringProperty(name = "IWTE task template", description = "IWTE task template file used for GLB to .mesh conversion", default = file_paths["directory_iwte_task_template"], subtype = "FILE_PATH")
 
 
 class MED2_TOOLKIT_OT_Refresh_Mods(bpy.types.Operator):
@@ -117,22 +121,32 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Medieval 2 Toolkit"
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.med2_toolkit_mode.mode_selection != 'qol'
+
     def draw(self, context):
         layout=self.layout
+        mode = context.scene.med2_toolkit_mode.mode_selection
         col = layout.column(align=True)
-        col.prop (context.scene.med2_toolkit_reader, "directory_med2", text="Medieval 2")
         col.prop (context.scene.med2_toolkit_reader, "directory_iwte", text="IWTE")
-        if context.scene.med2_toolkit_mode.mode_selection == 'units':
-            col.prop (context.scene.med2_toolkit_reader, "directory_models", text="Unit Output")
+        if mode == 'unit_export':
+            col.prop (context.scene.med2_toolkit_reader, "directory_unit_export", text="Export Output")
+            col.prop (context.scene.med2_toolkit_reader, "directory_iwte_task_template", text="IWTE Task Template")
         else:
-            col.prop (context.scene.med2_toolkit_reader, "directory_settlements", text="Settlement Output")
-        row = col.row(align=True)
-        row.prop(context.scene.med2_toolkit_reader, "mods_filtered", text="Mod")
-        row.operator("medieval2toolkit.refresh_mods", icon = "FILE_REFRESH", text = "")
-        if context.scene.med2_toolkit_reader.mods_filtered == "custom":
-            col.prop (context.scene.med2_toolkit_reader, "directory_mod_data", text="Manual Path")
-        col = layout.column(align=True)
-        col.operator ("medieval2toolkit.reader", text="Read Mod Data")
+            col.prop (context.scene.med2_toolkit_reader, "directory_med2", text="Medieval 2")
+            if mode == 'unit_import':
+                col.prop (context.scene.med2_toolkit_reader, "directory_models", text="Unit Output")
+            else:
+                col.prop (context.scene.med2_toolkit_reader, "directory_settlements", text="Settlement Output")
+            row = col.row(align=True)
+            row.prop(context.scene.med2_toolkit_reader, "mods_filtered", text="Mod")
+            row.operator("medieval2toolkit.refresh_mods", icon = "FILE_REFRESH", text = "")
+            if context.scene.med2_toolkit_reader.mods_filtered == "custom":
+                col.prop (context.scene.med2_toolkit_reader, "directory_mod_data", text="Manual Path")
+            col = layout.column(align=True)
+            col.operator ("medieval2toolkit.reader", text="Read Mod Data")
         if(context.mode != 'OBJECT'):
             layout.enabled = False
 

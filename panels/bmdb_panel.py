@@ -99,7 +99,7 @@ class MED_2_TOOLKIT_PT_BMDB_Import(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        if (context.scene.med2_toolkit_mode.mode_selection != 'units'):
+        if (context.scene.med2_toolkit_mode.mode_selection != 'unit_import'):
             return False
         return True
 
