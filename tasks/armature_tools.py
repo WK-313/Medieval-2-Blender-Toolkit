@@ -104,6 +104,7 @@ def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
         modifier.object = armature
 
     result = 'Finished'
+    source = None
     if transfer_weights:
         source = next((o for o in imported if o.type == 'MESH' and o.name.lower().startswith('sample__body')), None)
         if source is None:
@@ -118,10 +119,18 @@ def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
             continue
         is_sample = 'sample' in obj.name.lower()
         if delete_samples or not is_sample:
+            if obj is source:
+                source = None
             bpy.data.objects.remove(obj, do_unlink=True)
 
+    # Leave the transfer setup visible: sample body active, the user's
+    # meshes passively selected, so a manual re-transfer is one click away.
     bpy.ops.object.select_all(action='DESELECT')
     for target in targets:
         target.select_set(True)
-    context.view_layer.objects.active = armature
+    if source is not None:
+        source.select_set(True)
+        context.view_layer.objects.active = source
+    else:
+        context.view_layer.objects.active = armature
     return result
