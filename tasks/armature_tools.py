@@ -1,4 +1,5 @@
 import bpy
+from mathutils import Matrix
 from pathlib import Path
 
 addon_folder = Path(__file__).parent.parent
@@ -93,13 +94,20 @@ def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
             bpy.data.objects.remove(o, do_unlink=True)
         return 'No armature found inside %s' % variant
 
+    # The GLBs can carry a stray pose; weight transfer maps between evaluated
+    # meshes, so the sample body must sit at its bind pose or nothing lines up.
+    for pose_bone in armature.pose.bones:
+        pose_bone.matrix_basis = Matrix.Identity(4)
+
     to_lower = skeletonUsesLowercase(armature)
     for obj in targets:
         renameGroupsCase(obj, to_lower)
         for modifier in [m for m in obj.modifiers if m.type == 'ARMATURE']:
             obj.modifiers.remove(modifier)
+        world_matrix = obj.matrix_world.copy()
         obj.parent = armature
-        obj.matrix_parent_inverse = armature.matrix_world.inverted()
+        obj.matrix_parent_inverse = Matrix.Identity(4)
+        obj.matrix_world = world_matrix
         modifier = obj.modifiers.new('Armature', 'ARMATURE')
         modifier.object = armature
 
@@ -110,6 +118,7 @@ def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
         if source is None:
             result = 'Parented, but no sample__body mesh found inside %s' % variant
         else:
+            context.view_layer.update()
             transferSampleWeights(context, source, targets)
 
     # Imported meshes are never the user's originals, so only they are
