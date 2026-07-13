@@ -1,5 +1,6 @@
 import bpy
 from bpy.props import BoolProperty, EnumProperty, PointerProperty
+from ..tasks.armature_tools import skeletonItems, parentToSkeleton
 
 
 class MED_2_TOOLKIT_QOL_Data(bpy.types.PropertyGroup):
@@ -14,6 +15,7 @@ class MED_2_TOOLKIT_QOL_Data(bpy.types.PropertyGroup):
     )
     clear_groups: BoolProperty(name = "Clear Existing Groups", default = True)
     show_advanced: BoolProperty(name = "Advanced Tools", default = False)
+    skeleton: EnumProperty(name = "Skeleton", description = "Skeleton from the addon's armatures folder to parent selected meshes to", items = skeletonItems)
 
 
 class MED_2_TOOLKIT_OT_Weight_Transfer(bpy.types.Operator):
@@ -192,6 +194,63 @@ class MED_2_TOOLKIT_OT_Remove_Baked_Suffix(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MED_2_TOOLKIT_OT_Parent_To_Skeleton(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.parent_to_skeleton"
+    bl_label = "Parent to Skeleton"
+    bl_description = "Import the chosen skeleton and parent selected meshes to it, renaming vertex group _R/_L case to match the skeleton's bones."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT' and any(o.type == 'MESH' for o in context.selected_objects)
+
+    def execute(self, context):
+        result = parentToSkeleton(context, transfer_weights=False)
+        if result != 'Finished':
+            self.report({'ERROR'}, result)
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Parented selection to skeleton")
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Parent_Sample_Weights(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.parent_sample_weights"
+    bl_label = "Parent + Sample Weights"
+    bl_description = "Import the skeleton's _Sample variant, parent selected meshes, transfer weights from the sample body, then delete the sample meshes."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT' and any(o.type == 'MESH' for o in context.selected_objects)
+
+    def execute(self, context):
+        result = parentToSkeleton(context, transfer_weights=True, delete_samples=True)
+        if result != 'Finished':
+            self.report({'ERROR'}, result)
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Parented and transferred sample weights")
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Parent_Sample_Weights_Keep(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.parent_sample_weights_keep"
+    bl_label = "Parent + Sample Weights (Keep Samples)"
+    bl_description = "Same as Parent + Sample Weights, but keeps the imported sample meshes in the scene."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT' and any(o.type == 'MESH' for o in context.selected_objects)
+
+    def execute(self, context):
+        result = parentToSkeleton(context, transfer_weights=True, delete_samples=False)
+        if result != 'Finished':
+            self.report({'ERROR'}, result)
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Parented and transferred sample weights (samples kept)")
+        return {'FINISHED'}
+
+
 class MED_2_TOOLKIT_PT_QOL(bpy.types.Panel):
     bl_idname = "MED_2_TOOLKIT_PT_QOL"
     bl_parent_id = "MED_2_TOOLKIT_PT_Main_Panel"
@@ -212,6 +271,15 @@ class MED_2_TOOLKIT_PT_QOL(bpy.types.Panel):
         layout.operator("medieval2toolkit.weight_transfer", icon='MOD_DATA_TRANSFER')
         layout.prop(settings, "vert_mapping")
         layout.prop(settings, "clear_groups")
+
+        layout.separator()
+
+        layout.label(text="Armature:")
+        layout.prop(settings, "skeleton", text="Skeleton")
+        col = layout.column(align=True)
+        col.operator("medieval2toolkit.parent_to_skeleton", icon='ARMATURE_DATA')
+        col.operator("medieval2toolkit.parent_sample_weights", icon='MOD_DATA_TRANSFER')
+        col.operator("medieval2toolkit.parent_sample_weights_keep", icon='COMMUNITY')
 
         layout.separator()
 
@@ -238,6 +306,9 @@ classes = [
     MED_2_TOOLKIT_OT_Rename_Bones_Lower_To_Upper,
     MED_2_TOOLKIT_OT_Recreate_Simplebake_UV,
     MED_2_TOOLKIT_OT_Remove_Baked_Suffix,
+    MED_2_TOOLKIT_OT_Parent_To_Skeleton,
+    MED_2_TOOLKIT_OT_Parent_Sample_Weights,
+    MED_2_TOOLKIT_OT_Parent_Sample_Weights_Keep,
     MED_2_TOOLKIT_PT_QOL,
     ]
 
