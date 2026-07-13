@@ -100,20 +100,56 @@ def exportArmatureGLB(context):
     ]
 
     if not meshes:
-        return "No mesh objects found"
+        return "No mesh objects found under the armature (check the Visible Only toggle)"
 
-    bpy.ops.object.select_all(action='DESELECT')
-    arm.select_set(True)
-    for obj in meshes:
-        obj.select_set(True)
-    context.view_layer.objects.active = arm
+    export_objects = [arm] + meshes
 
-    bpy.ops.export_scene.gltf(
-        filepath=glb_path,
-        export_format='GLB',
-        use_selection=True,
-        export_apply=True
-    )
+    # Hidden objects silently refuse select_set(), and use_selection with an
+    # empty selection writes an empty GLB. Unhide for the export, restore after.
+    visibility_backup = [(obj, obj.hide_get()) for obj in export_objects]
+    # Stacked or dead Armature modifiers (duplicates, object=None, or aimed at
+    # another rig) get baked into the mesh by export_apply and wreck the
+    # result. Keep only the first one driven by the exported armature.
+    modifier_backup = []
+    try:
+        for obj, was_hidden in visibility_backup:
+            if was_hidden:
+                obj.hide_set(False)
+
+        for obj in meshes:
+            skin_found = False
+            for modifier in obj.modifiers:
+                if modifier.type != 'ARMATURE':
+                    continue
+                if modifier.object is arm and not skin_found:
+                    skin_found = True
+                    continue
+                modifier_backup.append((modifier, modifier.show_viewport, modifier.show_render))
+                modifier.show_viewport = False
+                modifier.show_render = False
+
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in export_objects:
+            obj.select_set(True)
+        context.view_layer.objects.active = arm
+        unselectable = [obj.name for obj in export_objects if not obj.select_get()]
+        if unselectable:
+            return "Cannot select for export (excluded collection?): %s" % ", ".join(unselectable)
+
+        bpy.ops.export_scene.gltf(
+            filepath=glb_path,
+            export_format='GLB',
+            use_selection=True,
+            export_apply=True,
+            export_animations=export_data.export_animations
+        )
+    finally:
+        for modifier, show_viewport, show_render in modifier_backup:
+            modifier.show_viewport = show_viewport
+            modifier.show_render = show_render
+        for obj, was_hidden in visibility_backup:
+            if was_hidden:
+                obj.hide_set(True)
 
     tex_dir = os.path.join(out_dir, "textures")
     os.makedirs(tex_dir, exist_ok=True)

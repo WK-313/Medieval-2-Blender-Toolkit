@@ -6,6 +6,7 @@ from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_fold
 
 class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     export_visible_only: BoolProperty(name = "Visible Only", description = "Only export visible mesh children of the armature", default = True)
+    export_animations: BoolProperty(name = "Export Animations", description = "Bake actions into the GLB. Slow and unnecessary for .mesh conversion, and reimports with the rig posed", default = False)
     export_glb_name: StringProperty(name = "GLB Name", description = "Name of the exported GLB file and its output subfolder", default = "export")
     last_export_dir: StringProperty(default = "", options = {'HIDDEN'})
     last_exported_glb: StringProperty(default = "", options = {'HIDDEN'})
@@ -76,6 +77,7 @@ class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
 
         col = layout.column(align=True)
         col.prop(export_data, "export_visible_only")
+        col.prop(export_data, "export_animations")
         col.prop(export_data, "export_glb_name")
 
         layout.operator("medieval2toolkit.export_unit_glb", icon='EXPORT')
