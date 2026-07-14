@@ -72,6 +72,22 @@ def transferSampleWeights(context, source, targets):
         mix_factor=1.0,
     )
 
+def importEquipment(context, armature):
+    equipment_path = armaturesFolder()/'Equipment.glb'
+    if not equipment_path.exists():
+        return
+    previous_objects = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=str(equipment_path))
+    for obj in bpy.data.objects:
+        if obj in previous_objects or obj.type != 'MESH':
+            continue
+        world_matrix = obj.matrix_world.copy()
+        obj.parent = armature
+        obj.matrix_parent_inverse = Matrix.Identity(4)
+        obj.matrix_world = world_matrix
+        modifier = obj.modifiers.new('Armature', 'ARMATURE')
+        modifier.object = armature
+
 def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
     skeleton = context.scene.med2_toolkit_qol.skeleton
     if skeleton == 'none':
@@ -131,6 +147,10 @@ def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
             if obj is source:
                 source = None
             bpy.data.objects.remove(obj, do_unlink=True)
+
+    # Full setup mode also brings in the equipment reference props.
+    if transfer_weights and not delete_samples:
+        importEquipment(context, armature)
 
     # Leave the transfer setup visible: sample body active, the user's
     # meshes passively selected, so a manual re-transfer is one click away.

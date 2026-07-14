@@ -215,8 +215,8 @@ class MED_2_TOOLKIT_OT_Parent_To_Skeleton(bpy.types.Operator):
 
 class MED_2_TOOLKIT_OT_Parent_Sample_Weights(bpy.types.Operator):
     bl_idname = "medieval2toolkit.parent_sample_weights"
-    bl_label = "Parent + Sample Weights"
-    bl_description = "Import the skeleton's _Sample variant, parent selected meshes, transfer weights from the sample body, then delete the sample meshes."
+    bl_label = "Rig with Sample Weights"
+    bl_description = "Parent selected meshes to the skeleton and copy weights onto them from its sample body, then remove the sample meshes."
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -228,14 +228,14 @@ class MED_2_TOOLKIT_OT_Parent_Sample_Weights(bpy.types.Operator):
         if result != 'Finished':
             self.report({'ERROR'}, result)
             return {'CANCELLED'}
-        self.report({'INFO'}, "Parented and transferred sample weights")
+        self.report({'INFO'}, "Rigged selection with sample weights")
         return {'FINISHED'}
 
 
 class MED_2_TOOLKIT_OT_Parent_Sample_Weights_Keep(bpy.types.Operator):
     bl_idname = "medieval2toolkit.parent_sample_weights_keep"
-    bl_label = "Parent + Sample Weights (Keep Samples)"
-    bl_description = "Same as Parent + Sample Weights, but keeps the imported sample meshes in the scene."
+    bl_label = "Full Setup (Samples + Equipment)"
+    bl_description = "Rig selected meshes with sample weights, keep the sample body for reference, and import the equipment props parented to the skeleton."
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -247,7 +247,7 @@ class MED_2_TOOLKIT_OT_Parent_Sample_Weights_Keep(bpy.types.Operator):
         if result != 'Finished':
             self.report({'ERROR'}, result)
             return {'CANCELLED'}
-        self.report({'INFO'}, "Parented and transferred sample weights (samples kept)")
+        self.report({'INFO'}, "Rigged selection; samples and equipment kept in scene")
         return {'FINISHED'}
 
 
