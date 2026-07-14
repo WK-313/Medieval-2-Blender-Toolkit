@@ -14,6 +14,9 @@ class MED_2_TOOLKIT_QOL_Data(bpy.types.PropertyGroup):
         default='POLYINTERP_NEAREST'
     )
     clear_groups: BoolProperty(name = "Clear Existing Groups", default = True)
+    show_weight_transfer: BoolProperty(name = "Weight Transfer", default = True)
+    show_armature: BoolProperty(name = "Armature", default = True)
+    show_rename: BoolProperty(name = "Rename Tools", default = True)
     show_advanced: BoolProperty(name = "Advanced Tools", default = False)
     skeleton: EnumProperty(name = "Skeleton", description = "Skeleton from the addon's armatures folder to parent selected meshes to", items = skeletonItems)
 
@@ -73,13 +76,21 @@ class MED_2_TOOLKIT_OT_Weight_Transfer(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Clean_Suffix(bpy.types.Operator):
     bl_idname = "medieval2toolkit.clean_number_suffix"
     bl_label = "Clean Number Suffix"
+    bl_description = "Remove the .001 style suffix from selected objects. If the base name is taken, the two objects swap names."
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         cleaned = 0
         for obj in context.selected_objects:
             if "." in obj.name and obj.name.split(".")[-1].isdigit():
-                obj.name = obj.name.rsplit(".", 1)[0]
+                base = obj.name.rsplit(".", 1)[0]
+                holder = bpy.data.objects.get(base)
+                if holder and holder is not obj:
+                    # Steal the base name; the previous holder takes our suffix
+                    suffixed_name = obj.name
+                    obj.name = base + ".__swap__"
+                    holder.name = suffixed_name
+                obj.name = base
                 cleaned += 1
         self.report({'INFO'}, f"Cleaned names of {cleaned} object(s)")
         return {'FINISHED'}
@@ -267,31 +278,38 @@ class MED_2_TOOLKIT_PT_QOL(bpy.types.Panel):
         layout = self.layout
         settings = context.scene.med2_toolkit_qol
 
-        layout.label(text="Weight Transfer")
-        layout.operator("medieval2toolkit.weight_transfer", icon='MOD_DATA_TRANSFER')
-        layout.prop(settings, "vert_mapping")
-        layout.prop(settings, "clear_groups")
-
-        layout.separator()
-
-        layout.label(text="Armature:")
-        layout.prop(settings, "skeleton", text="Skeleton")
-        col = layout.column(align=True)
-        col.operator("medieval2toolkit.parent_to_skeleton", icon='ARMATURE_DATA')
-        col.operator("medieval2toolkit.parent_sample_weights", icon='MOD_DATA_TRANSFER')
-        col.operator("medieval2toolkit.parent_sample_weights_keep", icon='COMMUNITY')
-
-        layout.separator()
-
-        layout.label(text="Rename Tools:")
-        layout.operator("medieval2toolkit.clean_number_suffix", icon='FILE_REFRESH')
-        layout.operator("medieval2toolkit.rename_bones_upper_to_lower", icon='SORT_ASC')
-        layout.operator("medieval2toolkit.rename_bones_lower_to_upper", icon='SORT_DESC')
+        box = layout.box()
+        row = box.row()
+        row.prop(settings, "show_weight_transfer", icon="TRIA_DOWN" if settings.show_weight_transfer else "TRIA_RIGHT", emboss=False)
+        if settings.show_weight_transfer:
+            col = box.column()
+            col.operator("medieval2toolkit.weight_transfer", icon='MOD_DATA_TRANSFER')
+            col.prop(settings, "vert_mapping")
+            col.prop(settings, "clear_groups")
 
         box = layout.box()
         row = box.row()
-        row.prop(settings, "show_advanced", icon="TRIA_RIGHT" if not settings.show_advanced else "TRIA_DOWN", emboss=False)
+        row.prop(settings, "show_armature", icon="TRIA_DOWN" if settings.show_armature else "TRIA_RIGHT", emboss=False)
+        if settings.show_armature:
+            col = box.column()
+            col.prop(settings, "skeleton", text="Skeleton")
+            col = box.column(align=True)
+            col.operator("medieval2toolkit.parent_to_skeleton", icon='ARMATURE_DATA')
+            col.operator("medieval2toolkit.parent_sample_weights", icon='MOD_DATA_TRANSFER')
+            col.operator("medieval2toolkit.parent_sample_weights_keep", icon='COMMUNITY')
 
+        box = layout.box()
+        row = box.row()
+        row.prop(settings, "show_rename", icon="TRIA_DOWN" if settings.show_rename else "TRIA_RIGHT", emboss=False)
+        if settings.show_rename:
+            col = box.column(align=True)
+            col.operator("medieval2toolkit.clean_number_suffix", icon='FILE_REFRESH')
+            col.operator("medieval2toolkit.rename_bones_upper_to_lower", icon='SORT_ASC')
+            col.operator("medieval2toolkit.rename_bones_lower_to_upper", icon='SORT_DESC')
+
+        box = layout.box()
+        row = box.row()
+        row.prop(settings, "show_advanced", icon="TRIA_DOWN" if settings.show_advanced else "TRIA_RIGHT", emboss=False)
         if settings.show_advanced:
             col = box.column(align=True)
             col.operator("medieval2toolkit.recreate_simplebake_uv", icon='UV')
