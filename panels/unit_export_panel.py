@@ -62,6 +62,20 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     copy_from_unit: BoolProperty(name = "Copy sprite and animations from a unit", description = "Parse the sprite and footer from an existing unit in the mod's battle_models.modeldb", default = False)
 
 
+SEVERITY_ORDER = {'ERROR': 0, 'WARNING': 1, 'INFO': 2}
+SEVERITY_ICONS = {'ERROR': 'CANCEL', 'WARNING': 'ERROR', 'INFO': 'INFO'}
+
+def showResultsPopup(context, title, results):
+    if bpy.app.background:
+        return
+    def draw(menu, _context):
+        for level, message in results:
+            menu.layout.label(text=message, icon=SEVERITY_ICONS.get(level, 'INFO'))
+    worst = min((SEVERITY_ORDER.get(level, 2) for level, _ in results), default=2)
+    icon = ('CANCEL', 'ERROR', 'CHECKMARK')[worst]
+    context.window_manager.popup_menu(draw, title=title, icon=icon)
+
+
 class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
     bl_idname = "medieval2toolkit.select_cleanup"
     bl_label = "Select + Cleanup"
@@ -74,17 +88,13 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
         return obj is not None and obj.type == 'ARMATURE'
 
     def execute(self, context):
-        results = runSelectCleanup(context)
-        worst = 'INFO'
-        for level, message in results:
-            self.report({level}, message)
-            if level == 'ERROR' or (level == 'WARNING' and worst == 'INFO'):
-                worst = level
+        # errors first so the most severe findings are instantly visible
+        results = sorted(runSelectCleanup(context), key=lambda r: SEVERITY_ORDER.get(r[0], 2))
         counts = {'INFO': 0, 'WARNING': 0, 'ERROR': 0}
         for level, message in results:
+            self.report({level}, message)
             counts[level] += 1
-        if counts['ERROR'] or counts['WARNING']:
-            self.report({worst}, "Cleanup: %d error(s), %d warning(s), %d note(s) - see Info log for details" % (counts['ERROR'], counts['WARNING'], counts['INFO']))
+        showResultsPopup(context, "Cleanup: %d error(s), %d warning(s), %d note(s)" % (counts['ERROR'], counts['WARNING'], counts['INFO']), results)
         return {'FINISHED'}
 
 
@@ -179,7 +189,9 @@ class MED_2_TOOLKIT_OT_Export_Unit_GLB(bpy.types.Operator):
         if result == "Finished":
             self.report({'INFO'}, "Export complete")
         else:
-            self.report({'WARNING'}, "Export complete, " + result[len("Finished, "):])
+            notes = result[len("Finished, but: "):].split("; ")
+            self.report({'WARNING'}, "Export complete, but: " + "; ".join(notes))
+            showResultsPopup(context, "Export finished with warnings", [('WARNING', n) for n in notes])
         return {'FINISHED'}
 
 
