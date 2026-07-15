@@ -1,7 +1,7 @@
 import bpy
 import json
 from pathlib import Path
-from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty
+from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
 from ..directories import saveFolderPaths
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder
 from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages
@@ -89,8 +89,24 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
         return obj is not None and obj.type == 'ARMATURE'
 
     def execute(self, context):
+        results = runSelectCleanup(context)
+
+        # auto-assign materials named *_main / *_attach to the dropdowns
+        export_data = context.scene.med2_toolkit_unit_export
+        for material in exportSetMaterials(context):
+            lowered = material.name.lower()
+            try:
+                if '_main' in lowered and export_data.material_main != material.name:
+                    export_data.material_main = material.name
+                    results.append(('INFO', "Auto-assigned main material: %s" % material.name))
+                elif '_attach' in lowered and export_data.material_attach != material.name:
+                    export_data.material_attach = material.name
+                    results.append(('INFO', "Auto-assigned attach material: %s" % material.name))
+            except TypeError:
+                pass
+
         # errors first so the most severe findings are instantly visible
-        results = sorted(runSelectCleanup(context), key=lambda r: SEVERITY_ORDER.get(r[0], 2))
+        results = sorted(results, key=lambda r: SEVERITY_ORDER.get(r[0], 2))
         counts = {'INFO': 0, 'WARNING': 0, 'ERROR': 0}
         for level, message in results:
             self.report({level}, message)
@@ -138,6 +154,27 @@ class MED_2_TOOLKIT_OT_Export_Factions_Set(bpy.types.Operator):
     def execute(self, context):
         for item in context.scene.med2_toolkit_export_factions:
             item.enabled = self.select
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Export_Faction_Toggle(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.export_faction_toggle"
+    bl_label = "Toggle Faction Ownership"
+    bl_options = {"INTERNAL"}
+
+    index: IntProperty()
+
+    @classmethod
+    def description(cls, context, properties):
+        factions = context.scene.med2_toolkit_export_factions
+        if 0 <= properties.index < len(factions):
+            return "Codename = %s" % factions[properties.index].faction_id
+        return "Toggle ownership"
+
+    def execute(self, context):
+        factions = context.scene.med2_toolkit_export_factions
+        if 0 <= self.index < len(factions):
+            factions[self.index].enabled = not factions[self.index].enabled
         return {'FINISHED'}
 
 
@@ -349,8 +386,11 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
             layout.label(text="Press refresh after Read Mod Data", icon='INFO')
         else:
             grid = layout.grid_flow(row_major=True, columns=2, even_columns=True, align=True)
-            for item in factions:
-                grid.prop(item, "enabled", text=item.name)
+            for index, item in enumerate(factions):
+                op = grid.operator("medieval2toolkit.export_faction_toggle", text=item.name,
+                                   depress=item.enabled, icon='CHECKBOX_HLT' if item.enabled else 'CHECKBOX_DEHLT')
+                op.index = index
+            layout.label(text="Hover over a faction to see its codename", icon='INFO')
 
         layout.separator()
         col = layout.column(align=True)
@@ -386,7 +426,10 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
         layout = self.layout
         export_data = context.scene.med2_toolkit_unit_export
 
-        layout.operator("medieval2toolkit.export_unit_glb", icon='EXPORT')
+        if export_data.generate_bmdb:
+            layout.operator("medieval2toolkit.export_unit_glb", icon='EXPORT', text="Export GLB + Convert Textures + BMDB")
+        else:
+            layout.operator("medieval2toolkit.export_unit_glb", icon='EXPORT')
         if export_data.last_export_dir:
             layout.operator("medieval2toolkit.open_export_folder", icon='FILE_FOLDER')
         layout.separator()
@@ -402,6 +445,7 @@ classes = [
     MED_2_TOOLKIT_OT_Select_Cleanup,
     MED_2_TOOLKIT_OT_Export_Factions_Refresh,
     MED_2_TOOLKIT_OT_Export_Factions_Set,
+    MED_2_TOOLKIT_OT_Export_Faction_Toggle,
     MED_2_TOOLKIT_OT_Copy_Sprite_Footer,
     MED_2_TOOLKIT_OT_Export_Unit_GLB,
     MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh,

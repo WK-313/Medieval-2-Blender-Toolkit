@@ -85,7 +85,7 @@ def runSelectCleanup(context):
     context.view_layer.objects.active = armature
 
     # 1. trailing .001 suffix cleanup, with conflict detection inside the set
-    renamed = 0
+    renamed = []
     for obj in meshes:
         if not ("." in obj.name and obj.name.split(".")[-1].isdigit()):
             continue
@@ -95,27 +95,28 @@ def runSelectCleanup(context):
             group = sorted(o.name for o in meshes if baseName(o.name) == base)
             report.append(('ERROR', "Cannot remove trailing number: %s all share the base name '%s'" % (", ".join(group), base)))
             continue
+        old_name = obj.name
         if holder and holder is not obj:
-            suffixed_name = obj.name
             obj.name = base + ".__swap__"
-            holder.name = suffixed_name
+            holder.name = old_name
         obj.name = base
-        renamed += 1
+        renamed.append("%s -> %s" % (old_name, obj.name))
     if renamed:
-        report.append(('INFO', "Removed trailing numbers from %d object(s)" % renamed))
+        report.append(('INFO', "Removed trailing numbers from %d object(s): %s" % (len(renamed), ", ".join(renamed))))
 
     # 2. x_y -> x__y (first underscore doubled), then x__y format check
-    underscored = 0
+    underscored = []
     bad_format = []
     for obj in meshes:
         if "__" not in obj.name and "_" in obj.name:
+            old_name = obj.name
             head, _, tail = obj.name.partition("_")
             obj.name = head + "__" + tail
-            underscored += 1
+            underscored.append("%s -> %s" % (old_name, obj.name))
         if "__" not in obj.name:
             bad_format.append(obj.name)
     if underscored:
-        report.append(('INFO', "Converted x_y to x__y naming on %d object(s)" % underscored))
+        report.append(('INFO', "Converted x_y to x__y naming on %d object(s): %s" % (len(underscored), ", ".join(underscored))))
     if bad_format:
         report.append(('WARNING', "Not in x__y naming format: %s" % ", ".join(bad_format)))
 
