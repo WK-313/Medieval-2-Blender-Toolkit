@@ -33,24 +33,53 @@ def skeletonUsesLowercase(armature):
             return False
     return True
 
+def caseConvertedName(name, to_lower):
+    if to_lower:
+        if name.endswith('_RThigh'):
+            return name.replace('_RThigh', '_rthigh')
+        if name.endswith('_LThigh'):
+            return name.replace('_LThigh', '_lthigh')
+        return name.replace('_R', '_r').replace('_L', '_l')
+    if name.endswith('_rthigh'):
+        return name.replace('_rthigh', '_RThigh')
+    if name.endswith('_lthigh'):
+        return name.replace('_lthigh', '_LThigh')
+    return name.replace('_r', '_R').replace('_l', '_L')
+
+def mergeGroupInto(obj, source, target):
+    """Fold source's weights into target (clamped sum) and delete source."""
+    source_index = source.index
+    target_index = target.index
+    for vertex in obj.data.vertices:
+        weight = 0.0
+        existing = 0.0
+        for entry in vertex.groups:
+            if entry.group == source_index:
+                weight = entry.weight
+            elif entry.group == target_index:
+                existing = entry.weight
+        if weight > 0.0:
+            target.add([vertex.index], min(1.0, existing + weight), 'REPLACE')
+    obj.vertex_groups.remove(source)
+
 def renameGroupsCase(obj, to_lower):
-    for group in obj.vertex_groups:
-        name = group.name
-        if to_lower:
-            if name.endswith('_RThigh'):
-                new = name.replace('_RThigh', '_rthigh')
-            elif name.endswith('_LThigh'):
-                new = name.replace('_LThigh', '_lthigh')
-            else:
-                new = name.replace('_R', '_r').replace('_L', '_l')
+    # Repair numbered duplicates (bone_rhand.001) left behind by earlier
+    # collisions before converting case.
+    for group in list(obj.vertex_groups):
+        if "." in group.name and group.name.split(".")[-1].isdigit():
+            base = obj.vertex_groups.get(group.name.rsplit(".", 1)[0])
+            if base is not None:
+                mergeGroupInto(obj, group, base)
+    # Renaming onto a name that already exists would silently produce a .001
+    # group; merge into the existing group instead so weights are reused.
+    for group in list(obj.vertex_groups):
+        new = caseConvertedName(group.name, to_lower)
+        if new == group.name:
+            continue
+        existing = obj.vertex_groups.get(new)
+        if existing is not None:
+            mergeGroupInto(obj, group, existing)
         else:
-            if name.endswith('_rthigh'):
-                new = name.replace('_rthigh', '_RThigh')
-            elif name.endswith('_lthigh'):
-                new = name.replace('_lthigh', '_LThigh')
-            else:
-                new = name.replace('_r', '_R').replace('_l', '_L')
-        if new != name:
             group.name = new
 
 def transferSampleWeights(context, source, targets):
@@ -124,9 +153,13 @@ def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
     for pose_bone in armature.pose.bones:
         pose_bone.matrix_basis = Matrix.Identity(4)
 
+    # Rename weights first, before any parenting, so group case always
+    # matches the new skeleton by the time the rig is attached.
     to_lower = skeletonUsesLowercase(armature)
     for obj in targets:
         renameGroupsCase(obj, to_lower)
+
+    for obj in targets:
         for modifier in [m for m in obj.modifiers if m.type == 'ARMATURE']:
             obj.modifiers.remove(modifier)
         world_matrix = obj.matrix_world.copy()
