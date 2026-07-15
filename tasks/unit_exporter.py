@@ -4,6 +4,8 @@ import struct
 import subprocess
 import bpy
 from pathlib import Path
+from .export_checks import deselectAll, materialImages
+from .bmdb_writer import buildEntry, parseRelativeUnitPath
 
 addon_folder = Path(__file__).parent.parent
 
@@ -70,6 +72,68 @@ def writeTexture(savefiletexture, ddsdata):
         f.write(ddsdata)
     return True
 
+def texturePlan(context):
+    """Resolve the main/attach materials into (image, out_name) pairs and the
+    effective texture names used for conversion and the BMDB entry."""
+    export_data = context.scene.med2_toolkit_unit_export
+    main_mat = bpy.data.materials.get(export_data.material_main)
+    attach_mat = bpy.data.materials.get(export_data.material_attach) if export_data.material_attach != 'none' else None
+    main_diff, main_norm = materialImages(main_mat) if main_mat else (None, None)
+    attach_diff, attach_norm = materialImages(attach_mat) if attach_mat else (None, None)
+
+    def out_name(image, requested):
+        if requested:
+            return requested
+        if image:
+            return os.path.splitext(os.path.basename(image.filepath) or image.name)[0]
+        return ""
+
+    plan = {
+        'main': (main_diff, out_name(main_diff, export_data.out_main)),
+        'main_norm': (main_norm, out_name(main_norm, export_data.out_main_norm)),
+        'attach': (attach_diff, out_name(attach_diff, export_data.out_attach)),
+        'attach_norm': (attach_norm, out_name(attach_norm, export_data.out_attach_norm)),
+    }
+    return plan
+
+def generateBlankNormal(texconv_unused, tex_dir, out_name, size):
+    blank = addon_folder/'normals'/('%d.dds' % size)
+    if not blank.exists():
+        return "No blank normal available for %dx%d (only 512/1024/2048)" % (size, size)
+    dds_path = os.path.join(tex_dir, out_name + ".dds")
+    shutil.copy2(blank, dds_path)
+    with open(dds_path, "rb") as f:
+        writeTexture(os.path.join(tex_dir, out_name + ".texture"), f.read())
+    return None
+
+def writeBMDBEntry(context, out_dir, plan):
+    export_data = context.scene.med2_toolkit_unit_export
+    factions = [item.faction_id for item in context.scene.med2_toolkit_export_factions if item.enabled]
+    if not factions:
+        return "BMDB entry skipped: no factions selected for ownership"
+    if not export_data.bmdb_unit_path:
+        return "BMDB entry skipped: no unit path set"
+    relative = parseRelativeUnitPath(export_data.bmdb_unit_path)
+    main_name = plan['main'][1]
+    main_norm_name = plan['main_norm'][1] or (export_data.out_main_norm if export_data.gen_blank_normals else "")
+    attach_name = plan['attach'][1] or main_name
+    attach_norm_name = plan['attach_norm'][1] or (export_data.out_attach_norm if export_data.gen_blank_normals else "") or main_norm_name
+    entry = buildEntry(
+        model_name=export_data.export_glb_name,
+        relative_path=relative,
+        out_main=main_name,
+        out_main_norm=main_norm_name,
+        sprite=export_data.bmdb_sprite,
+        out_attach=attach_name,
+        out_attach_norm=attach_norm_name,
+        footer=export_data.bmdb_footer,
+        factions=factions,
+    )
+    entry_path = os.path.join(out_dir, export_data.export_glb_name + "_bmdb.txt")
+    with open(entry_path, "w", encoding="utf-8") as f:
+        f.write(entry + "\n")
+    return None
+
 def exportArmatureGLB(context):
     texconv = get_texconv_path()
     if not texconv:
@@ -106,11 +170,20 @@ def exportArmatureGLB(context):
 
     # Hidden objects silently refuse select_set(), and use_selection with an
     # empty selection writes an empty GLB. Unhide for the export, restore after.
+    plan = texturePlan(context)
+    rename_map = {}
+    for image, name in plan.values():
+        if image is not None and name:
+            rename_map[bpy.path.abspath(image.filepath)] = name
+
     visibility_backup = [(obj, obj.hide_get()) for obj in export_objects]
     # Stacked or dead Armature modifiers (duplicates, object=None, or aimed at
     # another rig) get baked into the mesh by export_apply and wreck the
     # result. Keep only the first one driven by the exported armature.
     modifier_backup = []
+    # The GLB references textures by image name, so temporarily rename the
+    # images to their output names for the duration of the export.
+    image_name_backup = []
     try:
         for obj, was_hidden in visibility_backup:
             if was_hidden:
@@ -128,7 +201,12 @@ def exportArmatureGLB(context):
                 modifier.show_viewport = False
                 modifier.show_render = False
 
-        bpy.ops.object.select_all(action='DESELECT')
+        for image, name in plan.values():
+            if image is not None and name and image.name != name:
+                image_name_backup.append((image, image.name))
+                image.name = name
+
+        deselectAll(context)
         for obj in export_objects:
             obj.select_set(True)
         context.view_layer.objects.active = arm
@@ -144,6 +222,8 @@ def exportArmatureGLB(context):
             export_animations=export_data.export_animations
         )
     finally:
+        for image, original_name in image_name_backup:
+            image.name = original_name
         for modifier, show_viewport, show_render in modifier_backup:
             modifier.show_viewport = show_viewport
             modifier.show_render = show_render
@@ -158,11 +238,12 @@ def exportArmatureGLB(context):
         if not os.path.exists(tex):
             continue
 
-        dst = os.path.join(tex_dir, os.path.basename(tex))
+        ext = os.path.splitext(tex)[1].lower()
+        out_base = rename_map.get(bpy.path.abspath(tex)) or os.path.splitext(os.path.basename(tex))[0]
+        dst = os.path.join(tex_dir, out_base + ext)
         shutil.copy2(tex, dst)
 
-        name, ext = os.path.splitext(dst)
-        ext = ext.lower()
+        name = os.path.join(tex_dir, out_base)
 
         if ext in [".png", ".jpg", ".jpeg", ".tga"]:
             subprocess.run(
@@ -187,6 +268,26 @@ def exportArmatureGLB(context):
             with open(dds, "rb") as f:
                 writeTexture(name + ".texture", f.read())
 
+    notes = []
+    if export_data.gen_blank_normals:
+        for slot, norm_out_prop in (('main', 'out_main_norm'), ('attach', 'out_attach_norm')):
+            diffuse, _ = plan[slot]
+            norm_image, _ = plan[slot + '_norm']
+            requested = getattr(export_data, norm_out_prop)
+            if diffuse is None or norm_image is not None or not requested:
+                continue
+            size = diffuse.size[0]
+            error = generateBlankNormal(texconv, tex_dir, requested, size)
+            if error:
+                notes.append(error)
+
+    if export_data.generate_bmdb:
+        error = writeBMDBEntry(context, out_dir, plan)
+        if error:
+            notes.append(error)
+
+    if notes:
+        return "Finished, but: " + "; ".join(notes)
     return "Finished"
 
 def exportToMeshIWTE(context):
