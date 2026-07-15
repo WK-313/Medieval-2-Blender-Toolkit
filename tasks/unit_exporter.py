@@ -118,8 +118,9 @@ def writeBMDBEntry(context, out_dir, plan):
     main_norm_name = plan['main_norm'][1] or (export_data.out_main_norm if export_data.gen_blank_normals else "")
     attach_name = plan['attach'][1] or main_name
     attach_norm_name = plan['attach_norm'][1] or (export_data.out_attach_norm if export_data.gen_blank_normals else "") or main_norm_name
+    entry_name = export_data.bmdb_entry_name or export_data.export_glb_name
     entry = buildEntry(
-        model_name=export_data.export_glb_name,
+        model_name=entry_name,
         relative_path=relative,
         out_main=main_name,
         out_main_norm=main_norm_name,
@@ -128,6 +129,7 @@ def writeBMDBEntry(context, out_dir, plan):
         out_attach_norm=attach_norm_name,
         footer=export_data.bmdb_footer,
         factions=factions,
+        mesh_name=export_data.export_glb_name,
     )
     entry_path = os.path.join(out_dir, export_data.export_glb_name + "_bmdb.txt")
     with open(entry_path, "w", encoding="utf-8") as f:

@@ -16,10 +16,10 @@ def parseRelativeUnitPath(full_path):
     relative = match.group(1) if match else normalized.lstrip("/")
     return relative
 
-def buildEntry(model_name, relative_path, out_main, out_main_norm, sprite, out_attach, out_attach_norm, footer, factions):
+def buildEntry(model_name, relative_path, out_main, out_main_norm, sprite, out_attach, out_attach_norm, footer, factions, mesh_name=None):
     """Build one battle_models.modeldb entry, same layout as generate_bmdb.py."""
     relative_path = relative_path.replace("\\", "/").rstrip("/")
-    mesh_path = "%s/%s.mesh" % (relative_path, model_name)
+    mesh_path = "%s/%s.mesh" % (relative_path, mesh_name or model_name)
     tex = lambda name: "%s/textures/%s.texture" % (relative_path, name)
 
     out = []

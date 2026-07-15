@@ -130,23 +130,22 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
         layout=self.layout
         mode = context.scene.med2_toolkit_mode.mode_selection
         col = layout.column(align=True)
+        col.prop (context.scene.med2_toolkit_reader, "directory_med2", text="Medieval 2")
         col.prop (context.scene.med2_toolkit_reader, "directory_iwte", text="IWTE")
         if mode == 'unit_export':
             col.prop (context.scene.med2_toolkit_reader, "directory_unit_export", text="Export Output")
             col.prop (context.scene.med2_toolkit_reader, "directory_iwte_task_template", text="IWTE Task Template")
+        elif mode == 'unit_import':
+            col.prop (context.scene.med2_toolkit_reader, "directory_models", text="Unit Output")
         else:
-            col.prop (context.scene.med2_toolkit_reader, "directory_med2", text="Medieval 2")
-            if mode == 'unit_import':
-                col.prop (context.scene.med2_toolkit_reader, "directory_models", text="Unit Output")
-            else:
-                col.prop (context.scene.med2_toolkit_reader, "directory_settlements", text="Settlement Output")
-            row = col.row(align=True)
-            row.prop(context.scene.med2_toolkit_reader, "mods_filtered", text="Mod")
-            row.operator("medieval2toolkit.refresh_mods", icon = "FILE_REFRESH", text = "")
-            if context.scene.med2_toolkit_reader.mods_filtered == "custom":
-                col.prop (context.scene.med2_toolkit_reader, "directory_mod_data", text="Manual Path")
-            col = layout.column(align=True)
-            col.operator ("medieval2toolkit.reader", text="Read Mod Data")
+            col.prop (context.scene.med2_toolkit_reader, "directory_settlements", text="Settlement Output")
+        row = col.row(align=True)
+        row.prop(context.scene.med2_toolkit_reader, "mods_filtered", text="Mod")
+        row.operator("medieval2toolkit.refresh_mods", icon = "FILE_REFRESH", text = "")
+        if context.scene.med2_toolkit_reader.mods_filtered == "custom":
+            col.prop (context.scene.med2_toolkit_reader, "directory_mod_data", text="Manual Path")
+        col = layout.column(align=True)
+        col.operator ("medieval2toolkit.reader", text="Read Mod Data")
         if(context.mode != 'OBJECT'):
             layout.enabled = False
 

@@ -45,7 +45,8 @@ class MED_2_TOOLKIT_Export_Faction(bpy.types.PropertyGroup):
 class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     export_visible_only: BoolProperty(name = "Visible Only", description = "Only export visible mesh children of the armature", default = True)
     export_animations: BoolProperty(name = "Export Animations", description = "Bake actions into the GLB. Slow and unnecessary for .mesh conversion, and reimports with the rig posed", default = False)
-    export_glb_name: StringProperty(name = "GLB Name", description = "Name of the exported GLB file and its output subfolder", default = "export")
+    bmdb_entry_name: StringProperty(name = "BMDB Entry Name", description = "Model name at the top of the generated BMDB entry. Leave blank to use the mesh name")
+    export_glb_name: StringProperty(name = "Mesh Name", description = "Name of the exported GLB/mesh file and its output subfolder", default = "export")
     last_export_dir: StringProperty(default = "", options = {'HIDDEN'})
     last_exported_glb: StringProperty(default = "", options = {'HIDDEN'})
     material_main: EnumProperty(name = "Main Material", description = "Material treated as the unit's main texture", items = materialItems)
@@ -56,7 +57,7 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     out_attach_norm: StringProperty(name = "Attach Normal", description = "Output name for the attachment normal map (no extension)")
     gen_blank_normals: BoolProperty(name = "Generate Blank Normal Maps", description = "Copy a blank normal map of matching size from the addon's normals folder for materials without one", default = False)
     generate_bmdb: BoolProperty(name = "Generate BMDB Entry", description = "Write a battle_models.modeldb entry text file on export", default = False)
-    bmdb_unit_path: StringProperty(name = "Unit Path", description = "Folder for the unit inside the mod's data folder; only the part after \\data\\ is used", subtype = 'DIR_PATH')
+    bmdb_unit_path: StringProperty(name = "Mesh Path", description = "Folder for the unit's mesh inside the mod's data folder; only the part after \\data\\ is used", subtype = 'DIR_PATH')
     bmdb_sprite: StringProperty(name = "Sprite", description = "Sprite path for the entry, e.g. unit_sprites/example_sprite.spr")
     bmdb_footer: StringProperty(name = "Footer", description = "Entry footer (mounts/weapons/animation block). Use \\n for line breaks")
     copy_from_unit: BoolProperty(name = "Copy sprite and animations from a unit", description = "Parse the sprite and footer from an existing unit in the mod's battle_models.modeldb", default = False)
@@ -78,8 +79,8 @@ def showResultsPopup(context, title, results):
 
 class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
     bl_idname = "medieval2toolkit.select_cleanup"
-    bl_label = "Select + Cleanup"
-    bl_description = "Deselect everything, select the armature and its meshes, then run naming, material, weight, UV and texture checks."
+    bl_label = "Check Model for Export"
+    bl_description = "Select the armature and its meshes (deselecting everything else), auto-fix names and duplicate materials, and report any problems before exporting."
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -117,6 +118,8 @@ class MED_2_TOOLKIT_OT_Export_Factions_Refresh(bpy.types.Operator):
         previous = {item.faction_id: item.enabled for item in collection}
         collection.clear()
         for display_name, faction_id in factions.items():
+            if 'spawning' in display_name.lower() or 'spawning' in faction_id.lower():
+                continue
             item = collection.add()
             item.name = display_name
             item.faction_id = faction_id
@@ -240,17 +243,10 @@ class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
         col = layout.column(align=True)
         col.prop(export_data, "export_visible_only")
         col.prop(export_data, "export_animations")
+        col.prop(export_data, "bmdb_entry_name")
         col.prop(export_data, "export_glb_name")
 
         layout.operator("medieval2toolkit.select_cleanup", icon='CHECKMARK')
-        layout.operator("medieval2toolkit.export_unit_glb", icon='EXPORT')
-
-        if export_data.last_export_dir:
-            layout.operator("medieval2toolkit.open_export_folder", icon='FILE_FOLDER')
-
-        layout.separator()
-        layout.label(text="IWTE")
-        layout.operator("medieval2toolkit.export_unit_iwte_mesh", icon='MOD_ARMATURE')
 
         if context.mode != 'OBJECT':
             layout.enabled = False
@@ -299,6 +295,11 @@ class MED_2_TOOLKIT_PT_Export_Materials(bpy.types.Panel):
         layout.label(text="Output Names:")
         grid = layout.column(align=True)
 
+        header = grid.row(align=True)
+        header_split = header.split(factor=0.45, align=True)
+        header_split.label(text="Current output names")
+        header_split.label(text="New output names (blank = current)")
+
         def image_row(label, image, prop_name):
             row = grid.row(align=True)
             split = row.split(factor=0.45, align=True)
@@ -331,22 +332,11 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         export_data = context.scene.med2_toolkit_unit_export
-        reader = context.scene.med2_toolkit_reader
 
         layout.prop(export_data, "generate_bmdb")
         if not export_data.generate_bmdb:
             return
 
-        col = layout.column(align=True)
-        col.prop(reader, "directory_med2", text="Medieval 2")
-        row = col.row(align=True)
-        row.prop(reader, "mods_filtered", text="Mod")
-        row.operator("medieval2toolkit.refresh_mods", icon = "FILE_REFRESH", text = "")
-        if reader.mods_filtered == "custom":
-            col.prop(reader, "directory_mod_data", text="Manual Path")
-        col.operator("medieval2toolkit.reader", text="Read Mod Data")
-
-        layout.separator()
         row = layout.row(align=True)
         row.label(text="Ownership:")
         row.operator("medieval2toolkit.export_factions_refresh", icon='FILE_REFRESH', text="")
@@ -364,7 +354,7 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
 
         layout.separator()
         col = layout.column(align=True)
-        col.prop(export_data, "bmdb_unit_path", text="Unit Path")
+        col.prop(export_data, "bmdb_unit_path", text="Mesh Path")
         relative = parseRelativeUnitPath(export_data.bmdb_unit_path) if export_data.bmdb_unit_path else ""
         if relative:
             col.label(text="Entry path: %s" % relative, icon='FILE_FOLDER')
@@ -380,6 +370,32 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
             col.operator("medieval2toolkit.copy_sprite_footer", icon='COPYDOWN')
 
 
+class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
+    bl_idname = "MED_2_TOOLKIT_PT_Export_Run"
+    bl_parent_id = "MED_2_TOOLKIT_PT_Main_Panel"
+    bl_label = "Export"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Medieval 2 Toolkit"
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.med2_toolkit_mode.mode_selection == 'unit_export'
+
+    def draw(self, context):
+        layout = self.layout
+        export_data = context.scene.med2_toolkit_unit_export
+
+        layout.operator("medieval2toolkit.export_unit_glb", icon='EXPORT')
+        if export_data.last_export_dir:
+            layout.operator("medieval2toolkit.open_export_folder", icon='FILE_FOLDER')
+        layout.separator()
+        layout.label(text="IWTE")
+        layout.operator("medieval2toolkit.export_unit_iwte_mesh", icon='MOD_ARMATURE')
+        if context.mode != 'OBJECT':
+            layout.enabled = False
+
+
 classes = [
     MED_2_TOOLKIT_Export_Faction,
     MED_2_TOOLKIT_Unit_Export_Data,
@@ -393,6 +409,7 @@ classes = [
     MED_2_TOOLKIT_PT_Unit_Export,
     MED_2_TOOLKIT_PT_Export_Materials,
     MED_2_TOOLKIT_PT_Export_BMDB,
+    MED_2_TOOLKIT_PT_Export_Run,
     ]
 
 def register():
