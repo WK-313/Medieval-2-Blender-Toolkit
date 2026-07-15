@@ -140,6 +140,12 @@ class MED_2_TOOLKIT_OT_Export_Factions_Refresh(bpy.types.Operator):
             item.name = display_name
             item.faction_id = faction_id
             item.enabled = previous.get(faction_id, False)
+        # merc is a bmdb-only codename, not a faction in descr_sm_factions
+        if not any(item.faction_id == 'merc' for item in collection):
+            item = collection.add()
+            item.name = "Mercs"
+            item.faction_id = "merc"
+            item.enabled = previous.get("merc", False)
         self.report({'INFO'}, "Loaded %d factions" % len(collection))
         return {'FINISHED'}
 
