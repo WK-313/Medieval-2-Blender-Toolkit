@@ -217,6 +217,9 @@ class MED_2_TOOLKIT_OT_Rename_To_Prefix(bpy.types.Operator):
                     suffix = name
             else:
                 suffix = name
+            # only the prefix separator may be a double underscore, so any
+            # __ inside the kept part collapses to a single _
+            suffix = suffix.replace("__", "_")
             new = "%s__%s" % (prefix, suffix)
             if new != name:
                 obj.name = new
