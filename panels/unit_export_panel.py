@@ -1,11 +1,14 @@
 import bpy
 import json
+import math
+import os
+import time
 from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
 from ..directories import saveFolderPaths
-from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder
+from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder
 from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages
-from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter
+from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 
 script_folder = Path(__file__).parent.parent
 
@@ -36,6 +39,35 @@ def materialItemsNone(self, context):
     return _material_items_none
 
 
+def genBlankNormalsToggled(self, context):
+    """When Generate Blank Normal Maps is switched on, auto-fill the normal
+    output names as <main>_norm / <attach>_norm from the effective main and
+    attach texture names. Materials that already have a normal map keep their
+    output name untouched."""
+    if not self.gen_blank_normals:
+        return
+    main_mat = bpy.data.materials.get(self.material_main)
+    attach_mat = bpy.data.materials.get(self.material_attach) if self.material_attach != 'none' else None
+    main_diff, main_norm = materialImages(main_mat) if main_mat else (None, None)
+    attach_diff, attach_norm = materialImages(attach_mat) if attach_mat else (None, None)
+
+    def base_name(image, requested):
+        if requested:
+            return requested
+        if image:
+            return os.path.splitext(os.path.basename(image.filepath) or image.name)[0]
+        return ""
+
+    if main_norm is None:
+        name = base_name(main_diff, self.out_main)
+        if name:
+            self.out_main_norm = name + "_norm"
+    if attach_mat and attach_norm is None:
+        name = base_name(attach_diff, self.out_attach)
+        if name:
+            self.out_attach_norm = name + "_norm"
+
+
 class MED_2_TOOLKIT_Export_Faction(bpy.types.PropertyGroup):
     name: StringProperty(name = "Faction", description = "Display name of the faction")
     faction_id: StringProperty(name = "Faction ID", description = "Internal faction id used in battle_models.modeldb")
@@ -55,7 +87,7 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     out_main_norm: StringProperty(name = "Main Normal", description = "Output name for the main normal map (no extension)")
     out_attach: StringProperty(name = "Attach", description = "Output name for the attachment texture (no extension)")
     out_attach_norm: StringProperty(name = "Attach Normal", description = "Output name for the attachment normal map (no extension)")
-    gen_blank_normals: BoolProperty(name = "Generate Blank Normal Maps", description = "Copy a blank normal map of matching size from the addon's normals folder for materials without one", default = False)
+    gen_blank_normals: BoolProperty(name = "Generate Blank Normal Maps", description = "Copy a blank normal map of matching size from the addon's normals folder for materials without one. Auto-fills the normal output names as <main>_norm / <attach>_norm", default = False, update = genBlankNormalsToggled)
     generate_bmdb: BoolProperty(name = "Generate BMDB Entry", description = "Write a battle_models.modeldb entry text file on export", default = False)
     bmdb_unit_path: StringProperty(name = "Mesh Path", description = "Folder for the unit's mesh inside the mod's data folder; only the part after \\data\\ is used", subtype = 'DIR_PATH')
     bmdb_sprite: StringProperty(name = "Sprite", description = "Sprite path for the entry, e.g. unit_sprites/example_sprite.spr")
@@ -190,11 +222,7 @@ class MED_2_TOOLKIT_OT_Copy_Sprite_Footer(bpy.types.Operator):
     bl_description = "Parse the selected unit's sprite and footer from the mod's battle_models.modeldb into the fields below."
 
     def execute(self, context):
-        reader = context.scene.med2_toolkit_reader
-        if reader.mods_filtered != "custom":
-            mod_folder = reader.mods_filtered
-        else:
-            mod_folder = reader.directory_mod_data
+        mod_folder = selectedModFolder(context)
         try:
             unit_info = json.loads(context.scene.med2_toolkit_units.import_unit)
         except (ValueError, TypeError):
@@ -241,19 +269,93 @@ class MED_2_TOOLKIT_OT_Export_Unit_GLB(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# The one running IWTE conversion, shared with the Export panel so it can draw
+# a progress bar. IWTE gives no percentage feedback, so the bar eases toward
+# full over time and jumps to done when the process exits.
+_iwte_job = None
+
+def iwteProgress(elapsed):
+    return 1.0 - math.exp(-elapsed / 10.0)
+
+def redrawView3D(context):
+    for window in context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
+
+def finishIWTEJob(job):
+    """Judge a finished IWTE process by whether it produced a new .mesh file.
+    Returns (level, message) for reporting."""
+    elapsed = time.time() - job['start']
+    returncode = job['process'].returncode
+    try:
+        stat = os.stat(job['mesh_path'])
+    except OSError:
+        stat = None
+    if stat is not None and (job['previous_mtime'] is None or stat.st_mtime > job['previous_mtime']):
+        return ('INFO', "IWTE conversion finished: %s (%d KB) in %.1fs" % (job['mesh_name'], max(1, stat.st_size // 1024), elapsed))
+    if stat is not None:
+        return ('ERROR', "IWTE exited (code %s) but %s was not updated - check the task file and IWTE window" % (returncode, job['mesh_name']))
+    return ('ERROR', "IWTE exited (code %s) but %s was not created - check the task file and IWTE window" % (returncode, job['mesh_name']))
+
+
 class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
     bl_idname = "medieval2toolkit.export_unit_iwte_mesh"
     bl_label = "Export to Mesh (IWTE)"
-    bl_description = "Send the last exported GLB to IWTE to convert it into a .mesh file."
-    bl_options = {"REGISTER", "UNDO"}
+    bl_description = "Send the last exported GLB to IWTE to convert it into a .mesh file, showing progress until the conversion finishes."
+    bl_options = {"REGISTER"}
+
+    _timer = None
+
+    @classmethod
+    def poll(cls, context):
+        return _iwte_job is None
 
     def execute(self, context):
+        global _iwte_job
         saveFolderPaths()
         result = exportToMeshIWTE(context)
-        if result != "Finished":
+        if isinstance(result, str):
             self.report({'ERROR'}, result)
             return {'CANCELLED'}
-        self.report({'INFO'}, "IWTE mesh export started")
+        _iwte_job = result
+        if bpy.app.background or context.window is None:
+            # Headless: no event loop for timers, just wait for IWTE to exit.
+            result['process'].wait()
+            return self.finish(context)
+        wm = context.window_manager
+        wm.progress_begin(0, 100)
+        self._timer = wm.event_timer_add(0.2, window=context.window)
+        wm.modal_handler_add(self)
+        redrawView3D(context)
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+        job = _iwte_job
+        wm = context.window_manager
+        wm.progress_update(int(iwteProgress(time.time() - job['start']) * 100))
+        redrawView3D(context)
+        if job['process'].poll() is None:
+            return {'RUNNING_MODAL'}
+        wm.event_timer_remove(self._timer)
+        wm.progress_end()
+        result = self.finish(context)
+        redrawView3D(context)
+        return result
+
+    def finish(self, context):
+        global _iwte_job
+        job = _iwte_job
+        _iwte_job = None
+        level, message = finishIWTEJob(job)
+        if level == 'ERROR':
+            showResultsPopup(context, "IWTE conversion failed", [(level, message)])
+            self.report({'ERROR'}, message)
+            return {'CANCELLED'}
+        showResultsPopup(context, "IWTE conversion finished", [(level, message)])
+        self.report({'INFO'}, message)
         return {'FINISHED'}
 
 
@@ -288,6 +390,13 @@ class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
         col.prop(export_data, "export_animations")
         col.prop(export_data, "bmdb_entry_name")
         col.prop(export_data, "export_glb_name")
+
+        # entry name falls back to the mesh name, same as the BMDB writer
+        entry_name = export_data.bmdb_entry_name or export_data.export_glb_name
+        if entry_name:
+            existing = bmdbEntryNames(bpy.path.abspath(selectedModFolder(context)))
+            if existing is not None and entry_name.lower() in existing:
+                col.label(text="BMDB entry '%s' already exists in this mod" % entry_name, icon='ERROR')
 
         layout.operator("medieval2toolkit.select_cleanup", icon='CHECKMARK')
 
@@ -440,7 +549,12 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
             layout.operator("medieval2toolkit.open_export_folder", icon='FILE_FOLDER')
         layout.separator()
         layout.label(text="IWTE")
-        layout.operator("medieval2toolkit.export_unit_iwte_mesh", icon='MOD_ARMATURE')
+        if _iwte_job is not None:
+            elapsed = time.time() - _iwte_job['start']
+            layout.progress(factor=iwteProgress(elapsed), type='BAR',
+                            text="Converting %s... %ds" % (_iwte_job['mesh_name'], int(elapsed)))
+        else:
+            layout.operator("medieval2toolkit.export_unit_iwte_mesh", icon='MOD_ARMATURE')
         if context.mode != 'OBJECT':
             layout.enabled = False
 

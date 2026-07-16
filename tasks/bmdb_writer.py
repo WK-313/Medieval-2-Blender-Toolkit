@@ -46,6 +46,26 @@ def buildEntry(model_name, relative_path, out_main, out_main_norm, sprite, out_a
 # An entry starts with "<len> <name>", then "1 <lod count>", then a .mesh line.
 ENTRY_START = re.compile(r"^\d+ (\S+)\s*\n1 \d+\s*\n\d+ \S+\.mesh", re.IGNORECASE | re.MULTILINE)
 
+# Parsed entry names per modeldb file, invalidated when the file's mtime changes,
+# so panel redraws don't re-read a multi-megabyte file.
+_entry_names_cache = {}
+
+def bmdbEntryNames(mod_folder):
+    """All entry names (lowercased) in the mod's battle_models.modeldb, or None
+    if the mod has no modeldb file."""
+    modeldb_path = os.path.join(mod_folder, 'unit_models', 'battle_models.modeldb')
+    try:
+        mtime = os.path.getmtime(modeldb_path)
+    except OSError:
+        return None
+    cached = _entry_names_cache.get(modeldb_path)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    text = "".join(readModLines(modeldb_path, 'utf-8'))
+    names = {match.group(1).lower() for match in ENTRY_START.finditer(text)}
+    _entry_names_cache[modeldb_path] = (mtime, names)
+    return names
+
 def parseSpriteAndFooter(mod_folder, model_name):
     """Pull the sprite path and footer block of an existing model entry out of
     the mod's battle_models.modeldb. Returns (sprite, footer, error)."""

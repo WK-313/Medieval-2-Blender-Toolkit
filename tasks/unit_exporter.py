@@ -2,10 +2,11 @@ import os
 import shutil
 import struct
 import subprocess
+import time
 import bpy
 from pathlib import Path
 from .export_checks import deselectAll, materialImages
-from .bmdb_writer import buildEntry, parseRelativeUnitPath
+from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
 
 addon_folder = Path(__file__).parent.parent
 
@@ -19,6 +20,12 @@ def get_texconv_path():
 def open_folder(path):
     if os.path.exists(path):
         os.startfile(path)
+
+def selectedModFolder(context):
+    reader = context.scene.med2_toolkit_reader
+    if reader.mods_filtered != "custom":
+        return reader.mods_filtered
+    return reader.directory_mod_data
 
 def collect_textures(objects):
     textures = set()
@@ -134,6 +141,9 @@ def writeBMDBEntry(context, out_dir, plan):
     entry_path = os.path.join(out_dir, export_data.export_glb_name + "_bmdb.txt")
     with open(entry_path, "w", encoding="utf-8") as f:
         f.write(entry + "\n")
+    existing = bmdbEntryNames(bpy.path.abspath(selectedModFolder(context)))
+    if existing is not None and entry_name.lower() in existing:
+        return "BMDB entry '%s' already exists in the mod's battle_models.modeldb - replace the old entry instead of appending" % entry_name
     return None
 
 def exportArmatureGLB(context):
@@ -293,6 +303,8 @@ def exportArmatureGLB(context):
     return "Finished"
 
 def exportToMeshIWTE(context):
+    """Write the IWTE task file and launch the conversion. Returns an error
+    string on failure, or a job dict for the caller to monitor until IWTE exits."""
     reader = context.scene.med2_toolkit_reader
     glb_path = clean_path(context.scene.med2_toolkit_unit_export.last_exported_glb)
     iwte_dir = clean_path(reader.directory_iwte)
@@ -341,10 +353,22 @@ def exportToMeshIWTE(context):
     with open(task_path, "w", encoding="utf-8") as f:
         f.writelines(new_lines)
 
-    subprocess.Popen(
+    mesh_path = os.path.join(unit_folder, unit_name + ".mesh")
+    try:
+        previous_mtime = os.path.getmtime(mesh_path)
+    except OSError:
+        previous_mtime = None
+
+    process = subprocess.Popen(
         [iwte_exe, "--uh", "--st", task_path],
         cwd=iwte_dir,
         creationflags=0x08000000
     )
 
-    return "Finished"
+    return {
+        'process': process,
+        'mesh_path': mesh_path,
+        'mesh_name': unit_name + ".mesh",
+        'previous_mtime': previous_mtime,
+        'start': time.time(),
+    }
