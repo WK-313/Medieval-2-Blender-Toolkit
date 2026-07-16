@@ -188,23 +188,33 @@ class MED_2_TOOLKIT_OT_Rename_Bones_Lower_To_Upper(bpy.types.Operator):
 
 class MED_2_TOOLKIT_OT_Rename_To_Prefix(bpy.types.Operator):
     bl_idname = "medieval2toolkit.rename_to_prefix"
-    bl_label = "Apply Prefix to Selected"
-    bl_description = "Rename selected objects to <prefix>__x. Names already in x__y or x_y form keep their y part with the prefix swapped in."
+    bl_label = "Apply Prefix"
     bl_options = {'REGISTER', 'UNDO'}
+
+    swap: BoolProperty(default = False)
 
     @classmethod
     def poll(cls, context):
         return bool(context.selected_objects)
+
+    @classmethod
+    def description(cls, context, properties):
+        if properties.swap:
+            return "x__y or x_y becomes <prefix>__y: the part before the first underscore is replaced with the chosen prefix"
+        return "x becomes <prefix>__x: the whole current name is kept after the prefix"
 
     def execute(self, context):
         prefix = PREFIX_LOOKUP[context.scene.med2_toolkit_qol.rename_prefix]
         renamed = []
         for obj in context.selected_objects:
             name = obj.name
-            if "__" in name:
-                suffix = name.split("__", 1)[1]
-            elif "_" in name:
-                suffix = name.split("_", 1)[1]
+            if self.swap:
+                if "__" in name:
+                    suffix = name.split("__", 1)[1]
+                elif "_" in name:
+                    suffix = name.split("_", 1)[1]
+                else:
+                    suffix = name
             else:
                 suffix = name
             new = "%s__%s" % (prefix, suffix)
@@ -380,7 +390,10 @@ class MED_2_TOOLKIT_PT_Rename_Tools(bpy.types.Panel):
         layout.separator()
         col = layout.column(align=True)
         col.prop(settings, "rename_prefix", text="Prefix")
-        col.operator("medieval2toolkit.rename_to_prefix", icon='OUTLINER_OB_FONT')
+        op = col.operator("medieval2toolkit.rename_to_prefix", icon='ADD', text="Add Prefix (prefix__name)")
+        op.swap = False
+        op = col.operator("medieval2toolkit.rename_to_prefix", icon='ARROW_LEFTRIGHT', text="Swap Prefix (prefix__y)")
+        op.swap = True
 
 
 class MED_2_TOOLKIT_PT_QOL_Advanced(bpy.types.Panel):
