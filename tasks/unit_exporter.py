@@ -6,6 +6,7 @@ import time
 import bpy
 from pathlib import Path
 from .export_checks import deselectAll, materialImages, activeExportArmature, exportSettings
+from ..directories import loadStoredValue
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
 
 addon_folder = Path(__file__).parent.parent
@@ -26,6 +27,14 @@ def selectedModFolder(context):
     if reader.mods_filtered != "custom":
         return reader.mods_filtered
     return reader.directory_mod_data
+
+def defaultTaskTemplate(reader):
+    """Template used for rigs without their own: the last used one if it still
+    exists on disk, else the global one from the Paths panel."""
+    stored = loadStoredValue('last_iwte_task_template')
+    if stored and os.path.isfile(clean_path(stored)):
+        return stored
+    return reader.directory_iwte_task_template
 
 def collect_textures(objects):
     textures = set()
@@ -312,7 +321,10 @@ def exportToMeshIWTE(context):
         return "Select an Armature"
     glb_path = clean_path(export_data.last_exported_glb)
     iwte_dir = clean_path(reader.directory_iwte)
-    template = clean_path(reader.directory_iwte_task_template)
+    if not export_data.iwte_task_template:
+        # adopt the last used / Paths template so the rig remembers it
+        export_data.iwte_task_template = defaultTaskTemplate(reader)
+    template = clean_path(export_data.iwte_task_template)
 
     if not os.path.isfile(glb_path):
         return "No exported GLB found"

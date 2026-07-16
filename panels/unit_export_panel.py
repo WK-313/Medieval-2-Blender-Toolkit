@@ -5,8 +5,8 @@ import os
 import time
 from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
-from ..directories import saveFolderPaths
-from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder
+from ..directories import saveFolderPaths, loadStoredValue, storeValue
+from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate
 from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 
@@ -68,6 +68,98 @@ def genBlankNormalsToggled(self, context):
             self.out_attach_norm = name + "_norm"
 
 
+# Kept alive at module level like the material items (GC guard).
+_copy_faction_items = []
+_copy_unit_items = []
+
+def copyFactionItems(self, context):
+    global _copy_faction_items
+    try:
+        with open(script_folder/'text'/'available_factions.json', 'r') as factions_input:
+            factions = json.load(factions_input)
+    except (OSError, ValueError):
+        factions = {}
+    items = [(faction_id, display_name, '') for display_name, faction_id in factions.items()]
+    if not items:
+        items = [('none', 'None', 'Run Read Mod Data first')]
+    _copy_faction_items = items
+    return _copy_faction_items
+
+def copyUnitItems(self, context):
+    global _copy_unit_items
+    try:
+        with open(script_folder/'text'/'unit_dictionary.json', 'r') as units_input:
+            unit_dictionary = json.load(units_input)
+    except (OSError, ValueError):
+        unit_dictionary = {}
+    items = []
+    for unit, info in unit_dictionary.items():
+        try:
+            if self.copy_faction not in info['Owners'][self.copy_filter]:
+                continue
+        except (KeyError, TypeError):
+            continue
+        items.append((json.dumps(info), unit, ''))
+    if not items:
+        items = [('none', 'None', '')]
+    _copy_unit_items = items
+    return _copy_unit_items
+
+
+def bmdbUnitPathChanged(self, context):
+    if self.bmdb_unit_path:
+        storeValue('last_bmdb_unit_path', self.bmdb_unit_path)
+
+# True while prefillCopyFields assigns values, so copyFieldChanged doesn't
+# store a rig's untouched defaults over the remembered last-used selection.
+_prefilling = False
+
+def copyFieldChanged(self, context):
+    if _prefilling:
+        return
+    self.copy_initialized = True
+    for prop, key in (('copy_faction', 'last_copy_faction'), ('copy_filter', 'last_copy_filter'), ('copy_unit', 'last_copy_unit')):
+        value = getattr(self, prop)
+        if value and value != 'none':
+            storeValue(key, value)
+
+def iwteTemplateChanged(self, context):
+    if self.iwte_task_template:
+        storeValue('last_iwte_task_template', self.iwte_task_template)
+
+def prefillCopyFields(export_data):
+    """Fill a rig's untouched copy-from fields with the last used selection."""
+    global _prefilling
+    if export_data.copy_initialized:
+        return
+    export_data.copy_initialized = True
+    stored = [(prop, loadStoredValue(key)) for prop, key in
+              (('copy_faction', 'last_copy_faction'), ('copy_filter', 'last_copy_filter'), ('copy_unit', 'last_copy_unit'))]
+    _prefilling = True
+    try:
+        for prop, value in stored:
+            if value and value != 'none':
+                try:
+                    setattr(export_data, prop, value)
+                except TypeError:
+                    pass  # stored value not in the current mod's lists
+    finally:
+        _prefilling = False
+
+def generateBmdbToggled(self, context):
+    """Prefill a fresh rig's BMDB fields with the last used values when the
+    entry generation is switched on, instead of starting blank."""
+    if not self.generate_bmdb:
+        return
+    if not self.bmdb_unit_path:
+        self.bmdb_unit_path = loadStoredValue('last_bmdb_unit_path')
+    prefillCopyFields(self)
+
+def copyFromUnitToggled(self, context):
+    if self.copy_from_unit:
+        prefillCopyFields(self)
+
+
 class MED_2_TOOLKIT_Export_Faction(bpy.types.PropertyGroup):
     name: StringProperty(name = "Faction", description = "Display name of the faction")
     faction_id: StringProperty(name = "Faction ID", description = "Internal faction id used in battle_models.modeldb")
@@ -88,11 +180,16 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     out_attach: StringProperty(name = "Attach", description = "Output name for the attachment texture (no extension)")
     out_attach_norm: StringProperty(name = "Attach Normal", description = "Output name for the attachment normal map (no extension)")
     gen_blank_normals: BoolProperty(name = "Generate Blank Normal Maps", description = "Copy a blank normal map of matching size from the addon's normals folder for materials without one. Auto-fills the normal output names as <main>_norm / <attach>_norm", default = False, update = genBlankNormalsToggled)
-    generate_bmdb: BoolProperty(name = "Generate BMDB Entry", description = "Write a battle_models.modeldb entry text file on export", default = False)
-    bmdb_unit_path: StringProperty(name = "Mesh Path", description = "Folder for the unit's mesh inside the mod's data folder; only the part after \\data\\ is used", subtype = 'DIR_PATH')
+    generate_bmdb: BoolProperty(name = "Generate BMDB Entry", description = "Write a battle_models.modeldb entry text file on export. Prefills the mesh path and copy-from unit with the last used values", default = False, update = generateBmdbToggled)
+    bmdb_unit_path: StringProperty(name = "Mesh Path", description = "Folder for the unit's mesh inside the mod's data folder; only the part after \\data\\ is used. Remembered as the default for new rigs", subtype = 'DIR_PATH', update = bmdbUnitPathChanged)
     bmdb_sprite: StringProperty(name = "Sprite", description = "Sprite path for the entry, e.g. unit_sprites/example_sprite.spr")
     bmdb_footer: StringProperty(name = "Footer", description = "Entry footer (mounts/weapons/animation block). Use \\n for line breaks")
-    copy_from_unit: BoolProperty(name = "Copy sprite and animations from a unit", description = "Parse the sprite and footer from an existing unit in the mod's battle_models.modeldb", default = False)
+    copy_from_unit: BoolProperty(name = "Copy sprite and animations from a unit", description = "Parse the sprite and footer from an existing unit in the mod's battle_models.modeldb", default = False, update = copyFromUnitToggled)
+    copy_faction: EnumProperty(name = "Faction", description = "Faction whose unit list to copy from", items = copyFactionItems, update = copyFieldChanged)
+    copy_filter: EnumProperty(name = "Ownership filter", description = "Unit ownership filter", items = [('ownership','Ownership',''),('era 0','Era 0',''),('era 1','Era 1',''),('era 2','Era 2','')], default = 1, update = copyFieldChanged)
+    copy_unit: EnumProperty(name = "Unit", description = "Unit to copy the sprite and footer from", items = copyUnitItems, update = copyFieldChanged)
+    copy_initialized: BoolProperty(default = False, options = {'HIDDEN'})
+    iwte_task_template: StringProperty(name = "IWTE Task Template", description = "Task template used for this rig's GLB to .mesh conversion. Blank = the last used / Paths template, adopted on the first conversion", subtype = 'FILE_PATH', update = iwteTemplateChanged)
 
 
 SEVERITY_ORDER = {'ERROR': 0, 'WARNING': 1, 'INFO': 2}
@@ -238,8 +335,9 @@ class MED_2_TOOLKIT_OT_Copy_Sprite_Footer(bpy.types.Operator):
 
     def execute(self, context):
         mod_folder = selectedModFolder(context)
+        export_data = exportSettings(context)
         try:
-            unit_info = json.loads(context.scene.med2_toolkit_units.import_unit)
+            unit_info = json.loads(export_data.copy_unit)
         except (ValueError, TypeError):
             self.report({'ERROR'}, "Select a unit first (run Read Mod Data if the list is empty)")
             return {'CANCELLED'}
@@ -251,7 +349,6 @@ class MED_2_TOOLKIT_OT_Copy_Sprite_Footer(bpy.types.Operator):
         if error:
             self.report({'ERROR'}, error)
             return {'CANCELLED'}
-        export_data = exportSettings(context)
         export_data.bmdb_sprite = sprite
         export_data.bmdb_footer = footer.replace("\n", "\\n")
         self.report({'INFO'}, "Copied from '%s': sprite %s, footer %d line(s)" % (model_name, sprite, footer.count("\n") + 1))
@@ -580,9 +677,9 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
         layout.prop(export_data, "copy_from_unit")
         if export_data.copy_from_unit:
             col = layout.column(align=True)
-            col.prop(context.scene.med2_toolkit_units, "import_faction", text="Faction")
-            col.prop(context.scene.med2_toolkit_units, "import_filter", text="Filter")
-            col.prop(context.scene.med2_toolkit_units, "import_unit", text="Unit")
+            col.prop(export_data, "copy_faction", text="Faction")
+            col.prop(export_data, "copy_filter", text="Filter")
+            col.prop(export_data, "copy_unit", text="Unit")
             col.operator("medieval2toolkit.copy_sprite_footer", icon='COPYDOWN')
 
 
@@ -613,6 +710,12 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
             layout.operator("medieval2toolkit.open_export_folder", icon='FILE_FOLDER')
         layout.separator()
         layout.label(text="IWTE")
+        col = layout.column(align=True)
+        col.prop(export_data, "iwte_task_template", text="Task Template")
+        if not export_data.iwte_task_template:
+            fallback = defaultTaskTemplate(context.scene.med2_toolkit_reader)
+            if fallback:
+                col.label(text="Blank = %s" % os.path.basename(fallback.strip('"')), icon='FILE_TEXT')
         if _iwte_job is not None:
             elapsed = time.time() - _iwte_job['start']
             verb = "Converting" if _iwte_job['process'].returncode is None else "Waiting for"

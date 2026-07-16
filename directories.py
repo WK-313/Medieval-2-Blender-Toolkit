@@ -55,7 +55,14 @@ def saveFolderPaths():
         mod_list = ','.join(temp_list)
     else:
         mod_data = bpy.context.scene.med2_toolkit_reader.directory_mod_data
-    directories = {
+    # start from the existing file so extra keys (last-used defaults stored
+    # with storeValue) survive the rewrite
+    try:
+        with open(script_folder/('text/directories.json'), 'r') as directories_input:
+            directories = json.load(directories_input)
+    except (OSError, ValueError):
+        directories = {}
+    directories.update({
         "directory_med2": bpy.context.scene.med2_toolkit_reader.directory_med2,
         "directory_iwte": bpy.context.scene.med2_toolkit_reader.directory_iwte,
         "directory_mod_list": mod_list,
@@ -64,10 +71,31 @@ def saveFolderPaths():
         "directory_settlements": bpy.context.scene.med2_toolkit_reader.directory_settlements,
         "directory_unit_export": bpy.context.scene.med2_toolkit_reader.directory_unit_export,
         "directory_iwte_task_template": bpy.context.scene.med2_toolkit_reader.directory_iwte_task_template
-    }
+    })
     with open(script_folder/('text/directories.json'), 'w') as directories_output:
         json.dump(directories, directories_output, indent=2)
     return{"FINISHED"}
+
+
+def loadStoredValue(key, default=""):
+    """Read one extra value (e.g. a last-used default) from directories.json."""
+    try:
+        with open(script_folder/('text/directories.json'), 'r') as directories_input:
+            return json.load(directories_input).get(key, default)
+    except (OSError, ValueError):
+        return default
+
+
+def storeValue(key, value):
+    """Persist one extra value into directories.json."""
+    try:
+        with open(script_folder/('text/directories.json'), 'r') as directories_input:
+            directories = json.load(directories_input)
+    except (OSError, ValueError):
+        directories = {}
+    directories[key] = value
+    with open(script_folder/('text/directories.json'), 'w') as directories_output:
+        json.dump(directories, directories_output, indent=2)
 
 
 def saveSettings():
