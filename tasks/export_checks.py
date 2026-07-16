@@ -1,3 +1,4 @@
+import re
 import bpy
 from .armature_tools import skeletonUsesLowercase
 
@@ -104,8 +105,10 @@ def runSelectCleanup(context):
     if renamed:
         report.append(('INFO', "Removed trailing numbers from %d object(s): %s" % (len(renamed), ", ".join(renamed))))
 
-    # 2. x_y -> x__y (first underscore doubled), then x__y format check
+    # 2. x_y -> x__y (first underscore doubled), name+number like hair1 ->
+    # hair__hair_1, then x__y format check
     underscored = []
+    numbered = []
     bad_format = []
     for obj in meshes:
         if "__" not in obj.name and "_" in obj.name:
@@ -113,10 +116,19 @@ def runSelectCleanup(context):
             head, _, tail = obj.name.partition("_")
             obj.name = head + "__" + tail
             underscored.append("%s -> %s" % (old_name, obj.name))
+        elif "_" not in obj.name:
+            match = re.fullmatch(r"([A-Za-z]+?)(\d+)", obj.name)
+            if match:
+                old_name = obj.name
+                base, number = match.groups()
+                obj.name = "%s__%s_%s" % (base, base, number)
+                numbered.append("%s -> %s" % (old_name, obj.name))
         if "__" not in obj.name:
             bad_format.append(obj.name)
     if underscored:
         report.append(('INFO', "Converted x_y to x__y naming on %d object(s): %s" % (len(underscored), ", ".join(underscored))))
+    if numbered:
+        report.append(('INFO', "Converted name+number to name__name_number on %d object(s): %s" % (len(numbered), ", ".join(numbered))))
     if bad_format:
         report.append(('WARNING', "Not in x__y naming format: %s" % ", ".join(bad_format)))
 

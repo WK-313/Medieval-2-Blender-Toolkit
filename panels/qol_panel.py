@@ -2,6 +2,31 @@ import bpy
 from bpy.props import BoolProperty, EnumProperty, PointerProperty
 from ..tasks.armature_tools import skeletonItems, parentToSkeleton
 
+# Enum identifiers cannot safely carry spaces, so map them to the actual
+# in-mesh prefix strings ("cannon ball0" really does contain a space).
+PART_PREFIXES = [
+    ('WEAPON0', 'Weapon0', 'weapon0'),
+    ('WEAPON1', 'Weapon1', 'weapon1'),
+    ('PRIMARYACTIVE0', 'PrimaryActive0', 'primaryactive0'),
+    ('PRIMARYACTIVE1', 'PrimaryActive1', 'primaryactive1'),
+    ('PRIMARYPASSIVE0', 'PrimaryPassive0', 'primarypassive0'),
+    ('PRIMARYPASSIVE1', 'PrimaryPassive1', 'primarypassive1'),
+    ('SECONDARYACTIVE0', 'SecondaryActive0', 'secondaryactive0'),
+    ('SECONDARYACTIVE1', 'SecondaryActive1', 'secondaryactive1'),
+    ('SECONDARYPASSIVE0', 'SecondaryPassive0', 'secondarypassive0'),
+    ('SECONDARYPASSIVE1', 'SecondaryPassive1', 'secondarypassive1'),
+    ('SHIELD0', 'Shield0', 'shield0'),
+    ('SHIELD1', 'Shield1', 'shield1'),
+    ('SHIELDACTIVE0', 'ShieldActive0', 'shieldactive0'),
+    ('SHIELDACTIVE1', 'ShieldActive1', 'shieldactive1'),
+    ('SHIELDPASSIVE0', 'ShieldPassive0', 'shieldpassive0'),
+    ('SHIELDPASSIVE1', 'ShieldPassive1', 'shieldpassive1'),
+    ('RAMROD0', 'Ramrod0', 'ramrod0'),
+    ('CANNON_BALL0', 'Cannon Ball0', 'cannon ball0'),
+    ('BALLISTA_ARROW0', 'Ballista Arrow0', 'ballista arrow0'),
+]
+PREFIX_LOOKUP = {identifier: prefix for identifier, _, prefix in PART_PREFIXES}
+
 
 class MED_2_TOOLKIT_QOL_Data(bpy.types.PropertyGroup):
     vert_mapping: EnumProperty(
@@ -15,6 +40,7 @@ class MED_2_TOOLKIT_QOL_Data(bpy.types.PropertyGroup):
     )
     clear_groups: BoolProperty(name = "Clear Existing Groups", default = True)
     skeleton: EnumProperty(name = "Skeleton", description = "Skeleton from the addon's armatures folder to parent selected meshes to", items = skeletonItems)
+    rename_prefix: EnumProperty(name = "Part Prefix", description = "Prefix applied by Apply Prefix to Selected", items = [(i, label, '') for i, label, _ in PART_PREFIXES], default = 'PRIMARYACTIVE0')
 
 
 class MED_2_TOOLKIT_OT_Weight_Transfer(bpy.types.Operator):
@@ -157,6 +183,38 @@ class MED_2_TOOLKIT_OT_Rename_Bones_Lower_To_Upper(bpy.types.Operator):
 
         bpy.ops.object.mode_set(mode='OBJECT')
         self.report({'INFO'}, f"Renamed {count} bones")
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Rename_To_Prefix(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.rename_to_prefix"
+    bl_label = "Apply Prefix to Selected"
+    bl_description = "Rename selected objects to <prefix>__x. Names already in x__y or x_y form keep their y part with the prefix swapped in."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return bool(context.selected_objects)
+
+    def execute(self, context):
+        prefix = PREFIX_LOOKUP[context.scene.med2_toolkit_qol.rename_prefix]
+        renamed = []
+        for obj in context.selected_objects:
+            name = obj.name
+            if "__" in name:
+                suffix = name.split("__", 1)[1]
+            elif "_" in name:
+                suffix = name.split("_", 1)[1]
+            else:
+                suffix = name
+            new = "%s__%s" % (prefix, suffix)
+            if new != name:
+                obj.name = new
+                renamed.append("%s -> %s" % (name, obj.name))
+        if renamed:
+            self.report({'INFO'}, "Renamed %d object(s): %s" % (len(renamed), ", ".join(renamed)))
+        else:
+            self.report({'INFO'}, "No objects needed renaming")
         return {'FINISHED'}
 
 
@@ -314,10 +372,15 @@ class MED_2_TOOLKIT_PT_Rename_Tools(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
+        settings = context.scene.med2_toolkit_qol
         col = layout.column(align=True)
         col.operator("medieval2toolkit.clean_number_suffix", icon='FILE_REFRESH')
         col.operator("medieval2toolkit.rename_bones_upper_to_lower", icon='SORT_ASC')
         col.operator("medieval2toolkit.rename_bones_lower_to_upper", icon='SORT_DESC')
+        layout.separator()
+        col = layout.column(align=True)
+        col.prop(settings, "rename_prefix", text="Prefix")
+        col.operator("medieval2toolkit.rename_to_prefix", icon='OUTLINER_OB_FONT')
 
 
 class MED_2_TOOLKIT_PT_QOL_Advanced(bpy.types.Panel):
@@ -346,6 +409,7 @@ classes = [
     MED_2_TOOLKIT_OT_Clean_Suffix,
     MED_2_TOOLKIT_OT_Rename_Bones_Upper_To_Lower,
     MED_2_TOOLKIT_OT_Rename_Bones_Lower_To_Upper,
+    MED_2_TOOLKIT_OT_Rename_To_Prefix,
     MED_2_TOOLKIT_OT_Recreate_Simplebake_UV,
     MED_2_TOOLKIT_OT_Remove_Baked_Suffix,
     MED_2_TOOLKIT_OT_Parent_To_Skeleton,
