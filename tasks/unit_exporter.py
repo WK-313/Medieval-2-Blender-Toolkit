@@ -5,7 +5,7 @@ import subprocess
 import time
 import bpy
 from pathlib import Path
-from .export_checks import deselectAll, materialImages
+from .export_checks import deselectAll, materialImages, activeExportArmature, exportSettings
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
 
 addon_folder = Path(__file__).parent.parent
@@ -82,7 +82,7 @@ def writeTexture(savefiletexture, ddsdata):
 def texturePlan(context):
     """Resolve the main/attach materials into (image, out_name) pairs and the
     effective texture names used for conversion and the BMDB entry."""
-    export_data = context.scene.med2_toolkit_unit_export
+    export_data = exportSettings(context)
     main_mat = bpy.data.materials.get(export_data.material_main)
     attach_mat = bpy.data.materials.get(export_data.material_attach) if export_data.material_attach != 'none' else None
     main_diff, main_norm = materialImages(main_mat) if main_mat else (None, None)
@@ -114,8 +114,9 @@ def generateBlankNormal(texconv_unused, tex_dir, out_name, size):
     return None
 
 def writeBMDBEntry(context, out_dir, plan):
-    export_data = context.scene.med2_toolkit_unit_export
-    factions = [item.faction_id for item in context.scene.med2_toolkit_export_factions if item.enabled]
+    armature = activeExportArmature(context)
+    export_data = armature.med2_toolkit_unit_export
+    factions = [item.faction_id for item in armature.med2_toolkit_export_factions if item.enabled]
     if not factions:
         return "BMDB entry skipped: no factions selected for ownership"
     if not export_data.bmdb_unit_path:
@@ -151,11 +152,11 @@ def exportArmatureGLB(context):
     if not texconv:
         return "texconv.exe not found in the addon's bin folder"
 
-    arm = context.object
-    if not arm or arm.type != 'ARMATURE':
+    arm = activeExportArmature(context)
+    if not arm:
         return "Select an Armature"
 
-    export_data = context.scene.med2_toolkit_unit_export
+    export_data = arm.med2_toolkit_unit_export
     base_out = clean_path(context.scene.med2_toolkit_reader.directory_unit_export)
     export_name = export_data.export_glb_name
 
@@ -306,7 +307,10 @@ def exportToMeshIWTE(context):
     """Write the IWTE task file and launch the conversion. Returns an error
     string on failure, or a job dict for the caller to monitor until IWTE exits."""
     reader = context.scene.med2_toolkit_reader
-    glb_path = clean_path(context.scene.med2_toolkit_unit_export.last_exported_glb)
+    export_data = exportSettings(context)
+    if export_data is None:
+        return "Select an Armature"
+    glb_path = clean_path(export_data.last_exported_glb)
     iwte_dir = clean_path(reader.directory_iwte)
     template = clean_path(reader.directory_iwte_task_template)
 

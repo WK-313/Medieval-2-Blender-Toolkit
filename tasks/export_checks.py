@@ -14,8 +14,23 @@ def deselectAll(context):
         except RuntimeError:
             pass
 
+def activeExportArmature(context):
+    """The armature whose export settings apply: the active object if it's an
+    armature, else the nearest armature up the parent chain."""
+    obj = context.object
+    while obj is not None:
+        if obj.type == 'ARMATURE':
+            return obj
+        obj = obj.parent
+    return None
+
+def exportSettings(context):
+    """The active armature's per-object export settings, or None."""
+    armature = activeExportArmature(context)
+    return armature.med2_toolkit_unit_export if armature else None
+
 def exportMeshes(context, armature):
-    export_data = context.scene.med2_toolkit_unit_export
+    export_data = armature.med2_toolkit_unit_export
     return [
         obj for obj in armature.children_recursive
         if obj.type == 'MESH'
@@ -93,8 +108,8 @@ def runSelectCleanup(context):
     """Select the armature's export set and run all validation/cleanup checks.
     Returns a list of (level, message) where level is INFO/WARNING/ERROR."""
     report = []
-    armature = context.object
-    if not armature or armature.type != 'ARMATURE':
+    armature = activeExportArmature(context)
+    if not armature:
         return [('ERROR', "Select an Armature first")]
 
     deselectAll(context)

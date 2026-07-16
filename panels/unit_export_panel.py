@@ -7,7 +7,7 @@ from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
 from ..directories import saveFolderPaths
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder
-from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages
+from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 
 script_folder = Path(__file__).parent.parent
@@ -18,10 +18,10 @@ _material_items = []
 _material_items_none = []
 
 def exportSetMaterials(context):
-    obj = context.object
-    if not obj or obj.type != 'ARMATURE':
+    armature = activeExportArmature(context)
+    if not armature:
         return []
-    return uniqueMaterials(exportMeshes(context, obj))
+    return uniqueMaterials(exportMeshes(context, armature))
 
 def materialItems(self, context):
     global _material_items
@@ -117,14 +117,13 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        obj = context.object
-        return obj is not None and obj.type == 'ARMATURE'
+        return activeExportArmature(context) is not None
 
     def execute(self, context):
         results = runSelectCleanup(context)
 
         # auto-assign materials named *_main / *_attach to the dropdowns
-        export_data = context.scene.med2_toolkit_unit_export
+        export_data = exportSettings(context)
         for material in exportSetMaterials(context):
             lowered = material.name.lower()
             try:
@@ -150,7 +149,11 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Export_Factions_Refresh(bpy.types.Operator):
     bl_idname = "medieval2toolkit.export_factions_refresh"
     bl_label = "Refresh Factions"
-    bl_description = "Load the faction list from the last Read Mod Data."
+    bl_description = "Load the faction list from the last Read Mod Data into the active armature's entry."
+
+    @classmethod
+    def poll(cls, context):
+        return activeExportArmature(context) is not None
 
     def execute(self, context):
         factions_file = script_folder/'text'/'available_factions.json'
@@ -162,7 +165,7 @@ class MED_2_TOOLKIT_OT_Export_Factions_Refresh(bpy.types.Operator):
         if not factions:
             self.report({'ERROR'}, "No factions found - run Read Mod Data first")
             return {'CANCELLED'}
-        collection = context.scene.med2_toolkit_export_factions
+        collection = activeExportArmature(context).med2_toolkit_export_factions
         previous = {item.faction_id: item.enabled for item in collection}
         collection.clear()
         for display_name, faction_id in factions.items():
@@ -189,8 +192,12 @@ class MED_2_TOOLKIT_OT_Export_Factions_Set(bpy.types.Operator):
 
     select: BoolProperty(default = True)
 
+    @classmethod
+    def poll(cls, context):
+        return activeExportArmature(context) is not None
+
     def execute(self, context):
-        for item in context.scene.med2_toolkit_export_factions:
+        for item in activeExportArmature(context).med2_toolkit_export_factions:
             item.enabled = self.select
         return {'FINISHED'}
 
@@ -204,13 +211,17 @@ class MED_2_TOOLKIT_OT_Export_Faction_Toggle(bpy.types.Operator):
 
     @classmethod
     def description(cls, context, properties):
-        factions = context.scene.med2_toolkit_export_factions
+        armature = activeExportArmature(context)
+        factions = armature.med2_toolkit_export_factions if armature else []
         if 0 <= properties.index < len(factions):
             return "Codename = %s" % factions[properties.index].faction_id
         return "Toggle ownership"
 
     def execute(self, context):
-        factions = context.scene.med2_toolkit_export_factions
+        armature = activeExportArmature(context)
+        if armature is None:
+            return {'CANCELLED'}
+        factions = armature.med2_toolkit_export_factions
         if 0 <= self.index < len(factions):
             factions[self.index].enabled = not factions[self.index].enabled
         return {'FINISHED'}
@@ -220,6 +231,10 @@ class MED_2_TOOLKIT_OT_Copy_Sprite_Footer(bpy.types.Operator):
     bl_idname = "medieval2toolkit.copy_sprite_footer"
     bl_label = "Copy Sprite and Footer"
     bl_description = "Parse the selected unit's sprite and footer from the mod's battle_models.modeldb into the fields below."
+
+    @classmethod
+    def poll(cls, context):
+        return activeExportArmature(context) is not None
 
     def execute(self, context):
         mod_folder = selectedModFolder(context)
@@ -236,7 +251,7 @@ class MED_2_TOOLKIT_OT_Copy_Sprite_Footer(bpy.types.Operator):
         if error:
             self.report({'ERROR'}, error)
             return {'CANCELLED'}
-        export_data = context.scene.med2_toolkit_unit_export
+        export_data = exportSettings(context)
         export_data.bmdb_sprite = sprite
         export_data.bmdb_footer = footer.replace("\n", "\\n")
         self.report({'INFO'}, "Copied from '%s': sprite %s, footer %d line(s)" % (model_name, sprite, footer.count("\n") + 1))
@@ -251,8 +266,7 @@ class MED_2_TOOLKIT_OT_Export_Unit_GLB(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        obj = context.object
-        return obj is not None and obj.type == 'ARMATURE'
+        return activeExportArmature(context) is not None
 
     def execute(self, context):
         saveFolderPaths()
@@ -271,8 +285,15 @@ class MED_2_TOOLKIT_OT_Export_Unit_GLB(bpy.types.Operator):
 
 # The one running IWTE conversion, shared with the Export panel so it can draw
 # a progress bar. IWTE gives no percentage feedback, so the bar eases toward
-# full over time and jumps to done when the process exits.
+# full over time and jumps to done when the mesh lands on disk. The .mesh can
+# appear well after the IWTE process exits, so the watcher keeps polling the
+# folder until the file shows up (or updates) or the wait times out.
 _iwte_job = None
+
+# How long to keep watching the folder after the IWTE process has exited.
+IWTE_MESH_TIMEOUT = 300.0
+# The mesh counts as written once it has stopped growing for this long.
+IWTE_QUIET_SECONDS = 1.0
 
 def iwteProgress(elapsed):
     return 1.0 - math.exp(-elapsed / 10.0)
@@ -283,20 +304,31 @@ def redrawView3D(context):
             if area.type == 'VIEW_3D':
                 area.tag_redraw()
 
-def finishIWTEJob(job):
-    """Judge a finished IWTE process by whether it produced a new .mesh file.
-    Returns (level, message) for reporting."""
-    elapsed = time.time() - job['start']
-    returncode = job['process'].returncode
+def iwteMeshReady(job):
+    """True once the .mesh exists, is newer than any pre-existing file, and
+    has stopped changing (same size as last check and quiet for a moment)."""
     try:
         stat = os.stat(job['mesh_path'])
     except OSError:
-        stat = None
-    if stat is not None and (job['previous_mtime'] is None or stat.st_mtime > job['previous_mtime']):
-        return ('INFO', "IWTE conversion finished: %s (%d KB) in %.1fs" % (job['mesh_name'], max(1, stat.st_size // 1024), elapsed))
-    if stat is not None:
-        return ('ERROR', "IWTE exited (code %s) but %s was not updated - check the task file and IWTE window" % (returncode, job['mesh_name']))
-    return ('ERROR', "IWTE exited (code %s) but %s was not created - check the task file and IWTE window" % (returncode, job['mesh_name']))
+        return False
+    if job['previous_mtime'] is not None and stat.st_mtime <= job['previous_mtime']:
+        return False
+    if stat.st_size <= 0 or time.time() - stat.st_mtime < IWTE_QUIET_SECONDS:
+        return False
+    if stat.st_size != job.get('last_size'):
+        job['last_size'] = stat.st_size
+        return False
+    return True
+
+def finishIWTEJob(job, success):
+    """Compose the (level, message) report for a finished conversion."""
+    elapsed = time.time() - job['start']
+    if success:
+        size = os.stat(job['mesh_path']).st_size
+        return ('INFO', "IWTE conversion finished: %s (%d KB) in %.1fs" % (job['mesh_name'], max(1, size // 1024), elapsed))
+    returncode = job['process'].returncode
+    verb = "updated" if job['previous_mtime'] is not None else "created"
+    return ('ERROR', "IWTE exited (code %s) but %s was not %s within %ds - check the task file and IWTE window" % (returncode, job['mesh_name'], verb, int(IWTE_MESH_TIMEOUT)))
 
 
 class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
@@ -309,7 +341,7 @@ class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return _iwte_job is None
+        return _iwte_job is None and activeExportArmature(context) is not None
 
     def execute(self, context):
         global _iwte_job
@@ -320,9 +352,15 @@ class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
             return {'CANCELLED'}
         _iwte_job = result
         if bpy.app.background or context.window is None:
-            # Headless: no event loop for timers, just wait for IWTE to exit.
+            # Headless: no event loop for timers, wait for IWTE and then poll
+            # the folder for the mesh the same way the modal timer does.
             result['process'].wait()
-            return self.finish(context)
+            deadline = time.time() + IWTE_MESH_TIMEOUT
+            success = iwteMeshReady(result)
+            while not success and time.time() < deadline:
+                time.sleep(0.5)
+                success = iwteMeshReady(result)
+            return self.finish(context, success)
         wm = context.window_manager
         wm.progress_begin(0, 100)
         self._timer = wm.event_timer_add(0.2, window=context.window)
@@ -337,19 +375,30 @@ class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
         wm = context.window_manager
         wm.progress_update(int(iwteProgress(time.time() - job['start']) * 100))
         redrawView3D(context)
+        if iwteMeshReady(job):
+            return self.stop(context, True)
         if job['process'].poll() is None:
             return {'RUNNING_MODAL'}
+        # process gone: keep watching the folder, IWTE writes the mesh late
+        if job.get('exit_time') is None:
+            job['exit_time'] = time.time()
+        if time.time() - job['exit_time'] < IWTE_MESH_TIMEOUT:
+            return {'RUNNING_MODAL'}
+        return self.stop(context, False)
+
+    def stop(self, context, success):
+        wm = context.window_manager
         wm.event_timer_remove(self._timer)
         wm.progress_end()
-        result = self.finish(context)
+        result = self.finish(context, success)
         redrawView3D(context)
         return result
 
-    def finish(self, context):
+    def finish(self, context, success):
         global _iwte_job
         job = _iwte_job
         _iwte_job = None
-        level, message = finishIWTEJob(job)
+        level, message = finishIWTEJob(job, success)
         if level == 'ERROR':
             showResultsPopup(context, "IWTE conversion failed", [(level, message)])
             self.report({'ERROR'}, message)
@@ -362,10 +411,14 @@ class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Open_Export_Folder(bpy.types.Operator):
     bl_idname = "medieval2toolkit.open_export_folder"
     bl_label = "Open Output Folder"
-    bl_description = "Open the last unit export folder in the file explorer."
+    bl_description = "Open the armature's last unit export folder in the file explorer."
+
+    @classmethod
+    def poll(cls, context):
+        return activeExportArmature(context) is not None
 
     def execute(self, context):
-        open_folder(context.scene.med2_toolkit_unit_export.last_export_dir)
+        open_folder(exportSettings(context).last_export_dir)
         return {'FINISHED'}
 
 
@@ -383,7 +436,12 @@ class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        export_data = context.scene.med2_toolkit_unit_export
+        armature = activeExportArmature(context)
+        if not armature:
+            layout.label(text="Select an armature to edit its export settings", icon='INFO')
+            return
+        export_data = armature.med2_toolkit_unit_export
+        layout.label(text="Armature: %s" % armature.name, icon='ARMATURE_DATA')
 
         col = layout.column(align=True)
         col.prop(export_data, "export_visible_only")
@@ -418,12 +476,11 @@ class MED_2_TOOLKIT_PT_Export_Materials(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        export_data = context.scene.med2_toolkit_unit_export
-
-        obj = context.object
-        if not obj or obj.type != 'ARMATURE':
+        armature = activeExportArmature(context)
+        if not armature:
             layout.label(text="Select an armature to list materials", icon='INFO')
             return
+        export_data = armature.med2_toolkit_unit_export
 
         materials = exportSetMaterials(context)
         if len(materials) > 2:
@@ -483,7 +540,11 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        export_data = context.scene.med2_toolkit_unit_export
+        armature = activeExportArmature(context)
+        if not armature:
+            layout.label(text="Select an armature to edit its BMDB entry", icon='INFO')
+            return
+        export_data = armature.med2_toolkit_unit_export
 
         layout.prop(export_data, "generate_bmdb")
         if not export_data.generate_bmdb:
@@ -496,7 +557,7 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
         op.select = True
         op = row.operator("medieval2toolkit.export_factions_set", text="None")
         op.select = False
-        factions = context.scene.med2_toolkit_export_factions
+        factions = armature.med2_toolkit_export_factions
         if not factions:
             layout.label(text="Press refresh after Read Mod Data", icon='INFO')
         else:
@@ -539,8 +600,11 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        export_data = context.scene.med2_toolkit_unit_export
+        export_data = exportSettings(context)
 
+        if export_data is None:
+            layout.label(text="Select an armature to export", icon='INFO')
+            return
         if export_data.generate_bmdb:
             layout.operator("medieval2toolkit.export_unit_glb", icon='EXPORT', text="Export GLB + Convert Textures + BMDB")
         else:
@@ -551,8 +615,9 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
         layout.label(text="IWTE")
         if _iwte_job is not None:
             elapsed = time.time() - _iwte_job['start']
+            verb = "Converting" if _iwte_job['process'].returncode is None else "Waiting for"
             layout.progress(factor=iwteProgress(elapsed), type='BAR',
-                            text="Converting %s... %ds" % (_iwte_job['mesh_name'], int(elapsed)))
+                            text="%s %s... %ds" % (verb, _iwte_job['mesh_name'], int(elapsed)))
         else:
             layout.operator("medieval2toolkit.export_unit_iwte_mesh", icon='MOD_ARMATURE')
         if context.mode != 'OBJECT':
@@ -579,11 +644,13 @@ classes = [
 def register():
     for item in classes:
         bpy.utils.register_class(item)
-    bpy.types.Scene.med2_toolkit_unit_export = PointerProperty(type=MED_2_TOOLKIT_Unit_Export_Data)
-    bpy.types.Scene.med2_toolkit_export_factions = CollectionProperty(type=MED_2_TOOLKIT_Export_Faction)
+    # Stored on the Object (the armature) so every rig keeps its own export
+    # settings, saved with the .blend.
+    bpy.types.Object.med2_toolkit_unit_export = PointerProperty(type=MED_2_TOOLKIT_Unit_Export_Data)
+    bpy.types.Object.med2_toolkit_export_factions = CollectionProperty(type=MED_2_TOOLKIT_Export_Faction)
 
 def unregister():
     for item in classes:
         bpy.utils.unregister_class(item)
-    del bpy.types.Scene.med2_toolkit_unit_export
-    del bpy.types.Scene.med2_toolkit_export_factions
+    del bpy.types.Object.med2_toolkit_unit_export
+    del bpy.types.Object.med2_toolkit_export_factions
