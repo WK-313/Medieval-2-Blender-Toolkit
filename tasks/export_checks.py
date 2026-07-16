@@ -66,6 +66,29 @@ def materialFingerprint(material):
                 images.add(bpy.path.abspath(node.image.filepath) or node.image.name)
     return (baseName(material.name), frozenset(images))
 
+def stripTrailingNumbers(meshes):
+    """Remove trailing .001-style suffixes from the export set. If the base
+    name is held by an object outside the set, swap names with it; if it's
+    held inside the set, that's a real conflict. Returns (renamed, errors)."""
+    renamed = []
+    errors = []
+    for obj in meshes:
+        if not ("." in obj.name and obj.name.split(".")[-1].isdigit()):
+            continue
+        base = obj.name.rsplit(".", 1)[0]
+        holder = bpy.data.objects.get(base)
+        if holder and holder is not obj and holder in meshes:
+            group = sorted(o.name for o in meshes if baseName(o.name) == base)
+            errors.append("Cannot remove trailing number: %s all share the base name '%s'" % (", ".join(group), base))
+            continue
+        old_name = obj.name
+        if holder and holder is not obj:
+            obj.name = base + ".__swap__"
+            holder.name = old_name
+        obj.name = base
+        renamed.append("%s -> %s" % (old_name, obj.name))
+    return renamed, errors
+
 def runSelectCleanup(context):
     """Select the armature's export set and run all validation/cleanup checks.
     Returns a list of (level, message) where level is INFO/WARNING/ERROR."""
@@ -85,25 +108,10 @@ def runSelectCleanup(context):
         obj.select_set(True)
     context.view_layer.objects.active = armature
 
-    # 1. trailing .001 suffix cleanup, with conflict detection inside the set
-    renamed = []
-    for obj in meshes:
-        if not ("." in obj.name and obj.name.split(".")[-1].isdigit()):
-            continue
-        base = obj.name.rsplit(".", 1)[0]
-        holder = bpy.data.objects.get(base)
-        if holder and holder is not obj and holder in meshes:
-            group = sorted(o.name for o in meshes if baseName(o.name) == base)
-            report.append(('ERROR', "Cannot remove trailing number: %s all share the base name '%s'" % (", ".join(group), base)))
-            continue
-        old_name = obj.name
-        if holder and holder is not obj:
-            obj.name = base + ".__swap__"
-            holder.name = old_name
-        obj.name = base
-        renamed.append("%s -> %s" % (old_name, obj.name))
-    if renamed:
-        report.append(('INFO', "Removed trailing numbers from %d object(s): %s" % (len(renamed), ", ".join(renamed))))
+    # 1. trailing .001 suffix cleanup, with conflict detection inside the set.
+    # Runs again after step 2, whose renames can collide and pick up fresh
+    # suffixes; errors are deduplicated across the two passes.
+    renamed, name_errors = stripTrailingNumbers(meshes)
 
     # 2. x_y -> x__y (first underscore doubled), name+number like hair1 ->
     # hair__hair_1, then x__y format check
@@ -125,6 +133,19 @@ def runSelectCleanup(context):
                 numbered.append("%s -> %s" % (old_name, obj.name))
         if "__" not in obj.name:
             bad_format.append(obj.name)
+
+    # second .001 sweep: the step-2 renames collide with existing names and
+    # silently gain a fresh trailing number, which the first pass never saw
+    renamed_after, errors_after = stripTrailingNumbers(meshes)
+    renamed += renamed_after
+    for error in errors_after:
+        if error not in name_errors:
+            name_errors.append(error)
+
+    if renamed:
+        report.append(('INFO', "Removed trailing numbers from %d object(s): %s" % (len(renamed), ", ".join(renamed))))
+    for error in name_errors:
+        report.append(('ERROR', error))
     if underscored:
         report.append(('INFO', "Converted x_y to x__y naming on %d object(s): %s" % (len(underscored), ", ".join(underscored))))
     if numbered:
