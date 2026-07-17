@@ -5,7 +5,7 @@ import os
 import time
 from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
-from ..directories import saveFolderPaths, loadStoredValue, storeValue
+from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJsonCached
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate
 from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
@@ -68,17 +68,16 @@ def genBlankNormalsToggled(self, context):
             self.out_attach_norm = name + "_norm"
 
 
-# Kept alive at module level like the material items (GC guard).
+# Kept alive at module level like the material items (GC guard). The unit
+# list is also cached per (file version, faction, filter): the items callback
+# runs on every redraw and rebuilding ~900 units of JSON identifiers each
+# time lags the whole panel.
 _copy_faction_items = []
-_copy_unit_items = []
+_copy_unit_cache = {'key': None, 'items': [('none', 'None', '')]}
 
 def copyFactionItems(self, context):
     global _copy_faction_items
-    try:
-        with open(script_folder/'text'/'available_factions.json', 'r') as factions_input:
-            factions = json.load(factions_input)
-    except (OSError, ValueError):
-        factions = {}
+    factions = readJsonCached(script_folder/'text'/'available_factions.json')
     items = [(faction_id, display_name, '') for display_name, faction_id in factions.items()]
     if not items:
         items = [('none', 'None', 'Run Read Mod Data first')]
@@ -86,12 +85,15 @@ def copyFactionItems(self, context):
     return _copy_faction_items
 
 def copyUnitItems(self, context):
-    global _copy_unit_items
+    path = script_folder/'text'/'unit_dictionary.json'
     try:
-        with open(script_folder/'text'/'unit_dictionary.json', 'r') as units_input:
-            unit_dictionary = json.load(units_input)
-    except (OSError, ValueError):
-        unit_dictionary = {}
+        mtime = os.path.getmtime(path)
+    except OSError:
+        mtime = None
+    key = (mtime, self.copy_faction, self.copy_filter)
+    if _copy_unit_cache['key'] == key:
+        return _copy_unit_cache['items']
+    unit_dictionary = readJsonCached(path)
     items = []
     for unit, info in unit_dictionary.items():
         try:
@@ -102,8 +104,9 @@ def copyUnitItems(self, context):
         items.append((json.dumps(info), unit, ''))
     if not items:
         items = [('none', 'None', '')]
-    _copy_unit_items = items
-    return _copy_unit_items
+    _copy_unit_cache['key'] = key
+    _copy_unit_cache['items'] = items
+    return _copy_unit_cache['items']
 
 
 def bmdbUnitPathChanged(self, context):

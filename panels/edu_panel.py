@@ -3,7 +3,7 @@ import json
 from bpy.props import StringProperty, BoolProperty, PointerProperty, CollectionProperty, IntProperty, EnumProperty
 from pathlib import Path
 
-from..directories import saveFolderPaths, saveSettings
+from..directories import saveFolderPaths, saveSettings, readJsonCached
 from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, hideVariations, postImport
 from ..tasks.task_writer import unitTaskWriter, engineTaskWriter
 
@@ -11,8 +11,7 @@ from ..tasks.task_writer import unitTaskWriter, engineTaskWriter
 script_folder = Path(__file__).parent.parent
 
 def sortFactions(self, context):
-    with open(script_folder/('text/available_factions.json'), 'r') as import_factions_input:
-        factions = json.load(import_factions_input)
+    factions = readJsonCached(script_folder/('text/available_factions.json'))
     faction_list = []
     for faction in factions:
         entry = (factions[faction], faction, "")
@@ -20,8 +19,7 @@ def sortFactions(self, context):
     return(faction_list)
 
 def sortUnits(self, context):
-    with open(script_folder/('text/unit_dictionary.json'), 'r') as import_unit_input:
-        unit_dictionary = json.load(import_unit_input)
+    unit_dictionary = readJsonCached(script_folder/('text/unit_dictionary.json'))
     import_faction = context.scene.med2_toolkit_units.import_faction
     filter = context.scene.med2_toolkit_units.import_filter
     faction_units = []

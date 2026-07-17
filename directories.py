@@ -1,6 +1,6 @@
 
 from pathlib import Path
-import json, bpy
+import json, os, bpy
 
 script_folder = Path(__file__).parent
 
@@ -75,6 +75,32 @@ def saveFolderPaths():
     with open(script_folder/('text/directories.json'), 'w') as directories_output:
         json.dump(directories, directories_output, indent=2)
     return{"FINISHED"}
+
+
+# Parsed text/*.json files keyed by path, invalidated by mtime. Enum item
+# callbacks run on every redraw, and reparsing a big unit dictionary each
+# time visibly lags the UI.
+_json_cache = {}
+
+def readJsonCached(path):
+    """Parse one of the generated data JSONs, cached until the file changes.
+    Returns {} when the file is missing or invalid. Callers must not mutate
+    the returned object."""
+    key = str(path)
+    try:
+        mtime = os.path.getmtime(key)
+    except OSError:
+        return {}
+    cached = _json_cache.get(key)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    try:
+        with open(key, 'r') as json_input:
+            data = json.load(json_input)
+    except (OSError, ValueError):
+        data = {}
+    _json_cache[key] = (mtime, data)
+    return data
 
 
 def loadStoredValue(key, default=""):
