@@ -324,6 +324,25 @@ class MED_2_TOOLKIT_OT_Export_Faction_Toggle(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MED_2_TOOLKIT_OT_Copy_Mesh_Name(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.copy_mesh_name"
+    bl_label = "Copy Mesh Name"
+    bl_description = "Use the mesh name as the BMDB entry name."
+
+    @classmethod
+    def poll(cls, context):
+        return activeExportArmature(context) is not None
+
+    def execute(self, context):
+        export_data = exportSettings(context)
+        if not export_data.export_glb_name:
+            self.report({'ERROR'}, "Mesh name is empty")
+            return {'CANCELLED'}
+        export_data.bmdb_entry_name = export_data.export_glb_name
+        self.report({'INFO'}, "BMDB entry name set to '%s'" % export_data.export_glb_name)
+        return {'FINISHED'}
+
+
 class MED_2_TOOLKIT_OT_Copy_Sprite_Footer(bpy.types.Operator):
     bl_idname = "medieval2toolkit.copy_sprite_footer"
     bl_label = "Copy Sprite and Footer"
@@ -543,15 +562,7 @@ class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
         col = layout.column(align=True)
         col.prop(export_data, "export_visible_only")
         col.prop(export_data, "export_animations")
-        col.prop(export_data, "bmdb_entry_name")
         col.prop(export_data, "export_glb_name")
-
-        # entry name falls back to the mesh name, same as the BMDB writer
-        entry_name = export_data.bmdb_entry_name or export_data.export_glb_name
-        if entry_name:
-            existing = bmdbEntryNames(bpy.path.abspath(selectedModFolder(context)))
-            if existing is not None and entry_name.lower() in existing:
-                col.label(text="BMDB entry '%s' already exists in this mod" % entry_name, icon='ERROR')
 
         layout.operator("medieval2toolkit.select_cleanup", icon='CHECKMARK')
 
@@ -648,6 +659,16 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
             return
 
         row = layout.row(align=True)
+        row.prop(export_data, "bmdb_entry_name", text="Entry Name")
+        row.operator("medieval2toolkit.copy_mesh_name", text="Copy Mesh Name")
+        # entry name falls back to the mesh name, same as the BMDB writer
+        entry_name = export_data.bmdb_entry_name or export_data.export_glb_name
+        if entry_name:
+            existing = bmdbEntryNames(bpy.path.abspath(selectedModFolder(context)))
+            if existing is not None and entry_name.lower() in existing:
+                layout.label(text="BMDB entry '%s' already exists in this mod" % entry_name, icon='ERROR')
+
+        row = layout.row(align=True)
         row.label(text="Ownership:")
         row.operator("medieval2toolkit.export_factions_refresh", icon='FILE_REFRESH', text="")
         op = row.operator("medieval2toolkit.export_factions_set", text="All")
@@ -712,10 +733,14 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
         layout.label(text="IWTE")
         col = layout.column(align=True)
         col.prop(export_data, "iwte_task_template", text="Task Template")
-        if not export_data.iwte_task_template:
+        if export_data.iwte_task_template:
+            file_name = os.path.basename(export_data.iwte_task_template.strip('"').strip("'"))
+            col.label(text="IWTE task file selected: %s" % file_name, icon='FILE_TEXT')
+        else:
             fallback = defaultTaskTemplate(context.scene.med2_toolkit_reader)
             if fallback:
-                col.label(text="Blank = %s" % os.path.basename(fallback.strip('"')), icon='FILE_TEXT')
+                file_name = os.path.basename(fallback.strip('"').strip("'"))
+                col.label(text="If blank, uses recent task file: %s" % file_name, icon='FILE_TEXT')
         if _iwte_job is not None:
             elapsed = time.time() - _iwte_job['start']
             verb = "Converting" if _iwte_job['process'].returncode is None else "Waiting for"
@@ -734,6 +759,7 @@ classes = [
     MED_2_TOOLKIT_OT_Export_Factions_Refresh,
     MED_2_TOOLKIT_OT_Export_Factions_Set,
     MED_2_TOOLKIT_OT_Export_Faction_Toggle,
+    MED_2_TOOLKIT_OT_Copy_Mesh_Name,
     MED_2_TOOLKIT_OT_Copy_Sprite_Footer,
     MED_2_TOOLKIT_OT_Export_Unit_GLB,
     MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh,

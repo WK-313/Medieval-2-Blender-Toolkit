@@ -134,7 +134,6 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
         col.prop (context.scene.med2_toolkit_reader, "directory_iwte", text="IWTE")
         if mode == 'unit_export':
             col.prop (context.scene.med2_toolkit_reader, "directory_unit_export", text="Export Output")
-            col.prop (context.scene.med2_toolkit_reader, "directory_iwte_task_template", text="IWTE Task Template")
         elif mode == 'unit_import':
             col.prop (context.scene.med2_toolkit_reader, "directory_models", text="Unit Output")
         else:
