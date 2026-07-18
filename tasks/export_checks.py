@@ -81,6 +81,41 @@ def materialFingerprint(material):
                 images.add(bpy.path.abspath(node.image.filepath) or node.image.name)
     return (baseName(material.name), frozenset(images))
 
+def dedupeMaterialSlots(obj):
+    """Collapse repeated material slots on one mesh: remap its faces to the
+    first slot holding each material, then drop the now-duplicate slots.
+    Returns the number of slots removed."""
+    mesh = obj.data
+    slots = obj.material_slots
+    # remember each face's material by identity before we disturb slot indices
+    poly_material = []
+    for poly in mesh.polygons:
+        if 0 <= poly.material_index < len(slots):
+            poly_material.append(slots[poly.material_index].material)
+        else:
+            poly_material.append(None)
+    seen = set()
+    duplicate_indices = []
+    for index, slot in enumerate(slots):
+        material = slot.material
+        if material is None:
+            continue
+        if material in seen:
+            duplicate_indices.append(index)
+        else:
+            seen.add(material)
+    if not duplicate_indices:
+        return 0
+    # remove from the highest index down so lower indices stay valid
+    for index in reversed(duplicate_indices):
+        mesh.materials.pop(index=index)
+    # reassign faces by material identity to the surviving slot order
+    mat_to_index = {slot.material: index for index, slot in enumerate(obj.material_slots) if slot.material is not None}
+    for poly, material in zip(mesh.polygons, poly_material):
+        if material in mat_to_index:
+            poly.material_index = mat_to_index[material]
+    return len(duplicate_indices)
+
 def stripTrailingNumbers(meshes):
     """Remove trailing .001-style suffixes from the export set. If the base
     name is held by an object outside the set, swap names with it; if it's
@@ -183,7 +218,17 @@ def runSelectCleanup(context):
         if not has_secondary:
             report.append(('INFO', "Melee skeleton: no secondaryactive0__ object, check if needed"))
 
-    # 5. material count per object
+    # 5. collapse repeated material slots on a single object (same material
+    # assigned to two slots), so the count check below sees real materials
+    slot_deduped = []
+    for obj in meshes:
+        removed = dedupeMaterialSlots(obj)
+        if removed:
+            slot_deduped.append("%s (%d)" % (obj.name, removed))
+    if slot_deduped:
+        report.append(('INFO', "Removed duplicate material slots from %d object(s): %s" % (len(slot_deduped), ", ".join(slot_deduped))))
+
+    # 6. material count per object
     bad_counts = []
     for obj in meshes:
         count = sum(1 for slot in obj.material_slots if slot.material)
@@ -192,7 +237,7 @@ def runSelectCleanup(context):
     if bad_counts:
         report.append(('ERROR', "Objects need 1-2 materials: %s" % ", ".join(bad_counts)))
 
-    # 6. de-duplicate identical materials (material1 vs material1.001)
+    # 7. de-duplicate identical materials (material1 vs material1.001)
     fingerprints = {}
     remapped = []
     for material in uniqueMaterials(meshes):
@@ -209,7 +254,7 @@ def runSelectCleanup(context):
     if remapped:
         report.append(('INFO', "Merged duplicate materials: %s" % ", ".join(remapped)))
 
-    # 7. objects with no weights at all
+    # 8. objects with no weights at all
     weightless = []
     for obj in meshes:
         has_weight = False
@@ -223,7 +268,7 @@ def runSelectCleanup(context):
     if weightless:
         report.append(('ERROR', "Objects with no vertex weights: %s" % ", ".join(weightless)))
 
-    # 8. UVs must stay inside the main tile and one tile to the right
+    # 9. UVs must stay inside the main tile and one tile to the right
     eps = 0.001
     uv_offenders = []
     for obj in meshes:
@@ -239,7 +284,7 @@ def runSelectCleanup(context):
     if uv_offenders:
         report.append(('WARNING', "UVs outside the allowed 2x1 tile space: %s" % ", ".join(uv_offenders)))
 
-    # 9. texture dimensions
+    # 10. texture dimensions
     seen_images = set()
     for material in uniqueMaterials(meshes):
         if not material.use_nodes:
@@ -260,4 +305,61 @@ def runSelectCleanup(context):
 
     if not report:
         report.append(('INFO', "All checks passed"))
+    return report
+
+def forceTextures(context):
+    """Fold every .NNN numbered duplicate of the selected main/attach material
+    into that material across all export mesh slots, even if the duplicates use
+    different textures. Only 'material.001'/'material.002' style names match;
+    'material1.001' has base 'material1' and is left alone unless it is the
+    selected material. Returns a list of (level, message)."""
+    armature = activeExportArmature(context)
+    if not armature:
+        return [('ERROR', "Select an Armature first")]
+    export_data = armature.med2_toolkit_unit_export
+    meshes = exportMeshes(context, armature)
+    if not meshes:
+        return [('ERROR', "No mesh objects found under the armature (check the Visible Only toggle)")]
+
+    keepers = []
+    main_mat = bpy.data.materials.get(export_data.material_main)
+    if main_mat:
+        keepers.append(main_mat)
+    attach_mat = bpy.data.materials.get(export_data.material_attach) if export_data.material_attach != 'none' else None
+    if attach_mat and attach_mat not in keepers:
+        keepers.append(attach_mat)
+    if not keepers:
+        return [('ERROR', "Select a main material first")]
+
+    # a numbered material folds into a keeper when it shares the keeper's base
+    # name; keepers themselves are never folded
+    keeper_set = set(keepers)
+    remap = {}
+    for material in uniqueMaterials(meshes):
+        if material in keeper_set:
+            continue
+        if not ("." in material.name and material.name.split(".")[-1].isdigit()):
+            continue
+        base = material.name.rsplit(".", 1)[0]
+        for keeper in keepers:
+            if baseName(keeper.name) == base:
+                remap[material] = keeper
+                break
+
+    if not remap:
+        return [('INFO', "No .NNN duplicate materials found for the selected material(s)")]
+
+    report = []
+    changed = 0
+    for obj in meshes:
+        for slot in obj.material_slots:
+            if slot.material in remap:
+                target = remap[slot.material]
+                report.append(('INFO', "%s: %s -> %s" % (obj.name, slot.material.name, target.name)))
+                slot.material = target
+                changed += 1
+    # forcing usually leaves the keeper in two slots on the same object
+    for obj in meshes:
+        dedupeMaterialSlots(obj)
+    report.insert(0, ('INFO', "Forced %d material slot(s) to the selected texture(s)" % changed))
     return report

@@ -7,7 +7,7 @@ from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
 from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJsonCached
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate
-from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings
+from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 
 script_folder = Path(__file__).parent.parent
@@ -243,6 +243,29 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
             self.report({level}, message)
             counts[level] += 1
         showResultsPopup(context, "Cleanup: %d error(s), %d warning(s), %d note(s)" % (counts['ERROR'], counts['WARNING'], counts['INFO']), results)
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Force_Textures(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.force_textures"
+    bl_label = "Force Textures"
+    bl_description = ("Reassign every mesh slot that uses a .001/.002 numbered duplicate of the "
+                      "selected main/attach material to that material itself, even if the duplicate "
+                      "uses different textures. Only material.NNN names match; material1.001 is left alone.")
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return activeExportArmature(context) is not None
+
+    def execute(self, context):
+        results = forceTextures(context)
+        results = sorted(results, key=lambda r: SEVERITY_ORDER.get(r[0], 2))
+        counts = {'INFO': 0, 'WARNING': 0, 'ERROR': 0}
+        for level, message in results:
+            self.report({level}, message)
+            counts[level] += 1
+        showResultsPopup(context, "Force Textures: %d change note(s), %d error(s)" % (counts['INFO'], counts['ERROR']), results)
         return {'FINISHED'}
 
 
@@ -611,6 +634,20 @@ class MED_2_TOOLKIT_PT_Export_Materials(bpy.types.Panel):
         main_diff, main_norm = materialImages(main_mat) if main_mat else (None, None)
         attach_diff, attach_norm = materialImages(attach_mat) if attach_mat else (None, None)
 
+        # offer Force Textures when a .NNN numbered duplicate of a selected
+        # material is present in the export set
+        keeper_bases = {baseName(m.name) for m in (main_mat, attach_mat) if m}
+        numbered_dupes = sorted({
+            m.name for m in materials
+            if "." in m.name and m.name.split(".")[-1].isdigit()
+            and m.name.rsplit(".", 1)[0] in keeper_bases
+            and m not in (main_mat, attach_mat)
+        })
+        if numbered_dupes:
+            box = layout.box()
+            box.label(text="Duplicate materials: %s" % ", ".join(numbered_dupes), icon='ERROR')
+            box.operator("medieval2toolkit.force_textures", icon='MATERIAL', text="Force Textures")
+
         layout.separator()
         layout.label(text="Output Names:")
         grid = layout.column(align=True)
@@ -759,6 +796,7 @@ classes = [
     MED_2_TOOLKIT_Export_Faction,
     MED_2_TOOLKIT_Unit_Export_Data,
     MED_2_TOOLKIT_OT_Select_Cleanup,
+    MED_2_TOOLKIT_OT_Force_Textures,
     MED_2_TOOLKIT_OT_Export_Factions_Refresh,
     MED_2_TOOLKIT_OT_Export_Factions_Set,
     MED_2_TOOLKIT_OT_Export_Faction_Toggle,

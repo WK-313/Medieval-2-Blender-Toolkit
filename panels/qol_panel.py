@@ -275,12 +275,12 @@ class MED_2_TOOLKIT_OT_Remove_Baked_Suffix(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Parent_To_Skeleton(bpy.types.Operator):
     bl_idname = "medieval2toolkit.parent_to_skeleton"
     bl_label = "Parent to Skeleton"
-    bl_description = "Import the chosen skeleton and parent selected meshes to it, renaming vertex group _R/_L case to match the skeleton's bones."
+    bl_description = "Import the chosen skeleton and parent selected meshes to it, renaming vertex group _R/_L case to match the skeleton's bones. Selecting an armature re-rigs its meshes and removes the old skeleton."
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'OBJECT' and any(o.type == 'MESH' for o in context.selected_objects)
+        return context.mode == 'OBJECT' and any(o.type in {'MESH', 'ARMATURE'} for o in context.selected_objects)
 
     def execute(self, context):
         result = parentToSkeleton(context, transfer_weights=False)
@@ -299,7 +299,7 @@ class MED_2_TOOLKIT_OT_Parent_Sample_Weights(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'OBJECT' and any(o.type == 'MESH' for o in context.selected_objects)
+        return context.mode == 'OBJECT' and any(o.type in {'MESH', 'ARMATURE'} for o in context.selected_objects)
 
     def execute(self, context):
         result = parentToSkeleton(context, transfer_weights=True, delete_samples=True)
@@ -318,7 +318,7 @@ class MED_2_TOOLKIT_OT_Parent_Sample_Weights_Keep(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'OBJECT' and any(o.type == 'MESH' for o in context.selected_objects)
+        return context.mode == 'OBJECT' and any(o.type in {'MESH', 'ARMATURE'} for o in context.selected_objects)
 
     def execute(self, context):
         result = parentToSkeleton(context, transfer_weights=True, delete_samples=False)

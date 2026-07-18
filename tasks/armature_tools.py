@@ -130,9 +130,17 @@ def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
     skeleton = context.scene.med2_toolkit_qol.skeleton
     if skeleton == 'none':
         return 'No skeleton .glb files found in the armatures folder'
+
+    # Selecting an armature re-rigs its meshes onto the new skeleton: gather
+    # its mesh children as targets and drop the old rig once they are re-homed.
+    old_armatures = [o for o in context.selected_objects if o.type == 'ARMATURE']
     targets = [o for o in context.selected_objects if o.type == 'MESH']
+    for old in old_armatures:
+        for child in old.children_recursive:
+            if child.type == 'MESH' and child not in targets:
+                targets.append(child)
     if not targets:
-        return 'Select at least one mesh object'
+        return 'Select at least one mesh object, or an armature with mesh children'
 
     variant = skeleton + ('_Sample' if transfer_weights else '') + '.glb'
     glb_path = armaturesFolder()/variant
@@ -168,6 +176,12 @@ def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
         obj.matrix_world = world_matrix
         modifier = obj.modifiers.new('Armature', 'ARMATURE')
         modifier.object = armature
+
+    # The targets are re-homed onto the new rig, so the old skeletons they came
+    # from are now empty and get removed.
+    for old in old_armatures:
+        if old is not armature:
+            bpy.data.objects.remove(old, do_unlink=True)
 
     result = 'Finished'
     source = None
