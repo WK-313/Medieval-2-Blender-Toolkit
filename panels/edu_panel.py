@@ -102,7 +102,12 @@ class MED_2_TOOLKIT_OT_Officer_Importer(bpy.types.Operator):
         fileChecker(model_folder, officers)
         for officer in officers:
             model_info = bmdb_dictionary[officer]
-            modelImporter(model_folder, officer, faction, coordinates, model_info, officer)
+            result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
+            if result != 0:
+                imported = bpy.data.objects.get(officer)
+                if imported:
+                    imported.location = coordinates
+                    imported.location[2] += z_offset
             coordinates[1] -= 2
         postImport(self, context)
         return{"FINISHED"}
@@ -134,7 +139,12 @@ class MED_2_TOOLKIT_OT_Import_Full_Unit(bpy.types.Operator):
         fileChecker(model_folder, officers)
         for officer in officers:
             model_info = bmdb_dictionary[officer]
-            modelImporter(model_folder, officer, faction, coordinates, model_info, officer)
+            result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
+            if result != 0:
+                imported = bpy.data.objects.get(officer)
+                if imported:
+                    imported.location = coordinates
+                    imported.location[2] += z_offset
             coordinates[1] -= round(offset*0.5, 1)*2
         if context.scene.med2_toolkit_units.hide_toggle:
             hideVariations()

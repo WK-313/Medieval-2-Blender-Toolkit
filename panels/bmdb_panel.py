@@ -79,7 +79,12 @@ class MED_2_TOOLKIT_OT_Model_Importer(bpy.types.Operator):
         saveSettings()
         unitTaskWriter()
         fileChecker(model_folder, [model])
-        modelImporter(model_folder, model, faction, coordinates, model_info, model)
+        result, width, z_offset = modelImporter(model_folder, model, faction, model_info, model)
+        if result != 0:
+            imported = bpy.data.objects.get(model)
+            if imported:
+                imported.location = coordinates
+                imported.location[2] += z_offset
         postImport(self, context)
         return{"FINISHED"}
 

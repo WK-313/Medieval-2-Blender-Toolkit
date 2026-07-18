@@ -56,7 +56,7 @@ def bmdbReader(mod_folder):
         elif '.texture' in entry:
             faction_id = previous_line
             model_textures.setdefault(faction_id, [])
-            model_textures[faction_id].append(re.sub(".*/|\.texture.*", "", entry)+".dds")
+            model_textures[faction_id].append(re.sub(r".*/|\.texture.*", "", entry)+".dds")
             flag = 0
         # If none of the above keywords, store the model or faction ID
         else:
