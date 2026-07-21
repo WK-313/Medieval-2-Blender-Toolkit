@@ -4,7 +4,7 @@ bl_info = {
     "author" : "WK",
     "description" : "Collection of tools and features for modders of Medieval 2: Total War",
     "blender" : (5, 0, 0),
-    "version" : (0.8, 26, 5, 20),
+    "version" : (1, 3, 0),
     "location" : "",
     "warning" : "",
     "category" : "Generic"
