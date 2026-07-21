@@ -321,21 +321,9 @@ def runSelectCleanup(context):
     if weightless:
         report.append(('ERROR', "Objects with no vertex weights: %s" % ", ".join(weightless)))
 
-    # 9. UVs must stay inside the main tile and one tile to the right
-    eps = 0.001
-    uv_offenders = []
-    for obj in meshes:
-        uv_layer = obj.data.uv_layers.active
-        if uv_layer is None:
-            uv_offenders.append(obj.name + " (no UVs)")
-            continue
-        for loop_uv in uv_layer.data:
-            u, v = loop_uv.uv
-            if u < -eps or u > 2.0 + eps or v < -eps or v > 1.0 + eps:
-                uv_offenders.append(obj.name)
-                break
-    if uv_offenders:
-        report.append(('WARNING', "UVs outside the allowed 2x1 tile space: %s" % ", ".join(uv_offenders)))
+    # 9. per-texture UV tile placement runs separately (checkUVSpace), after
+    # the operator has auto-detected the main/attach textures, so it can tell
+    # main objects (first tile) from attach objects (tile to the right).
 
     # 10. texture dimensions
     seen_images = set()
@@ -359,6 +347,73 @@ def runSelectCleanup(context):
     if not report:
         report.append(('INFO', "All checks passed"))
     return report
+
+def objectMainAttach(obj, main_mat, attach_mat):
+    """Classify a mesh as an attach-texture object (True) or a main-texture
+    object (False) from the materials on its slots."""
+    mats = [slot.material for slot in obj.material_slots if slot.material]
+    return attach_mat is not None and attach_mat in mats and main_mat not in mats
+
+def checkUVSpace(context):
+    """Check UV tile placement per texture: main-texture objects must keep
+    their UVs in the first tile (u 0..1), attach-texture objects in the tile
+    one unit to the right (u 1..2). Returns (report, wrong_objects) where
+    wrong_objects is the list of offending mesh objects for the optional
+    select-and-edit toggle. Skips (with a warning) when the textures aren't
+    set yet or a duplicate/extra-texture problem still needs resolving."""
+    report = []
+    wrong = []
+    armature = activeExportArmature(context)
+    if not armature:
+        return report, wrong
+    export_data = armature.med2_toolkit_unit_export
+    meshes = exportMeshes(context, armature)
+    if not meshes:
+        return report, wrong
+
+    def resolve(name):
+        return bpy.data.materials.get(name) if name and name != 'none' else None
+    main_mat = resolve(export_data.material_main)
+    attach_mat = resolve(export_data.material_attach)
+
+    # can't tell which tile an object belongs in with no texture assigned
+    if main_mat is None and attach_mat is None:
+        report.append(('WARNING', "Textures not set, so UV space checking was not initiated. Set the main/attach texture and rerun the check."))
+        return report, wrong
+
+    # UV tiles are assigned per texture, so every mesh must use only the main
+    # and/or attach material; a third texture makes the tile ambiguous
+    allowed = {m for m in (main_mat, attach_mat) if m is not None}
+    extra = sorted({obj.name for obj in meshes for slot in obj.material_slots
+                    if slot.material and slot.material not in allowed})
+    if extra:
+        report.append(('WARNING', "Multiple material textures still present on: %s. Resolve them (Force Textures or remove the extra material) before UV space checking." % ", ".join(extra)))
+        return report, wrong
+
+    eps = 0.001
+    main_wrong = []
+    attach_wrong = []
+    for obj in meshes:
+        is_attach = objectMainAttach(obj, main_mat, attach_mat)
+        target = attach_wrong if is_attach else main_wrong
+        lo, hi = (1.0, 2.0) if is_attach else (0.0, 1.0)
+        uv_layer = obj.data.uv_layers.active
+        if uv_layer is None:
+            wrong.append(obj)
+            target.append(obj.name + " (no UVs)")
+            continue
+        for loop_uv in uv_layer.data:
+            u, v = loop_uv.uv
+            if u < lo - eps or u > hi + eps or v < -eps or v > 1.0 + eps:
+                wrong.append(obj)
+                target.append(obj.name)
+                break
+
+    if main_wrong:
+        report.append(('WARNING', "Main-texture objects with UVs outside the first tile (u 0-1): %s" % ", ".join(main_wrong)))
+    if attach_wrong:
+        report.append(('WARNING', "Attach-texture objects with UVs outside the tile to the right (u 1-2): %s" % ", ".join(attach_wrong)))
+    return report, wrong
 
 def forceTextures(context):
     """Fold every .NNN numbered duplicate of the selected main/attach material

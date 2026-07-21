@@ -7,7 +7,7 @@ from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
 from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJsonCached
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate
-from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName
+from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 
 script_folder = Path(__file__).parent.parent
@@ -178,6 +178,7 @@ class MED_2_TOOLKIT_Export_Faction(bpy.types.PropertyGroup):
 class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     export_visible_only: BoolProperty(name = "Visible Only", description = "Only export visible mesh children of the armature", default = True)
     export_animations: BoolProperty(name = "Export Animations", description = "Bake actions into the GLB. Slow and unnecessary for .mesh conversion, and reimports with the rig posed", default = False)
+    select_wrong_uv: BoolProperty(name = "Select objects with wrong UV", description = "After the check, select the objects whose UVs are in the wrong tile and enter UV/edit mode on them", default = False)
     bmdb_entry_name: StringProperty(name = "BMDB Entry Name", description = "Model name at the top of the generated BMDB entry. Leave blank to use the mesh name")
     export_glb_name: StringProperty(name = "Mesh Name", description = "Name of the exported GLB/mesh file and its output subfolder", default = "export")
     last_export_dir: StringProperty(default = "", options = {'HIDDEN'})
@@ -242,6 +243,10 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
             except TypeError:
                 pass
 
+        # UV tile placement, right after the main/attach textures are known
+        uv_results, wrong_uv = checkUVSpace(context)
+        results.extend(uv_results)
+
         # errors first so the most severe findings are instantly visible
         results = sorted(results, key=lambda r: SEVERITY_ORDER.get(r[0], 2))
         counts = {'INFO': 0, 'WARNING': 0, 'ERROR': 0}
@@ -249,6 +254,25 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
             self.report({level}, message)
             counts[level] += 1
         showResultsPopup(context, "Cleanup: %d error(s), %d warning(s), %d note(s)" % (counts['ERROR'], counts['WARNING'], counts['INFO']), results)
+
+        # optionally isolate the wrong-UV objects and drop into UV editing
+        if export_data.select_wrong_uv and wrong_uv:
+            deselectAll(context)
+            for obj in wrong_uv:
+                try:
+                    obj.hide_set(False)
+                    obj.select_set(True)
+                except RuntimeError:
+                    pass
+            context.view_layer.objects.active = wrong_uv[0]
+            try:
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.mesh.select_all(action='SELECT')
+            except RuntimeError:
+                pass
+            uv_editing = bpy.data.workspaces.get("UV Editing")
+            if uv_editing is not None and context.window is not None:
+                context.window.workspace = uv_editing
         return {'FINISHED'}
 
 
@@ -635,6 +659,7 @@ class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
         col.prop(export_data, "export_glb_name")
 
         layout.operator("medieval2toolkit.select_cleanup", icon='CHECKMARK')
+        layout.prop(export_data, "select_wrong_uv")
 
         if context.mode != 'OBJECT':
             layout.enabled = False
