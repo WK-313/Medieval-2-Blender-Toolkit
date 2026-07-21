@@ -45,6 +45,48 @@ def baseName(name):
         return name.rsplit(".", 1)[0]
     return name
 
+# The __opt marker flags a mesh as an optional part. It is applied by the QOL
+# "Toggle __opt Suffix" tool and must survive every naming cleanup untouched:
+# it sits AFTER the mesh name but BEFORE Blender's trailing .001 number, so a
+# duplicate reads object__opt.001, never object.001__opt. The helpers below let
+# the cleanup passes set it aside, work on the bare name, then restore it.
+OPT_SUFFIX = "__opt"
+
+def splitNumberSuffix(name):
+    """Split a trailing '.001'-style Blender number off a name. Returns
+    (base, number) where number is '.001' etc. or '' when there is none."""
+    if "." in name and name.rsplit(".", 1)[1].isdigit():
+        base, num = name.rsplit(".", 1)
+        return base, "." + num
+    return name, ""
+
+def hasOptSuffix(name):
+    """True if name carries the intentional __opt marker (before any .001)."""
+    base, _ = splitNumberSuffix(name)
+    return base.endswith(OPT_SUFFIX)
+
+def addOptSuffix(name):
+    """Insert __opt before the trailing number: object.001 -> object__opt.001."""
+    base, num = splitNumberSuffix(name)
+    if base.endswith(OPT_SUFFIX):
+        return name
+    return base + OPT_SUFFIX + num
+
+def removeOptSuffix(name):
+    """Strip a trailing __opt marker, keeping any number: object__opt.001 -> object.001."""
+    base, num = splitNumberSuffix(name)
+    if base.endswith(OPT_SUFFIX):
+        return base[:-len(OPT_SUFFIX)] + num
+    return name
+
+def splitOptSuffix(name):
+    """Peel __opt and any trailing number off a name for cleanup passes.
+    Returns (base, opt, number) so it can be rebuilt as base + opt + number."""
+    core, number = splitNumberSuffix(name)
+    if core.endswith(OPT_SUFFIX):
+        return core[:-len(OPT_SUFFIX)], OPT_SUFFIX, number
+    return core, "", number
+
 def materialImages(material):
     """Return (diffuse_image, normal_image) for a material."""
     diffuse = None
@@ -169,19 +211,30 @@ def runSelectCleanup(context):
     numbered = []
     bad_format = []
     for obj in meshes:
-        if "__" not in obj.name and "_" in obj.name:
-            old_name = obj.name
-            head, _, tail = obj.name.partition("_")
-            obj.name = head + "__" + tail
-            underscored.append("%s -> %s" % (old_name, obj.name))
-        elif "_" not in obj.name:
-            match = re.fullmatch(r"([A-Za-z]+?)(\d+)", obj.name)
+        # Set the intentional __opt marker (and any trailing number) aside so
+        # its double underscore isn't mistaken for the x__y prefix separator;
+        # the format fix runs on the bare name, then __opt is restored.
+        base, opt, number = splitOptSuffix(obj.name)
+        new_base = base
+        kind = None
+        if "__" not in base and "_" in base:
+            head, _, tail = base.partition("_")
+            new_base = head + "__" + tail
+            kind = 'underscored'
+        elif "_" not in base:
+            match = re.fullmatch(r"([A-Za-z]+?)(\d+)", base)
             if match:
-                old_name = obj.name
-                base, number = match.groups()
-                obj.name = "%s__%s_%s" % (base, base, number)
+                stem, number_part = match.groups()
+                new_base = "%s__%s_%s" % (stem, stem, number_part)
+                kind = 'numbered'
+        if new_base != base:
+            old_name = obj.name
+            obj.name = new_base + opt + number
+            if kind == 'underscored':
+                underscored.append("%s -> %s" % (old_name, obj.name))
+            else:
                 numbered.append("%s -> %s" % (old_name, obj.name))
-        if "__" not in obj.name:
+        if "__" not in new_base:
             bad_format.append(obj.name)
 
     # second .001 sweep: the step-2 renames collide with existing names and

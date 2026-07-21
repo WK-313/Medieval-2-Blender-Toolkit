@@ -58,14 +58,20 @@ def genBlankNormalsToggled(self, context):
             return os.path.splitext(os.path.basename(image.filepath) or image.name)[0]
         return ""
 
+    def norm_name(name):
+        # insert _norm before the file extension so black_numenorean.png
+        # becomes black_numenorean_norm.png, not black_numenorean.png_norm
+        root, ext = os.path.splitext(name)
+        return root + "_norm" + ext
+
     if main_norm is None:
         name = base_name(main_diff, self.out_main)
         if name:
-            self.out_main_norm = name + "_norm"
+            self.out_main_norm = norm_name(name)
     if attach_mat and attach_norm is None:
         name = base_name(attach_diff, self.out_attach)
         if name:
-            self.out_attach_norm = name + "_norm"
+            self.out_attach_norm = norm_name(name)
 
 
 # Kept alive at module level like the material items (GC guard). The unit
@@ -564,6 +570,44 @@ class MED_2_TOOLKIT_OT_Open_Export_Folder(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MED_2_TOOLKIT_OT_Browse_Task_Template(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.browse_task_template"
+    bl_label = "Browse Task Template"
+    bl_description = ("Pick this rig's IWTE task file. The browser opens inside the IWTE "
+                      "tasks folder (the IWTE path's iwte_tasks subfolder) when it exists")
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    filepath: StringProperty(subtype='FILE_PATH')
+    filter_glob: StringProperty(default="*.txt", options={'HIDDEN'})
+
+    @classmethod
+    def poll(cls, context):
+        return exportSettings(context) is not None
+
+    def invoke(self, context, event):
+        export_data = exportSettings(context)
+        current = export_data.iwte_task_template.strip('"').strip("'") if export_data.iwte_task_template else ""
+        if current:
+            # already picked once: reopen where that file lives
+            self.filepath = current
+        else:
+            reader = context.scene.med2_toolkit_reader
+            iwte_root = bpy.path.abspath(reader.directory_iwte) if reader.directory_iwte else ""
+            if iwte_root:
+                tasks_dir = os.path.join(iwte_root, "iwte_tasks")
+                if os.path.isdir(tasks_dir):
+                    # trailing separator makes Blender open inside the folder
+                    self.filepath = os.path.join(tasks_dir, "")
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        export_data = exportSettings(context)
+        if export_data is not None and self.filepath:
+            export_data.iwte_task_template = self.filepath
+        return {'FINISHED'}
+
+
 class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
     bl_idname = "MED_2_TOOLKIT_PT_Unit_Export"
     bl_parent_id = "MED_2_TOOLKIT_PT_Main_Panel"
@@ -772,7 +816,9 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
         layout.separator()
         layout.label(text="IWTE")
         col = layout.column(align=True)
-        col.prop(export_data, "iwte_task_template", text="Task Template")
+        row = col.row(align=True)
+        row.prop(export_data, "iwte_task_template", text="Task Template")
+        row.operator("medieval2toolkit.browse_task_template", icon='FILEBROWSER', text="")
         if export_data.iwte_task_template:
             file_name = os.path.basename(export_data.iwte_task_template.strip('"').strip("'"))
             col.label(text="IWTE task file selected: %s" % file_name, icon='FILE_TEXT')
@@ -805,6 +851,7 @@ classes = [
     MED_2_TOOLKIT_OT_Export_Unit_GLB,
     MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh,
     MED_2_TOOLKIT_OT_Open_Export_Folder,
+    MED_2_TOOLKIT_OT_Browse_Task_Template,
     MED_2_TOOLKIT_PT_Unit_Export,
     MED_2_TOOLKIT_PT_Export_Materials,
     MED_2_TOOLKIT_PT_Export_BMDB,

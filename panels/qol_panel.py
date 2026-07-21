@@ -1,6 +1,9 @@
 import bpy
 from bpy.props import BoolProperty, EnumProperty, PointerProperty
 from ..tasks.armature_tools import skeletonItems, parentToSkeleton
+from ..tasks.export_checks import (
+    OPT_SUFFIX, splitNumberSuffix, hasOptSuffix, addOptSuffix, removeOptSuffix, splitOptSuffix,
+)
 
 # Enum identifiers cannot safely carry spaces, so map them to the actual
 # in-mesh prefix strings ("cannon ball0" really does contain a space).
@@ -104,8 +107,11 @@ class MED_2_TOOLKIT_OT_Clean_Suffix(bpy.types.Operator):
     def execute(self, context):
         cleaned = 0
         for obj in context.selected_objects:
-            if "." in obj.name and obj.name.split(".")[-1].isdigit():
-                base = obj.name.rsplit(".", 1)[0]
+            # Only the trailing .001 number is stripped; an intentional __opt
+            # marker sits inside the base and is preserved untouched
+            # (object__opt.001 -> object__opt).
+            base, number = splitNumberSuffix(obj.name)
+            if number:
                 holder = bpy.data.objects.get(base)
                 if holder and holder is not obj:
                     # Steal the base name; the previous holder takes our suffix
@@ -208,19 +214,23 @@ class MED_2_TOOLKIT_OT_Rename_To_Prefix(bpy.types.Operator):
         renamed = []
         for obj in context.selected_objects:
             name = obj.name
+            # The trailing __opt marker (and any .001 number) is intentional:
+            # set it aside so it isn't read as the prefix separator or collapsed
+            # to a single underscore, then re-append it to the rebuilt name.
+            core, opt, number = splitOptSuffix(name)
             if self.swap:
-                if "__" in name:
-                    suffix = name.split("__", 1)[1]
-                elif "_" in name:
-                    suffix = name.split("_", 1)[1]
+                if "__" in core:
+                    suffix = core.split("__", 1)[1]
+                elif "_" in core:
+                    suffix = core.split("_", 1)[1]
                 else:
-                    suffix = name
+                    suffix = core
             else:
-                suffix = name
+                suffix = core
             # only the prefix separator may be a double underscore, so any
             # __ inside the kept part collapses to a single _
             suffix = suffix.replace("__", "_")
-            new = "%s__%s" % (prefix, suffix)
+            new = "%s__%s%s%s" % (prefix, suffix, opt, number)
             if new != name:
                 obj.name = new
                 renamed.append("%s -> %s" % (name, obj.name))
@@ -228,6 +238,33 @@ class MED_2_TOOLKIT_OT_Rename_To_Prefix(bpy.types.Operator):
             self.report({'INFO'}, "Renamed %d object(s): %s" % (len(renamed), ", ".join(renamed)))
         else:
             self.report({'INFO'}, "No objects needed renaming")
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Toggle_Opt_Suffix(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.toggle_opt_suffix"
+    bl_label = "Toggle __opt Suffix"
+    bl_description = ("Add or remove the __opt optional-part marker on selected objects "
+                      "(object <-> object__opt). It is inserted before any trailing number, "
+                      "so object.001 becomes object__opt.001, and the cleanup tools leave it intact")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return bool(context.selected_objects)
+
+    def execute(self, context):
+        renamed = []
+        for obj in context.selected_objects:
+            name = obj.name
+            new = removeOptSuffix(name) if hasOptSuffix(name) else addOptSuffix(name)
+            if new != name:
+                obj.name = new
+                renamed.append("%s -> %s" % (name, obj.name))
+        if renamed:
+            self.report({'INFO'}, "Toggled __opt on %d object(s): %s" % (len(renamed), ", ".join(renamed)))
+        else:
+            self.report({'INFO'}, "No objects needed changing")
         return {'FINISHED'}
 
 
@@ -397,6 +434,7 @@ class MED_2_TOOLKIT_PT_Rename_Tools(bpy.types.Panel):
         op.swap = False
         op = col.operator("medieval2toolkit.rename_to_prefix", icon='ARROW_LEFTRIGHT', text="Swap Prefix (prefix__y)")
         op.swap = True
+        col.operator("medieval2toolkit.toggle_opt_suffix", icon='CHECKBOX_HLT', text="Toggle __opt Suffix")
 
 
 class MED_2_TOOLKIT_PT_QOL_Advanced(bpy.types.Panel):
@@ -426,6 +464,7 @@ classes = [
     MED_2_TOOLKIT_OT_Rename_Bones_Upper_To_Lower,
     MED_2_TOOLKIT_OT_Rename_Bones_Lower_To_Upper,
     MED_2_TOOLKIT_OT_Rename_To_Prefix,
+    MED_2_TOOLKIT_OT_Toggle_Opt_Suffix,
     MED_2_TOOLKIT_OT_Recreate_Simplebake_UV,
     MED_2_TOOLKIT_OT_Remove_Baked_Suffix,
     MED_2_TOOLKIT_OT_Parent_To_Skeleton,
