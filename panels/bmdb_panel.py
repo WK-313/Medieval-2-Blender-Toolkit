@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from..directories import saveFolderPaths, saveSettings
 from ..tasks.task_writer import unitTaskWriter
-from ..tasks.importer import fileChecker, modelImporter, postImport
+from ..tasks.importer import fileChecker, modelImporter, importedArmature, postImport
 from bpy.props import StringProperty, CollectionProperty, IntProperty, EnumProperty, PointerProperty
 
 script_folder = Path(__file__).parent.parent
@@ -79,7 +79,13 @@ class MED_2_TOOLKIT_OT_Model_Importer(bpy.types.Operator):
         saveSettings()
         unitTaskWriter()
         fileChecker(model_folder, [model])
-        modelImporter(model_folder, model, faction, coordinates, model_info, model)
+        existing = set(bpy.data.objects)
+        result, width, z_offset = modelImporter(model_folder, model, faction, model_info, model)
+        if result != 0:
+            imported = importedArmature(existing)
+            if imported:
+                imported.location = coordinates
+                imported.location[2] += z_offset
         postImport(self, context)
         return{"FINISHED"}
 
@@ -99,7 +105,7 @@ class MED_2_TOOLKIT_PT_BMDB_Import(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        if (context.scene.med2_toolkit_mode.mode_selection != 'units'):
+        if (context.scene.med2_toolkit_mode.mode_selection != 'unit_import'):
             return False
         return True
 

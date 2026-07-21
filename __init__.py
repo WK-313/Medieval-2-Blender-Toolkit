@@ -11,12 +11,14 @@ bl_info = {
 }
 
 import bpy
-from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel
+from .directories import ensureDataFiles
+ensureDataFiles()
+from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel, unit_export_panel, qol_panel
 from bpy.props import EnumProperty, PointerProperty
 
 
 class MED_2_TOOLKIT_Mode_Selection(bpy.types.PropertyGroup):
-    mode_selection: EnumProperty(items = [("units", "Units", ""), ("settlements", "Settlements", "")], name = "Mode selection", description = "Select the workmode")
+    mode_selection: EnumProperty(items = [("unit_import", "Unit Import", ""), ("unit_export", "Unit Export", ""), ("settlements", "Settlements", ""), ("qol", "QOL", "")], name = "Mode selection", description = "Select the workmode")
 
 class MED_2_TOOLKIT_PT_Main_Panel(bpy.types.Panel):
     bl_idname = "MED_2_TOOLKIT_PT_Main_Panel"
@@ -28,8 +30,9 @@ class MED_2_TOOLKIT_PT_Main_Panel(bpy.types.Panel):
     def draw(self, context):
         layout=self.layout
         layout.label(text = "Workmode:")
-        row = layout.row(align=True)
-        row.prop(context.scene.med2_toolkit_mode, "mode_selection", expand=True)
+        col = layout.column(align=True)
+        grid = col.grid_flow(row_major=True, columns=2, even_columns=True, even_rows=True, align=True)
+        grid.prop(context.scene.med2_toolkit_mode, "mode_selection", expand=True)
 
 
 classes = [
@@ -45,6 +48,8 @@ def register():
     edu_panel.register()
     bmdb_panel.register()
     settlements_panel.register()
+    unit_export_panel.register()
+    qol_panel.register()
 
 def unregister():
     for item in classes:
@@ -54,6 +59,8 @@ def unregister():
     edu_panel.unregister()
     bmdb_panel.unregister()
     settlements_panel.unregister()
+    unit_export_panel.unregister()
+    qol_panel.unregister()
 
 if __name__ == "__main__":
     register()

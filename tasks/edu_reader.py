@@ -3,25 +3,20 @@ import re
 import json
 import unicodedata
 from pathlib import Path
+from .text_io import readModLines
 
 def eduReader(mod_folder):
     try:
-        with open(os.path.join(mod_folder, 'descr_sm_factions.txt'), 'r', encoding="utf8") as descr_factions:
-            lines = descr_factions.readlines()
-            available_factions_list = [re.sub(";.*", " ", line).lower().rstrip().split()[1] for line in lines if line[:7].lower() == 'faction']
+        lines = readModLines(os.path.join(mod_folder, 'descr_sm_factions.txt'), 'utf-8')
+        available_factions_list = [re.sub(";.*", " ", line).lower().rstrip().split()[1] for line in lines if line[:7].lower() == 'faction']
     except FileNotFoundError as error:
         return('No descr_sm_factions.txt found in the specified directory.\n%s' % error)
-    except UnicodeError as error:
-        return('UnicodeError reading the descr_sm_factions.txt. Check that the file is saved in UTF-8 encoding. Alternatively, try to "save as" and replacing the old file.\n%s' % error)
     try:
-        with open(os.path.join(mod_folder, 'text', 'expanded.txt'), 'r', encoding="utf16") as expanded:
-            skips = ['_descr}', '_descr_short}']
-            lines = expanded.readlines()
-            expanded_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
+        lines = readModLines(os.path.join(mod_folder, 'text', 'expanded.txt'), 'utf-16')
+        skips = ['_descr}', '_descr_short}']
+        expanded_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
     except FileNotFoundError as error:
         return('No expanded.txt found in the specified directory.\n%s' % error)
-    except UnicodeError as error    :
-        return('UnicodeError reading the expanded.txt. Check that the file is saved in UTF-16 encoding. Alternatively, try to "save as" and replacing the old file.\n%s' % error)
 
     faction_database = {}
     for faction in available_factions_list:
@@ -31,29 +26,23 @@ def eduReader(mod_folder):
                 normalized_faction_name = unicodedata.normalize('NFKD', faction_name).encode('ascii', 'ignore')
                 faction_database[normalized_faction_name.decode('ascii')] = faction
     try:
-        with open(os.path.join(mod_folder, 'export_descr_unit.txt'), 'r', encoding="utf8") as edu:
-            edu_keywords = ['type', 'dictionary', 'officer', 'formation', 'mount', 'engine', 'armour_ug_models', 'ownership', 'era', 'info_pic_dir', 'card_pic_dir']
-            lines = edu.readlines()
-            edu_lines = [re.sub(",|;.*", " ", line).lower().strip().split() for line in lines if not line.strip().startswith(';') and len(line.split()) > 1]
-            edu_cleaned = []
-            for line in edu_lines:
-                if line[0] not in edu_keywords:
-                    continue
-                edu_cleaned.append(line)
+        lines = readModLines(os.path.join(mod_folder, 'export_descr_unit.txt'), 'utf-8')
+        edu_keywords = ['type', 'dictionary', 'officer', 'formation', 'mount', 'engine', 'armour_ug_models', 'ownership', 'era', 'info_pic_dir', 'card_pic_dir']
+        edu_lines = [re.sub(",|;.*", " ", line).lower().strip().split() for line in lines if not line.strip().startswith(';') and len(line.split()) > 1]
+        edu_cleaned = []
+        for line in edu_lines:
+            if line[0] not in edu_keywords:
+                continue
+            edu_cleaned.append(line)
     except FileNotFoundError as error:
         return('No export_descr_unit.txt found in the specified directory.\n%s' % error)
-    except UnicodeError as error:
-        return('UnicodeError reading the export_descr_unit.txt. Check that the file is saved in UTF-8 encoding. Alternatively, try to "save as" and replacing the old file.\n%s' % error)
-    
+
     try:
-        with open(os.path.join(mod_folder, 'text', 'export_units.txt'), 'r', encoding="utf16") as export_units:
-            skips = ['_descr}', '_descr_short}']
-            lines = export_units.readlines()
-            eu_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
+        lines = readModLines(os.path.join(mod_folder, 'text', 'export_units.txt'), 'utf-16')
+        skips = ['_descr}', '_descr_short}']
+        eu_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
     except FileNotFoundError as error:
         return('No export_units.txt found in the specified directory.\n%s' % error)
-    except UnicodeError as error:
-        return('UnicodeError reading the export_units.txt. Check that the file is saved in UTF-16 encoding. Alternatively, try to "save as" and replacing the old file.\n%s' % error)
 
     unit_id = ''
     unit_attachment = 'unused'
@@ -109,14 +98,11 @@ def eduReader(mod_folder):
                 unit_database[normalized_unit_name.decode('ascii')] = unit
 
     try:
-        with open(os.path.join(mod_folder, 'descr_mount.txt'), 'r', encoding="utf8") as descr_mount:
-            save = ['type', 'model', 'root_node_height', 'rider_offset']
-            m_lines = descr_mount.readlines()
-            mount_lines = [re.sub("(;.*)|(,)", " ", line).lower().rstrip().split() for line in m_lines if line[0] != ';' and any (x in line for x in save)]
+        m_lines = readModLines(os.path.join(mod_folder, 'descr_mount.txt'), 'utf-8')
+        save = ['type', 'model', 'root_node_height', 'rider_offset']
+        mount_lines = [re.sub("(;.*)|(,)", " ", line).lower().rstrip().split() for line in m_lines if line[0] != ';' and any (x in line for x in save)]
     except FileNotFoundError as error:
         return('No descr_mount.txt found in the specified directory.\n%s' % error)
-    except UnicodeError as error:
-        return('UnicodeError reading the descr_mount.txt. Check that the file is saved in UTF-8 encoding. Alternatively, try to "save as" and replacing the old file.\n%s' % error)
 
     mount_id = ''
     mount_model = ''
@@ -142,14 +128,11 @@ def eduReader(mod_folder):
     #   -------------  #
 
     try:
-        with open((os.path.join(mod_folder, 'descr_engines.txt')), 'r', encoding="utf8") as descr_engine:
-            save = ['type', 'engine_mesh', 'engine_dock_dist', 'obstacle_x_radius']
-            e_lines = descr_engine.readlines()
-            engine_lines = [re.sub(";.*", " ", line).lower().rstrip().split() for line in e_lines if line[0] != ';' and any (x in line for x in save)]
+        e_lines = readModLines(os.path.join(mod_folder, 'descr_engines.txt'), 'utf-8')
+        save = ['type', 'engine_mesh', 'engine_dock_dist', 'obstacle_x_radius']
+        engine_lines = [re.sub(";.*", " ", line).lower().rstrip().split() for line in e_lines if line[0] != ';' and any (x in line for x in save)]
     except FileNotFoundError as error:
         return('No descr_engines.txt found in the specified directory.\n%s' % error)
-    except UnicodeError as error:
-        return('UnicodeError reading the descr_engines.txt. Check that the file is saved in UTF-8 encoding. Alternatively, try to "save as" and replacing the old file.\n%s' % error)
 
     engine_id = ''
     engine_model = ''

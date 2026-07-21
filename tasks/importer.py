@@ -13,6 +13,18 @@ def postImport(self, context):
             bpy.context.space_data.shading.light = 'FLAT'
             bpy.context.space_data.shading.color_type = 'TEXTURE'
 
+def importedArmature(existing_objects):
+    # Return the armature created since existing_objects was captured. modelImporter
+    # names the new object after the unit, but when that name is already taken (e.g.
+    # a unit lists the same officer twice, or every armour upgrade shares the unit's
+    # ID) Blender appends ".001", so looking the object up by the requested name hands
+    # back the earlier duplicate and the real new rig never gets positioned - it sits
+    # at the world origin. Diff the object set instead.
+    for obj in bpy.data.objects:
+        if obj not in existing_objects and obj.type == 'ARMATURE':
+            return obj
+    return None
+
 def selectionBoundingBox():
     selection_bounding_box = []
     for child in bpy.context.active_object.children_recursive:

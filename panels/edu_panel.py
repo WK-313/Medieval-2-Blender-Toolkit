@@ -3,25 +3,35 @@ import json
 from bpy.props import StringProperty, BoolProperty, PointerProperty, CollectionProperty, IntProperty, EnumProperty
 from pathlib import Path
 
-from..directories import saveFolderPaths, saveSettings
-from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, hideVariations, postImport
+from..directories import saveFolderPaths, saveSettings, readJsonCached
+from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport
 from ..tasks.task_writer import unitTaskWriter, engineTaskWriter
 
 
 script_folder = Path(__file__).parent.parent
 
+# Blender keeps only pointers - not Python references - to the strings an
+# EnumProperty items callback returns, so once Python garbage-collects them the
+# dropdown renders blank/greyed entries (it shows up as a couple of random units
+# going grey on long faction lists). Hold the last-returned items alive so the
+# strings survive until the next query. This is the documented workaround in the
+# EnumProperty "There is a known bug with using a callback" note.
+_faction_enum_items = []
+_unit_enum_items = []
+
 def sortFactions(self, context):
-    with open(script_folder/('text/available_factions.json'), 'r') as import_factions_input:
-        factions = json.load(import_factions_input)
+    global _faction_enum_items
+    factions = readJsonCached(script_folder/('text/available_factions.json'))
     faction_list = []
     for faction in factions:
         entry = (factions[faction], faction, "")
         faction_list.append(entry)
-    return(faction_list)
+    _faction_enum_items = faction_list
+    return _faction_enum_items
 
 def sortUnits(self, context):
-    with open(script_folder/('text/unit_dictionary.json'), 'r') as import_unit_input:
-        unit_dictionary = json.load(import_unit_input)
+    global _unit_enum_items
+    unit_dictionary = readJsonCached(script_folder/('text/unit_dictionary.json'))
     import_faction = context.scene.med2_toolkit_units.import_faction
     filter = context.scene.med2_toolkit_units.import_filter
     faction_units = []
@@ -32,8 +42,9 @@ def sortUnits(self, context):
         entry = (unit_info, unit, "")
         faction_units.append(entry)
     if len(faction_units) == 0:
-         return [('none','None','')]
-    return(faction_units)
+        faction_units = [('none','None','')]
+    _unit_enum_items = faction_units
+    return _unit_enum_items
 
 def sortUpgrades(self, context):
     unit_info = json.loads(context.scene.med2_toolkit_units.import_unit)
@@ -104,7 +115,13 @@ class MED_2_TOOLKIT_OT_Officer_Importer(bpy.types.Operator):
         fileChecker(model_folder, officers)
         for officer in officers:
             model_info = bmdb_dictionary[officer]
-            modelImporter(model_folder, officer, faction, coordinates, model_info, officer)
+            existing = set(bpy.data.objects)
+            result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
+            if result != 0:
+                imported = importedArmature(existing)
+                if imported:
+                    imported.location = coordinates
+                    imported.location[2] += z_offset
             coordinates[1] -= 2
         postImport(self, context)
         return{"FINISHED"}
@@ -136,7 +153,13 @@ class MED_2_TOOLKIT_OT_Import_Full_Unit(bpy.types.Operator):
         fileChecker(model_folder, officers)
         for officer in officers:
             model_info = bmdb_dictionary[officer]
-            modelImporter(model_folder, officer, faction, coordinates, model_info, officer)
+            existing = set(bpy.data.objects)
+            result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
+            if result != 0:
+                imported = importedArmature(existing)
+                if imported:
+                    imported.location = coordinates
+                    imported.location[2] += z_offset
             coordinates[1] -= round(offset*0.5, 1)*2
         if context.scene.med2_toolkit_units.hide_toggle:
             hideVariations()
@@ -230,7 +253,7 @@ class MED_2_TOOLKIT_PT_EDU_Import(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        if (context.scene.med2_toolkit_mode.mode_selection != 'units'):
+        if (context.scene.med2_toolkit_mode.mode_selection != 'unit_import'):
             return False
         return True
 
