@@ -198,7 +198,7 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     copy_filter: EnumProperty(name = "Ownership filter", description = "Unit ownership filter", items = [('ownership','Ownership',''),('era 0','Era 0',''),('era 1','Era 1',''),('era 2','Era 2','')], default = 1, update = copyFieldChanged)
     copy_unit: EnumProperty(name = "Unit", description = "Unit to copy the sprite and footer from", items = copyUnitItems, update = copyFieldChanged)
     copy_initialized: BoolProperty(default = False, options = {'HIDDEN'})
-    iwte_task_template: StringProperty(name = "IWTE Task Template", description = "Task template used for this rig's GLB to .mesh conversion. Blank = the last used / Paths template, adopted on the first conversion", subtype = 'FILE_PATH', update = iwteTemplateChanged)
+    iwte_task_template: StringProperty(name = "IWTE Task Template", description = "Task template used for this rig's GLB to .mesh conversion. Blank = the last used / Paths template, adopted on the first conversion. Use the browse button to pick it, starting in the IWTE tasks folder", update = iwteTemplateChanged)
 
 
 SEVERITY_ORDER = {'ERROR': 0, 'WARNING': 1, 'INFO': 2}
