@@ -46,20 +46,42 @@ def sortModels(self, context):
     return{'FINISHED'}
 
 
+# Blender only keeps pointers to the strings an EnumProperty items callback
+# returns, so the list has to stay referenced until the next query or the
+# entries render blank. Same workaround as the EDU panel's faction/unit enums.
+_model_faction_items = []
+
 def modelFactions(self, context):
+    """Texture variants of the selected model, one entry per faction. Factions
+    whose textures are identical to an earlier faction's are labelled
+    "Faction (Same as Other)" so the genuinely unique variants stand out."""
+    global _model_faction_items
     with open(script_folder/('text/available_factions.json'), 'r') as import_factions_input:
         factions_named = json.load(import_factions_input)
     with open(script_folder/('text/model_dictionary.json'), 'r') as import_bmdb_input:
         bmdb_dictionary = json.load(import_bmdb_input)
+    # available_factions.json maps display name -> codename; invert it once
+    # instead of scanning it per faction (and never fall through to the
+    # previous loop's entry when a codename is missing from it)
+    faction_names = {code: name for name, code in factions_named.items()}
     factions = []
     model = context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].name
-    for faction in bmdb_dictionary[model]['Textures']:
-        for faction_name in factions_named:
-            if factions_named[faction_name] != faction:
-                continue
-            entry = (faction, faction_name, "")
-        factions.append(entry)
-    return(factions)
+    model_textures = bmdb_dictionary[model]['Textures']
+    first_use = {}
+    for faction in model_textures:
+        faction_name = faction_names.get(faction, faction)
+        fingerprint = tuple(model_textures[faction])
+        original = first_use.get(fingerprint)
+        if original is None:
+            first_use[fingerprint] = faction_name
+            label = faction_name
+            description = ", ".join(model_textures[faction])
+        else:
+            label = "%s (Same as %s)" % (faction_name, original)
+            description = "Uses the same textures as %s: %s" % (original, ", ".join(model_textures[faction]))
+        factions.append((faction, label, description))
+    _model_faction_items = factions
+    return(_model_faction_items)
 
 
 class MED_2_TOOLKIT_OT_Model_Importer(bpy.types.Operator):

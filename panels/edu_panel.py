@@ -1,6 +1,6 @@
 import bpy
 import json
-from bpy.props import StringProperty, BoolProperty, PointerProperty, CollectionProperty, IntProperty, EnumProperty
+from bpy.props import StringProperty, BoolProperty, BoolVectorProperty, PointerProperty, CollectionProperty, IntProperty, EnumProperty
 from pathlib import Path
 
 from..directories import saveFolderPaths, saveSettings, readJsonCached
@@ -46,22 +46,54 @@ def sortUnits(self, context):
     _unit_enum_items = faction_units
     return _unit_enum_items
 
-def sortUpgrades(self, context):
-    unit_info = json.loads(context.scene.med2_toolkit_units.import_unit)
-    upgrade_models = []
-    for upgrade in unit_info['Model']:
-        upgrade_models.append(upgrade)
+# Armour upgrade slots the unit importer offers as tick boxes. The EDU allows
+# levels 0-3, so four bools cover every unit in the dictionary; anything beyond
+# that is simply not offered.
+UPGRADE_SLOTS = 4
+
+def upgradeModels(context):
+    """Model IDs of the selected unit, one per armour upgrade level."""
+    if context.scene.med2_toolkit_units.import_unit == 'none':
+        return []
     try:
-        upgrade = upgrade_models[context.scene.med2_toolkit_units.single_import_upgrade]
-    except IndexError:
-        upgrade = upgrade_models[-1]
-    return(upgrade)
+        unit_info = json.loads(context.scene.med2_toolkit_units.import_unit)
+    except ValueError:
+        return []
+    return unit_info['Model'][:UPGRADE_SLOTS]
+
+
+def selectedUpgrades(context):
+    """Ticked armour upgrade levels that the selected unit actually has."""
+    upgrades = context.scene.med2_toolkit_units.single_import_upgrades
+    return [index for index in range(len(upgradeModels(context))) if upgrades[index]]
+
+
+def deleteImportedObjects(item):
+    """Delete the rig an import list entry points at, plus everything parented
+    to it. Returns the number of objects removed."""
+    target = bpy.data.objects.get(item.object_name) if item.object_name else None
+    if target is None:
+        # entries imported before object_name existed, and any rig that was
+        # never renamed, still match on the list name
+        target = bpy.data.objects.get(item.name)
+    if target is None:
+        return 0
+    doomed = list(target.children_recursive) + [target]
+    removed = 0
+    for obj in doomed:
+        try:
+            bpy.data.objects.remove(obj, do_unlink=True)
+            removed += 1
+        except (ReferenceError, RuntimeError):
+            pass
+    return removed
 
 
 class MED_2_TOOLKIT_Unit_data(bpy.types.PropertyGroup):
     with open(script_folder/('text/menu_settings.json'), 'r') as settings_input:
             bool_settings = json.load(settings_input)
-    single_import_upgrade: IntProperty(name = "Upgrade level", description = "Number of units armour upgrades", default = 0, min = 0, soft_max = 3)
+    single_import_upgrades: BoolVectorProperty(name = "Upgrade levels", description = "Armour upgrade levels to import", size = UPGRADE_SLOTS, default = (True,) + (False,)*(UPGRADE_SLOTS-1))
+    delete_with_item: BoolProperty(name = "Delete objects", description = "Also delete the armature and every object parented to it when removing entries from the imported models list", default = bool_settings.get('delete_with_item', True))
     import_faction: EnumProperty(name = "Faction list", description = "List of factions", items = sortFactions)
     import_unit: EnumProperty(name = "Unit list", description = "List of units in faction", items = sortUnits)
     import_filter: EnumProperty(name = "Ownership filter", description = "Unit ownership filter", items = [('ownership','Ownership',''),('era 0','Era 0',''),('era 1','Era 1',''),('era 2','Era 2','')], default = 1)
@@ -76,20 +108,27 @@ class MED_2_TOOLKIT_Unit_data(bpy.types.PropertyGroup):
 class MED_2_TOOLKIT_OT_Unit_Importer(bpy.types.Operator):
     bl_idname = "medieval2toolkit.unit_importer"
     bl_label = "Import unit"
-    bl_description = "Import the selected armour upgrade of the selected unit."
+    bl_description = "Import the ticked armour upgrades of the selected unit."
     bl_options = {"REGISTER", "UNDO"}
     def execute(self, context):
         model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
         faction = context.scene.med2_toolkit_units.import_faction
-        upgrade = context.scene.med2_toolkit_units.single_import_upgrade
+        upgrades = selectedUpgrades(context)
+        if not upgrades:
+            self.report({'ERROR'}, "Tick at least one upgrade level to import")
+            return{"CANCELLED"}
         unit_info = json.loads(context.scene.med2_toolkit_units.import_unit)
+        # first ticked upgrade sits at the origin, the rest march out along +X
+        # using the same half-width spacing as Import Full Unit
         coordinates = [0, 0, 0]
         saveFolderPaths()
         saveSettings()
         unitTaskWriter()
         engineTaskWriter()
-        unitChecker(model_folder, [unit_info], upgrade)
-        unitImporter(model_folder, unit_info, faction, coordinates, upgrade)
+        for upgrade in upgrades:
+            unitChecker(model_folder, [unit_info], upgrade)
+            offset = unitImporter(model_folder, unit_info, faction, coordinates, upgrade)
+            coordinates[0] += round(offset*0.5, 1) + 0.25
         postImport(self, context)
         return{"FINISHED"}
 
@@ -210,7 +249,7 @@ class MED_2_TOOLKIT_OT_Variations(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Remove_Item(bpy.types.Operator):
     bl_idname = "medieval2toolkit.remove_item"
     bl_label = "Remove item"
-    bl_description = "Remove the selected item from the list."
+    bl_description = "Remove the selected item from the list, and its objects when Delete objects is ticked."
     bl_options = {"REGISTER", "UNDO"}
     @classmethod
     def poll(cls, context):
@@ -218,15 +257,20 @@ class MED_2_TOOLKIT_OT_Remove_Item(bpy.types.Operator):
     def execute(self, context):
         imported_list = context.scene.med2_toolkit_import_list
         imported_list_index = context.scene.med2_toolkit_import_list_index
+        removed = 0
+        if context.scene.med2_toolkit_units.delete_with_item:
+            removed = deleteImportedObjects(imported_list[imported_list_index])
         imported_list.remove(imported_list_index)
         context.scene.med2_toolkit_import_list_index = min(max(0, imported_list_index - 1), len(imported_list) -1)
+        if context.scene.med2_toolkit_units.delete_with_item:
+            self.report({'INFO'}, "Removed item and deleted %d object(s)" % removed)
         return{"FINISHED"}
 
 
 class MED_2_TOOLKIT_OT_Purge_List(bpy.types.Operator):
     bl_idname = "medieval2toolkit.purge_list"
     bl_label = "Purge list"
-    bl_description = "Remove all items from the list."
+    bl_description = "Remove all items from the list, and their objects when Delete objects is ticked."
     bl_options = {"REGISTER", "UNDO"}
     @classmethod
     def poll(cls, context):
@@ -235,8 +279,14 @@ class MED_2_TOOLKIT_OT_Purge_List(bpy.types.Operator):
         return context.window_manager.invoke_confirm(self, event)
     def execute(self, context):
         imported_list = context.scene.med2_toolkit_import_list
+        removed = 0
+        if context.scene.med2_toolkit_units.delete_with_item:
+            for item in imported_list:
+                removed += deleteImportedObjects(item)
         imported_list.clear()
         context.scene.med2_toolkit_import_list_index = 0
+        if context.scene.med2_toolkit_units.delete_with_item:
+            self.report({'INFO'}, "Purged list and deleted %d object(s)" % removed)
         return{"FINISHED"}
 
 
@@ -271,16 +321,20 @@ class MED_2_TOOLKIT_PT_EDU_Import(bpy.types.Panel):
         col.prop (context.scene.med2_toolkit_units, "import_filter", text="Filter")
         col.prop (context.scene.med2_toolkit_units, "import_unit", text="Unit")
         col.prop (context.scene.med2_toolkit_units, "primary_secondary", text="Skeleton")
-        row = col.row()
-        if context.scene.med2_toolkit_units.import_unit != 'none':
-            row.prop (context.scene.med2_toolkit_units, "single_import_upgrade", text="Upgrade level:")
-            row.label(text=sortUpgrades(self, context))
+        upgrade_models = upgradeModels(context)
+        if upgrade_models:
+            box = layout.box()
+            box.label(text="Upgrade levels:")
+            grid = box.column(align=True)
+            for index, model_id in enumerate(upgrade_models):
+                entry = grid.row(align=True)
+                entry.prop (context.scene.med2_toolkit_units, "single_import_upgrades", index=index, text=str(index))
+                entry.label(text=model_id)
         col = layout.column(align=True)
         col.operator("medieval2toolkit.unit_importer", text="Import unit")
         col.operator("medieval2toolkit.officer_importer", text="Import officers")
         col.operator("medieval2toolkit.full_unit_importer", text="Import Full Unit")
         if context.scene.med2_toolkit_units.import_unit == 'none':
-            row.enabled = False
             col.enabled = False
         col = layout.column(align=True)
         col.prop (context.scene.med2_toolkit_units, "import_upgrade", text="Upgrade level:")
@@ -294,6 +348,7 @@ class MED_2_TOOLKIT_PT_EDU_Import(bpy.types.Panel):
             unit = context.scene.med2_toolkit_import_list[context.scene.med2_toolkit_import_list_index]
             col = layout.column()
             col.prop (unit, "id")
+        layout.prop (context.scene.med2_toolkit_units, "delete_with_item", text="Delete objects with the entry")
         row = layout.row(align=True)
         row.operator("medieval2toolkit.remove_item", text="Remove item")
         row.operator("medieval2toolkit.purge_list", text="Purge list")
@@ -303,6 +358,7 @@ class MED_2_TOOLKIT_PT_EDU_Import(bpy.types.Panel):
 class MED_2_TOOLKIT_List_Items(bpy.types.PropertyGroup):
     name: StringProperty(name="Name", description="Names of the imported units")
     id: StringProperty(name="Unit ID", description="IDs of the imported units")
+    object_name: StringProperty(name="Object name", description="Name of the armature object this entry was imported as")
     icon: StringProperty(name="Menu icon", description="")
 
 class MED_2_TOOLKIT_UL_Import_List(bpy.types.UIList):

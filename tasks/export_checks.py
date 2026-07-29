@@ -87,6 +87,36 @@ def splitOptSuffix(name):
         return core[:-len(OPT_SUFFIX)], OPT_SUFFIX, number
     return core, "", number
 
+def formatExportName(base):
+    """Convert a bare mesh name to the x__y export format. `base` must already
+    have the __opt marker and any trailing .001 peeled off (splitOptSuffix).
+    Returns (new_base, kind) with kind None when the name is already valid.
+
+        name                            -> name__name
+        name1_name2                     -> name1__name2
+        namenumber / name_number /
+        name__number                    -> name__name_number
+
+    A number after the separator is never a second name, so those three all
+    collapse to the same name__name_number shape."""
+    if "__" in base:
+        head, _, tail = base.partition("__")
+        if head and tail.isdigit():
+            return "%s__%s_%s" % (head, head, tail), 'numbered'
+        return base, None
+    if "_" in base:
+        head, _, tail = base.partition("_")
+        if head and tail.isdigit():
+            return "%s__%s_%s" % (head, head, tail), 'numbered'
+        return head + "__" + tail, 'underscored'
+    match = re.fullmatch(r"(.*?[A-Za-z])(\d+)", base)
+    if match:
+        stem, number_part = match.groups()
+        return "%s__%s_%s" % (stem, stem, number_part), 'numbered'
+    if base:
+        return "%s__%s" % (base, base), 'doubled'
+    return base, None
+
 def materialImages(material):
     """Return (diffuse_image, normal_image) for a material."""
     diffuse = None
@@ -205,35 +235,24 @@ def runSelectCleanup(context):
     # suffixes; errors are deduplicated across the two passes.
     renamed, name_errors = stripTrailingNumbers(meshes)
 
-    # 2. x_y -> x__y (first underscore doubled), name+number like hair1 ->
-    # hair__hair_1, then x__y format check
+    # 2. x_y -> x__y (first underscore doubled), anything ending in a number
+    # like hair1 / hair_1 / hair__1 -> hair__hair_1, bare hair -> hair__hair,
+    # then x__y format check
     underscored = []
     numbered = []
+    doubled = []
     bad_format = []
+    renames = {'underscored': underscored, 'numbered': numbered, 'doubled': doubled}
     for obj in meshes:
         # Set the intentional __opt marker (and any trailing number) aside so
         # its double underscore isn't mistaken for the x__y prefix separator;
         # the format fix runs on the bare name, then __opt is restored.
         base, opt, number = splitOptSuffix(obj.name)
-        new_base = base
-        kind = None
-        if "__" not in base and "_" in base:
-            head, _, tail = base.partition("_")
-            new_base = head + "__" + tail
-            kind = 'underscored'
-        elif "_" not in base:
-            match = re.fullmatch(r"([A-Za-z]+?)(\d+)", base)
-            if match:
-                stem, number_part = match.groups()
-                new_base = "%s__%s_%s" % (stem, stem, number_part)
-                kind = 'numbered'
+        new_base, kind = formatExportName(base)
         if new_base != base:
             old_name = obj.name
             obj.name = new_base + opt + number
-            if kind == 'underscored':
-                underscored.append("%s -> %s" % (old_name, obj.name))
-            else:
-                numbered.append("%s -> %s" % (old_name, obj.name))
+            renames[kind].append("%s -> %s" % (old_name, obj.name))
         if "__" not in new_base:
             bad_format.append(obj.name)
 
@@ -253,6 +272,8 @@ def runSelectCleanup(context):
         report.append(('INFO', "Converted x_y to x__y naming on %d object(s): %s" % (len(underscored), ", ".join(underscored))))
     if numbered:
         report.append(('INFO', "Converted name+number to name__name_number on %d object(s): %s" % (len(numbered), ", ".join(numbered))))
+    if doubled:
+        report.append(('INFO', "Converted name to name__name on %d object(s): %s" % (len(doubled), ", ".join(doubled))))
     if bad_format:
         report.append(('WARNING', "Not in x__y naming format: %s" % ", ".join(bad_format)))
 

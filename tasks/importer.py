@@ -102,25 +102,38 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade):
     recurlayercollection.findCollection(unit_name)
     model_info = bmdb_dictionary[model_id]
     result = 0
+    root_object = None
+    # Every rig imported here is looked up by diffing the object set, never by
+    # bpy.data.objects[unit_name]: each armour upgrade of a unit is named after
+    # the same unit ID, so Blender hands the later ones a ".001" suffix and a
+    # name lookup returns the FIRST rig instead. That moved upgrade 0 out to the
+    # right and left the newest rig unpositioned at the origin, sunk below the
+    # ground because its z_offset was never applied.
     if unit_attachment == 'unused':
+        existing = set(bpy.data.objects)
         result, width, z_offset = modelImporter(model_folder, unit_name, faction_id, model_info, model_id)
         if result == 0:
             return(0)
         if coordinates != [0, 0, 0]:
             coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
-        bpy.data.objects[unit_name].location = coordinates
-        bpy.data.objects[unit_name].location[2] += z_offset
+        root_object = importedArmature(existing)
+        if root_object:
+            root_object.location = coordinates
+            root_object.location[2] += z_offset
     elif unit_attachment[0] == 'mount':
         mount_info = attachment_dictionary[unit_attachment[1]]
         mount_model = bmdb_dictionary[mount_info['Model']]
+        existing = set(bpy.data.objects)
         result, width, z_offset = modelImporter(model_folder, unit_name, faction_id, mount_model, model_id)
         if result == 0:
             return(0)
         if coordinates != [0, 0, 0]:
             coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
-        mount_object = bpy.data.objects[unit_name]
-        mount_object.location = coordinates
-        mount_object.location[2] += z_offset
+        mount_object = importedArmature(existing)
+        root_object = mount_object
+        if mount_object:
+            mount_object.location = coordinates
+            mount_object.location[2] += z_offset
         n = 1
         for member in mount_info['Crew']:
             rider_coordinates = [
@@ -128,24 +141,29 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade):
                 float(member[1]),
                 float(member[2])
             ]
+            existing = set(bpy.data.objects)
             result, c_width, z_offset = modelImporter(model_folder, unit_name+' Rider '+str(n), faction_id, model_info, model_id)
             if result == 0:
                 return(0)
-            rider_object = bpy.data.objects[unit_name+' Rider '+str(n)]
-            rider_object.parent = mount_object
-            rider_object.location = rider_coordinates
+            rider_object = importedArmature(existing)
+            if rider_object:
+                rider_object.parent = mount_object
+                rider_object.location = rider_coordinates
             n += 1
     elif unit_attachment[0] == 'engine':
         engine_info = attachment_dictionary[unit_attachment[1]]
         engine_model = unit_attachment[1]
+        existing = set(bpy.data.objects)
         result, width, z_offset = engineImporter(model_folder, unit_name, faction_id, engine_model+'.glb')
         if result == 0:
             return(0)
         if coordinates != [0, 0, 0]:
             coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
-        engine_object = bpy.data.objects[unit_name]
-        engine_object.location = coordinates
-        engine_object.location[2] += z_offset
+        engine_object = importedArmature(existing)
+        root_object = engine_object
+        if engine_object:
+            engine_object.location = coordinates
+            engine_object.location[2] += z_offset
         n = 1
         for member in engine_info['Crew']:
             rider_coordinates = [
@@ -153,18 +171,24 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade):
                 -float(member[1]),
                 float(member[2])
             ]
+            existing = set(bpy.data.objects)
             result, c_width, z_offset = modelImporter(model_folder, unit_name+' Crew '+str(n), faction_id, model_info, model_id)
             if result == 0:
                 return(0)
-            crew_object = bpy.data.objects[unit_name+' Crew '+str(n)]
-            crew_object.parent = engine_object
-            crew_object.location = rider_coordinates
-            crew_object.location[2] += z_offset
+            crew_object = importedArmature(existing)
+            if crew_object:
+                crew_object.parent = engine_object
+                crew_object.location = rider_coordinates
+                crew_object.location[2] += z_offset
             n += 1
     if result == 2:
         item = bpy.context.scene.med2_toolkit_import_list.add()
         item.name = unit_name
         item.id = unit_info['ID']
+        # the real object name, which carries a .001 suffix when several
+        # upgrades of the same unit are in the scene - the list's delete
+        # option needs it to find the right rig
+        item.object_name = root_object.name if root_object else unit_name
         if unit_attachment == 'unused':
             item.icon = unit_attachment
         else:
