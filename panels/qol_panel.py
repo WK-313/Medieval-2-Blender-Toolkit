@@ -88,13 +88,24 @@ class MED_2_TOOLKIT_OT_Weight_Transfer(bpy.types.Operator):
             mix_factor=1.0,
         )
 
+        # soften the hard edges the mapping leaves behind
+        for obj in selected_objs:
+            for o in context.selected_objects:
+                o.select_set(False)
+            obj.select_set(True)
+            context.view_layer.objects.active = obj
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.object.vertex_group_smooth(group_select_mode='ALL', repeat=5)
+            bpy.ops.object.mode_set(mode='OBJECT')
+
         for o in context.selected_objects:
             o.select_set(False)
         for o in orig_selected:
             o.select_set(True)
         context.view_layer.objects.active = orig_active
 
-        self.report({'INFO'}, f"Transferred weights to {len(selected_objs)} object(s)")
+        self.report({'INFO'}, f"Transferred weights to {len(selected_objs)} object(s) and smoothed 5x")
         return {'FINISHED'}
 
 

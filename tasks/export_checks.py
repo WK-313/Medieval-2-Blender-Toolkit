@@ -1,4 +1,5 @@
 import re
+import math
 import bpy
 from .armature_tools import skeletonUsesLowercase
 
@@ -87,6 +88,15 @@ def splitOptSuffix(name):
         return core[:-len(OPT_SUFFIX)], OPT_SUFFIX, number
     return core, "", number
 
+def _tailRepeatsHeadNumbered(head, tail):
+    """True when tail is head immediately followed by digits, e.g.
+    head='hair', tail='hair1'. Catches name_namenumber / name__namenumber
+    so they collapse to the same name__name_number shape as name_number."""
+    if head and tail.startswith(head):
+        rest = tail[len(head):]
+        return rest if rest.isdigit() else None
+    return None
+
 def formatExportName(base):
     """Convert a bare mesh name to the x__y export format. `base` must already
     have the __opt marker and any trailing .001 peeled off (splitOptSuffix).
@@ -95,19 +105,26 @@ def formatExportName(base):
         name                            -> name__name
         name1_name2                     -> name1__name2
         namenumber / name_number /
-        name__number                    -> name__name_number
+        name__number / name_namenumber /
+        name__namenumber                -> name__name_number
 
-    A number after the separator is never a second name, so those three all
+    A number after the separator is never a second name, so those all
     collapse to the same name__name_number shape."""
     if "__" in base:
         head, _, tail = base.partition("__")
         if head and tail.isdigit():
             return "%s__%s_%s" % (head, head, tail), 'numbered'
+        number = _tailRepeatsHeadNumbered(head, tail)
+        if number:
+            return "%s__%s_%s" % (head, head, number), 'numbered'
         return base, None
     if "_" in base:
         head, _, tail = base.partition("_")
         if head and tail.isdigit():
             return "%s__%s_%s" % (head, head, tail), 'numbered'
+        number = _tailRepeatsHeadNumbered(head, tail)
+        if number:
+            return "%s__%s_%s" % (head, head, number), 'numbered'
         return head + "__" + tail, 'underscored'
     match = re.fullmatch(r"(.*?[A-Za-z])(\d+)", base)
     if match:
@@ -188,27 +205,56 @@ def dedupeMaterialSlots(obj):
             poly.material_index = mat_to_index[material]
     return len(duplicate_indices)
 
+def nextFreeNumberedName(base):
+    """First 'base_NN' (01, 02, ...) not already held by another object in
+    the scene."""
+    n = 1
+    while True:
+        candidate = "%s_%02d" % (base, n)
+        if bpy.data.objects.get(candidate) is None:
+            return candidate
+        n += 1
+
 def stripTrailingNumbers(meshes):
     """Remove trailing .001-style suffixes from the export set. If the base
-    name is held by an object outside the set, swap names with it; if it's
-    held inside the set, that's a real conflict. Returns (renamed, errors)."""
+    name is held by an object outside the set, swap names with it. If it's
+    held by more than one object inside the set (a real conflict that can't
+    be resolved by dropping the .001), rename the whole group instead to
+    base_01, base_02, ... skipping any base_NN already taken elsewhere in the
+    scene. Returns (renamed, errors)."""
     renamed = []
     errors = []
-    for obj in meshes:
-        if not ("." in obj.name and obj.name.split(".")[-1].isdigit()):
-            continue
+
+    suffixed = [obj for obj in meshes if "." in obj.name and obj.name.split(".")[-1].isdigit()]
+
+    groups = {}
+    for obj in suffixed:
         base = obj.name.rsplit(".", 1)[0]
+        groups.setdefault(base, []).append(obj)
+    for base, group in groups.items():
         holder = bpy.data.objects.get(base)
-        if holder and holder is not obj and holder in meshes:
-            group = sorted(o.name for o in meshes if baseName(o.name) == base)
-            errors.append("Cannot remove trailing number: %s all share the base name '%s'" % (", ".join(group), base))
+        if holder and holder in meshes and holder not in group:
+            group.append(holder)
+    conflict_bases = {base for base, group in groups.items() if len(group) > 1}
+
+    for obj in suffixed:
+        base = obj.name.rsplit(".", 1)[0]
+        if base in conflict_bases:
             continue
+        holder = bpy.data.objects.get(base)
         old_name = obj.name
         if holder and holder is not obj:
             obj.name = base + ".__swap__"
             holder.name = old_name
         obj.name = base
         renamed.append("%s -> %s" % (old_name, obj.name))
+
+    for base in sorted(conflict_bases):
+        for obj in sorted(groups[base], key=lambda o: o.name):
+            old_name = obj.name
+            obj.name = nextFreeNumberedName(base)
+            renamed.append("%s -> %s" % (old_name, obj.name))
+
     return renamed, errors
 
 def runSelectCleanup(context):
@@ -375,6 +421,94 @@ def objectMainAttach(obj, main_mat, attach_mat):
     mats = [slot.material for slot in obj.material_slots if slot.material]
     return attach_mat is not None and attach_mat in mats and main_mat not in mats
 
+# Substrings that mark a material as the attachment texture by name, e.g.
+# sword_at, shield_attach, cape_attachment.
+ATTACH_NAME_KEYWORDS = ('_at', 'attach')
+
+def looksLikeAttach(material_name):
+    lowered = material_name.lower()
+    return any(keyword in lowered for keyword in ATTACH_NAME_KEYWORDS)
+
+def autoAssignMaterials(context):
+    """Auto-detect the main/attach materials from naming, fill in the other
+    slot when it's the only material left once attach is known, and fold any
+    further extra materials into main/attach by name. Returns a list of
+    (level, message)."""
+    report = []
+    armature = activeExportArmature(context)
+    if not armature:
+        return report
+    export_data = armature.med2_toolkit_unit_export
+    materials = uniqueMaterials(exportMeshes(context, armature))
+    if not materials:
+        return report
+
+    def resolve(name):
+        return bpy.data.materials.get(name) if name and name != 'none' else None
+    main_mat = resolve(export_data.material_main)
+    attach_mat = resolve(export_data.material_attach)
+
+    if main_mat is None:
+        for material in materials:
+            if '_main' in material.name.lower():
+                main_mat = material
+                try:
+                    export_data.material_main = material.name
+                    report.append(('INFO', "Auto-assigned main material: %s" % material.name))
+                except TypeError:
+                    pass
+                break
+
+    if attach_mat is None:
+        for material in materials:
+            if material is main_mat:
+                continue
+            if looksLikeAttach(material.name):
+                attach_mat = material
+                try:
+                    export_data.material_attach = material.name
+                    report.append(('INFO', "Auto-assigned attach material: %s" % material.name))
+                except TypeError:
+                    pass
+                break
+
+    # attach identified but main isn't, and exactly one other material
+    # remains: that has to be main
+    if main_mat is None and attach_mat is not None:
+        others = [m for m in materials if m is not attach_mat]
+        if len(others) == 1:
+            main_mat = others[0]
+            try:
+                export_data.material_main = main_mat.name
+                report.append(('INFO', "Auto-assigned main material (only one other material found): %s" % main_mat.name))
+            except TypeError:
+                pass
+
+    # extra materials beyond main/attach: fold each into whichever it looks
+    # like by name, then reassign every object using it
+    if main_mat is not None or attach_mat is not None:
+        keepers = {m for m in (main_mat, attach_mat) if m is not None}
+        extras = [m for m in materials if m not in keepers]
+        remap = {}
+        for material in extras:
+            if attach_mat is not None and looksLikeAttach(material.name):
+                remap[material] = ('attach', attach_mat)
+            elif main_mat is not None:
+                remap[material] = ('main', main_mat)
+            elif attach_mat is not None:
+                remap[material] = ('attach', attach_mat)
+        if remap:
+            descriptions = ["%s -> %s (%s)" % (m.name, target.name, label) for m, (label, target) in remap.items()]
+            report.append(('WARNING', "Extra material(s) found, converted to main/attach: %s" % ", ".join(descriptions)))
+            meshes = exportMeshes(context, armature)
+            for obj in meshes:
+                for slot in obj.material_slots:
+                    if slot.material in remap:
+                        slot.material = remap[slot.material][1]
+            for obj in meshes:
+                dedupeMaterialSlots(obj)
+    return report
+
 def checkUVSpace(context):
     """Check UV tile placement per texture: main-texture objects must keep
     their UVs in the first tile (u 0..1), attach-texture objects in the tile
@@ -435,6 +569,67 @@ def checkUVSpace(context):
     if attach_wrong:
         report.append(('WARNING', "Attach-texture objects with UVs outside the tile to the right (u 1-2): %s" % ", ".join(attach_wrong)))
     return report, wrong
+
+def autoAssignUV(context):
+    """For every mesh whose active UV layer fits inside a single grid cell in
+    both U and V, translate the whole island onto its correct tile: main
+    objects into u 0-1, attach objects into u 1-2, both always into v 0-1.
+    Islands that already span more than one cell are left alone for manual
+    fixing. Returns a list of (level, message)."""
+    armature = activeExportArmature(context)
+    if not armature:
+        return [('ERROR', "Select an Armature first")]
+    export_data = armature.med2_toolkit_unit_export
+    meshes = exportMeshes(context, armature)
+    if not meshes:
+        return [('ERROR', "No mesh objects found under the armature (check the Visible Only toggle)")]
+
+    def resolve(name):
+        return bpy.data.materials.get(name) if name and name != 'none' else None
+    main_mat = resolve(export_data.material_main)
+    attach_mat = resolve(export_data.material_attach)
+    if main_mat is None and attach_mat is None:
+        return [('WARNING', "Textures not set, so UV space could not be auto-assigned. Set the main/attach texture and rerun.")]
+
+    eps = 0.001
+    moved = []
+    skipped = []
+    for obj in meshes:
+        uv_layer = obj.data.uv_layers.active
+        if uv_layer is None or not uv_layer.data:
+            continue
+        is_attach = objectMainAttach(obj, main_mat, attach_mat)
+        target_tile_u = 1 if is_attach else 0
+
+        us = [loop_uv.uv[0] for loop_uv in uv_layer.data]
+        vs = [loop_uv.uv[1] for loop_uv in uv_layer.data]
+        min_u, max_u = min(us), max(us)
+        min_v, max_v = min(vs), max(vs)
+
+        if max_u - min_u > 1.0 + eps or max_v - min_v > 1.0 + eps:
+            skipped.append(obj.name)
+            continue
+
+        current_tile_u = math.floor(min_u + eps)
+        current_tile_v = math.floor(min_v + eps)
+        shift_u = target_tile_u - current_tile_u
+        shift_v = -current_tile_v  # V is never tiled, it always belongs in 0-1
+        if shift_u == 0 and shift_v == 0:
+            continue
+
+        for loop_uv in uv_layer.data:
+            loop_uv.uv[0] += shift_u
+            loop_uv.uv[1] += shift_v
+        moved.append(obj.name)
+
+    report = []
+    if moved:
+        report.append(('INFO', "Moved UVs onto the correct tile for %d object(s): %s" % (len(moved), ", ".join(moved))))
+    if skipped:
+        report.append(('WARNING', "UVs span more than one grid tile, fix manually: %s" % ", ".join(skipped)))
+    if not moved and not skipped:
+        report.append(('INFO', "All UVs already on the correct tile"))
+    return report
 
 def forceTextures(context):
     """Fold every .NNN numbered duplicate of the selected main/attach material

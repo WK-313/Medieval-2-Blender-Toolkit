@@ -7,7 +7,7 @@ from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
 from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJsonCached
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate
-from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll
+from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 
 script_folder = Path(__file__).parent.parent
@@ -229,19 +229,11 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
     def execute(self, context):
         results = runSelectCleanup(context)
 
-        # auto-assign materials named *_main / *_attach to the dropdowns
+        # auto-detect main/attach materials by name, fill in the lone
+        # remaining material once attach is known, and fold any extra
+        # materials into main/attach
         export_data = exportSettings(context)
-        for material in exportSetMaterials(context):
-            lowered = material.name.lower()
-            try:
-                if '_main' in lowered and export_data.material_main != material.name:
-                    export_data.material_main = material.name
-                    results.append(('INFO', "Auto-assigned main material: %s" % material.name))
-                elif '_attach' in lowered and export_data.material_attach != material.name:
-                    export_data.material_attach = material.name
-                    results.append(('INFO', "Auto-assigned attach material: %s" % material.name))
-            except TypeError:
-                pass
+        results.extend(autoAssignMaterials(context))
 
         # UV tile placement, right after the main/attach textures are known
         uv_results, wrong_uv = checkUVSpace(context)
@@ -296,6 +288,29 @@ class MED_2_TOOLKIT_OT_Force_Textures(bpy.types.Operator):
             self.report({level}, message)
             counts[level] += 1
         showResultsPopup(context, "Force Textures: %d change note(s), %d error(s)" % (counts['INFO'], counts['ERROR']), results)
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Auto_Assign_UV(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.auto_assign_uv"
+    bl_label = "Attempt to Auto-Assign UV"
+    bl_description = ("Move whole UV islands onto the correct tile (main = u 0-1, attach = u 1-2) "
+                      "when they fit inside a single grid cell. Islands spanning more than one tile "
+                      "are left for manual fixing.")
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return activeExportArmature(context) is not None
+
+    def execute(self, context):
+        results = autoAssignUV(context)
+        results = sorted(results, key=lambda r: SEVERITY_ORDER.get(r[0], 2))
+        counts = {'INFO': 0, 'WARNING': 0, 'ERROR': 0}
+        for level, message in results:
+            self.report({level}, message)
+            counts[level] += 1
+        showResultsPopup(context, "Auto-Assign UV: %d note(s), %d warning(s)" % (counts['INFO'], counts['WARNING']), results)
         return {'FINISHED'}
 
 
@@ -660,6 +675,7 @@ class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
 
         layout.operator("medieval2toolkit.select_cleanup", icon='CHECKMARK')
         layout.prop(export_data, "select_wrong_uv")
+        layout.operator("medieval2toolkit.auto_assign_uv", icon='UV')
 
         if context.mode != 'OBJECT':
             layout.enabled = False
@@ -868,6 +884,7 @@ classes = [
     MED_2_TOOLKIT_Unit_Export_Data,
     MED_2_TOOLKIT_OT_Select_Cleanup,
     MED_2_TOOLKIT_OT_Force_Textures,
+    MED_2_TOOLKIT_OT_Auto_Assign_UV,
     MED_2_TOOLKIT_OT_Export_Factions_Refresh,
     MED_2_TOOLKIT_OT_Export_Factions_Set,
     MED_2_TOOLKIT_OT_Export_Faction_Toggle,
