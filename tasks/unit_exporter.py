@@ -49,15 +49,64 @@ def collect_textures(objects):
                     textures.add(bpy.path.abspath(node.image.filepath))
     return textures
 
+DXT_FOURCCS = ('DXT1', 'DXT3', 'DXT5')
+
+def ddsFourcc(path):
+    """FourCC of a .dds file on disk. Uncompressed DDS files leave the field
+    zeroed, so '' means "not DXT compressed" as much as "not a DDS"."""
+    try:
+        with open(path, "rb") as dds_input:
+            header = dds_input.read(88)
+    except OSError:
+        return ""
+    if len(header) < 88 or header[0:4] != b'DDS ':
+        return ""
+    return header[84:88].decode('ascii', errors='ignore').strip('\x00')
+
+def runTexconv(texconv, source, tex_dir, out_base):
+    """Convert an image to DXT5 at tex_dir/out_base.dds and return that path,
+    or None when texconv fails. The output is staged in a temp folder first so
+    this also works when source IS the destination (a .dds being recompressed
+    in place), which texconv itself refuses to do."""
+    staging = os.path.join(tex_dir, "_texconv")
+    shutil.rmtree(staging, ignore_errors=True)
+    os.makedirs(staging, exist_ok=True)
+    try:
+        subprocess.run(
+            [
+                str(texconv),
+                "-f", "DXT5",
+                "-m", "1",
+                "-nologo",
+                "-y",
+                "-o", staging,
+                source
+            ],
+            check=True
+        )
+        produced = os.path.join(staging, os.path.splitext(os.path.basename(source))[0] + ".dds")
+        if not os.path.exists(produced):
+            return None
+        final = os.path.join(tex_dir, out_base + ".dds")
+        os.replace(produced, final)
+        return final
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
 def writeTexture(savefiletexture, ddsdata):
+    """Wrap DDS data in the game's .texture header. Returns None on success, or
+    a reason string when the data can't be used - callers must surface it, a
+    silently skipped texture leaves the unit untextured in game."""
     if ddsdata[0:4] != b'DDS ':
-        return False
+        return "not a DDS file"
 
     height = struct.unpack("<I", ddsdata[12:16])[0]
     width = struct.unpack("<I", ddsdata[16:20])[0]
 
     if (width & (width - 1)) != 0 or (height & (height - 1)) != 0:
-        return False
+        return "%dx%d is not a power of two" % (width, height)
 
     fourcc = ddsdata[84:88].decode('ascii', errors='ignore')
 
@@ -66,7 +115,7 @@ def writeTexture(savefiletexture, ddsdata):
     elif fourcc == 'DXT1':
         dxt = 16
     else:
-        return False
+        return "%s DDS, the game only reads DXT1/DXT3/DXT5" % (fourcc.strip('\x00') or "uncompressed")
 
     header_bytes = bytes([
         1,0,0,0,
@@ -86,7 +135,7 @@ def writeTexture(savefiletexture, ddsdata):
     with open(savefiletexture, "wb") as f:
         f.write(header_bytes)
         f.write(ddsdata)
-    return True
+    return None
 
 def texturePlan(context):
     """Resolve the main/attach materials into (image, out_name) pairs and the
@@ -119,7 +168,9 @@ def generateBlankNormal(texconv_unused, tex_dir, out_name, size):
     dds_path = os.path.join(tex_dir, out_name + ".dds")
     shutil.copy2(blank, dds_path)
     with open(dds_path, "rb") as f:
-        writeTexture(os.path.join(tex_dir, out_name + ".texture"), f.read())
+        error = writeTexture(os.path.join(tex_dir, out_name + ".texture"), f.read())
+    if error:
+        return "Blank normal %s not converted: %s" % (out_name, error)
     return None
 
 def writeBMDBEntry(context, out_dir, plan):
@@ -256,6 +307,7 @@ def exportArmatureGLB(context):
     tex_dir = os.path.join(out_dir, "textures")
     os.makedirs(tex_dir, exist_ok=True)
 
+    texture_errors = []
     for tex in collect_textures(meshes):
         if not os.path.exists(tex):
             continue
@@ -268,29 +320,28 @@ def exportArmatureGLB(context):
         name = os.path.join(tex_dir, out_base)
 
         if ext in [".png", ".jpg", ".jpeg", ".tga"]:
-            subprocess.run(
-                [
-                    str(texconv),
-                    "-f", "DXT5",
-                    "-m", "1",
-                    "-nologo",
-                    "-y",
-                    "-o", tex_dir,
-                    dst
-                ],
-                check=True
-            )
-            dds = name + ".dds"
+            dds = runTexconv(texconv, dst, tex_dir, out_base)
         elif ext == ".dds":
             dds = dst
+            # a .dds is not automatically game-ready: uncompressed, BC7 and
+            # DX10-header files all load fine in Blender but the game only
+            # reads DXT1/DXT3/DXT5, so recompress those the same way a png
+            if ddsFourcc(dst) not in DXT_FOURCCS:
+                dds = runTexconv(texconv, dst, tex_dir, out_base)
         else:
             continue
 
-        if os.path.exists(dds):
-            with open(dds, "rb") as f:
-                writeTexture(name + ".texture", f.read())
+        if dds is None or not os.path.exists(dds):
+            texture_errors.append("%s (texconv could not convert it)" % os.path.basename(tex))
+            continue
+        with open(dds, "rb") as f:
+            error = writeTexture(name + ".texture", f.read())
+        if error:
+            texture_errors.append("%s (%s)" % (os.path.basename(tex), error))
 
     notes = []
+    if texture_errors:
+        notes.append("no .texture written for %s" % "; ".join(texture_errors))
     if export_data.gen_blank_normals:
         for slot, norm_out_prop in (('main', 'out_main_norm'), ('attach', 'out_attach_norm')):
             diffuse, _ = plan[slot]
