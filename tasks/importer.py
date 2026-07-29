@@ -88,7 +88,10 @@ def engineChecker(model_folder, model_list):
         engineTaskRun()
 
 
-def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade):
+def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, apply_offset=True):
+    # apply_offset=False lets a caller place this exact `coordinates` (e.g.
+    # stacking a unit's armour upgrades on Z) without the auto x-spacing below,
+    # which otherwise fires on any non-origin `coordinates` regardless of axis.
     with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
         bmdb_dictionary = json.load(bmdb_input)
     with open(script_folder/('text/attachment_dictionary.json'), 'r') as attachment_input:
@@ -114,7 +117,7 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade):
         result, width, z_offset = modelImporter(model_folder, unit_name, faction_id, model_info, model_id)
         if result == 0:
             return(0)
-        if coordinates != [0, 0, 0]:
+        if apply_offset and coordinates != [0, 0, 0]:
             coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
         root_object = importedArmature(existing)
         if root_object:
@@ -127,7 +130,7 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade):
         result, width, z_offset = modelImporter(model_folder, unit_name, faction_id, mount_model, model_id)
         if result == 0:
             return(0)
-        if coordinates != [0, 0, 0]:
+        if apply_offset and coordinates != [0, 0, 0]:
             coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
         mount_object = importedArmature(existing)
         root_object = mount_object
@@ -157,7 +160,7 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade):
         result, width, z_offset = engineImporter(model_folder, unit_name, faction_id, engine_model+'.glb')
         if result == 0:
             return(0)
-        if coordinates != [0, 0, 0]:
+        if apply_offset and coordinates != [0, 0, 0]:
             coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
         engine_object = importedArmature(existing)
         root_object = engine_object

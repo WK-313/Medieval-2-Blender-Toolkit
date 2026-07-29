@@ -51,6 +51,11 @@ def sortUnits(self, context):
 # that is simply not offered.
 UPGRADE_SLOTS = 4
 
+# Vertical clearance between a unit's stacked armour upgrades on Z. Models
+# don't report their own height (selectionBoundingBox only returns width and
+# the bottom z_offset), so this is a flat guess rather than a measured gap.
+UPGRADE_Z_STEP = 2.5
+
 def upgradeModels(context):
     """Model IDs of the selected unit, one per armour upgrade level."""
     if context.scene.med2_toolkit_units.import_unit == 'none':
@@ -97,7 +102,7 @@ class MED_2_TOOLKIT_Unit_data(bpy.types.PropertyGroup):
     import_faction: EnumProperty(name = "Faction list", description = "List of factions", items = sortFactions)
     import_unit: EnumProperty(name = "Unit list", description = "List of units in faction", items = sortUnits)
     import_filter: EnumProperty(name = "Ownership filter", description = "Unit ownership filter", items = [('ownership','Ownership',''),('era 0','Era 0',''),('era 1','Era 1',''),('era 2','Era 2','')], default = 1)
-    import_upgrade: IntProperty(name = "Armour upgrade", description = "Armour upgrade level", default = 0, min = 0, max = 3)
+    faction_import_officers: BoolProperty(name = "Import Officers", description = "Also import each unit's officers, placed behind it on the -Y axis", default = False)
     use_existing: BoolProperty(name = "Use existing", description = "Toggle between using existing .GLB files or always converting from .mesh", default =  bool_settings['use_existing'])
     hide_toggle: BoolProperty(name = "Hide variations", description = "Toggle to automatically hide model variations when importing units", default = bool_settings['hide_toggle'])
     frame_toggle: BoolProperty(name = "Frame models", description = "Toggle to automatically focus the view on imported models", default = bool_settings['frame_toggle'])
@@ -208,12 +213,14 @@ class MED_2_TOOLKIT_OT_Import_Full_Unit(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Faction_Importer(bpy.types.Operator):
     bl_idname = "medieval2toolkit.faction_importer"
     bl_label = "Import faction"
-    bl_description = "Import all units of the selected faction according to the ownership."
+    bl_description = ("Import all units of the selected faction according to the ownership, "
+                      "with every armour upgrade stacked on Z. Optionally also import each "
+                      "unit's officers, placed behind it on -Y.")
     bl_options = {"REGISTER", "UNDO"}
     def execute(self, context):
         model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
         faction = context.scene.med2_toolkit_units.import_faction
-        upgrade = context.scene.med2_toolkit_units.import_upgrade
+        import_officers = context.scene.med2_toolkit_units.faction_import_officers
         coordinates = [0, 0, 0]
         saveFolderPaths()
         saveSettings()
@@ -224,10 +231,38 @@ class MED_2_TOOLKIT_OT_Faction_Importer(bpy.types.Operator):
             unit_info_list.append(unit_info)
         unitTaskWriter()
         engineTaskWriter()
-        unitChecker(model_folder, unit_info_list, upgrade)
+
+        if import_officers:
+            with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
+                bmdb_dictionary = json.load(bmdb_input)
+
         for unit_info in unit_info_list:
-            offset = unitImporter(model_folder, unit_info, faction, coordinates, upgrade)
-            coordinates[0] += round(offset*0.5, 1) + 0.25
+            unit_x = coordinates[0]
+            unit_width = 0
+            for level in range(len(unit_info['Model'])):
+                unitChecker(model_folder, [unit_info], level)
+                # apply_offset=False: every upgrade of this unit shares unit_x,
+                # only stacking upward on Z, so the auto x-spacing must stay off
+                upgrade_coordinates = [unit_x, 0, level * UPGRADE_Z_STEP]
+                offset = unitImporter(model_folder, unit_info, faction, upgrade_coordinates, level, apply_offset=False)
+                unit_width = max(unit_width, offset)
+            coordinates[0] = unit_x + round(unit_width*0.5, 1) + 0.25
+
+            if import_officers:
+                officers = unit_info['Officers']
+                fileChecker(model_folder, officers)
+                officer_coordinates = [unit_x, 0, 0]
+                for officer in officers:
+                    model_info = bmdb_dictionary[officer]
+                    existing = set(bpy.data.objects)
+                    result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
+                    if result != 0:
+                        imported = importedArmature(existing)
+                        if imported:
+                            imported.location = officer_coordinates
+                            imported.location[2] += z_offset
+                    officer_coordinates[1] -= 2
+
         postImport(self, context)
         return{"FINISHED"}
 
@@ -337,7 +372,7 @@ class MED_2_TOOLKIT_PT_EDU_Import(bpy.types.Panel):
         if context.scene.med2_toolkit_units.import_unit == 'none':
             col.enabled = False
         col = layout.column(align=True)
-        col.prop (context.scene.med2_toolkit_units, "import_upgrade", text="Upgrade level:")
+        col.prop (context.scene.med2_toolkit_units, "faction_import_officers", text="Import Officers")
         col.operator("medieval2toolkit.faction_importer", text="Import faction")
         col = layout.column(align=True)
         col.operator("medieval2toolkit.variations", text="Shuffle variations")
