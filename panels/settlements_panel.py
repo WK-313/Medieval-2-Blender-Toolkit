@@ -138,7 +138,6 @@ class MED_2_TOOLKIT_UL_Settlement_List(bpy.types.UIList):
 
 classes = [
     MED_2_TOOLKIT_Settlement_Data,
-    MED_2_TOOLKIT_PT_Settlements_Panel,
     MED_2_TOOLKIT_OT_Sort_Settlements,
     MED_2_TOOLKIT_OT_Import_Settlement,
     MED_2_TOOLKIT_Settlement_List_Items,

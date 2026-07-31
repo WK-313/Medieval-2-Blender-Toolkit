@@ -1,0 +1,48 @@
+# This is an Asset Catalog Definition file for Blender.
+#
+# Empty lines and lines starting with `#` will be ignored.
+# The first non-ignored line should be the version indicator.
+# Other lines are of the format "UUID:catalog/path/for/assets:simple catalog name"
+
+VERSION 1
+
+d44aca9d-deec-431b-85df-1d54b0ecc189:Compositor Nodes:Compositor Nodes
+63de4cb6-1d75-4d91-82c6-b69cafe329af:Info ground:Info ground
+da7078ad-a982-4e7b-9ba9-94f73d41f2a2:Poses:Poses
+ae008f4a-aaa8-4737-9eed-68e1afbd5b88:Poses Old -> Mounts:Poses Old -> Mounts
+2c1fa9c7-3fbc-4549-b281-a3283011b617:Poses/IK Bodyparts:Poses-IK Bodyparts
+49237650-6daf-49b7-8ab0-2e622c39dd9c:Poses/IK Bodyparts/IK Arms:Poses-IK Bodyparts-IK Arms
+4cab6dc0-0137-4295-903d-39071ed0ddcc:Poses/IK Bodyparts/IK Head:Poses-IK Bodyparts-IK Head
+8a0233c7-c0fc-486d-9bf7-fb005a527842:Poses/IK Bodyparts/IK Legs:Poses-IK Bodyparts-IK Legs
+fdbd1e25-0d55-4f97-b81b-af4f3c2576ee:Poses/IK Bodyparts/IK Posture:Poses-IK Bodyparts-IK Posture
+544e7a32-28ff-4c65-aa87-e987fe6c3534:Poses/IK Dwarves Full:Poses-IK Dwarves Full
+9ad95239-91e7-4b5a-b5a2-8fb2786812ed:Poses/IK Dwarves Full/1H:Poses-IK Dwarves Full-1H
+1b8bf767-9f28-4b2c-b00e-b8e9f7fbe25f:Poses/IK Dwarves Full/2H:Poses-IK Dwarves Full-2H
+a08ffd54-56f7-44cf-9a3c-001ea9836ebe:Poses/IK Dwarves Full/Archer:Poses-IK Dwarves Full-Archer
+d2ebc1d8-7ad4-4971-b264-3430df71af08:Poses/IK Dwarves Full/Crossbow:Poses-IK Dwarves Full-Crossbow
+2258d40a-f3b3-49d7-bdee-c8e1e364500f:Poses/IK Dwarves Full/Javeling:Poses-IK Dwarves Full-Javeling
+9ba1a196-98eb-4c8b-854d-0c42c02324de:Poses/IK Dwarves Full/Mounted:Poses-IK Dwarves Full-Mounted
+522e999a-2c54-4342-87e1-adc1acdc03ad:Poses/IK Dwarves Full/Polearm:Poses-IK Dwarves Full-Polearm
+dadc76e3-663c-41d6-b5a1-86dff7c1e6fb:Poses/IK Dwarves Full/Spears:Poses-IK Dwarves Full-Spears
+39175b53-c33b-4ba4-80e4-d44638b05d2d:Poses/IK Full:Poses-IK Full
+1849527c-b9f9-4b0d-b9f7-1d5f34035f81:Poses/IK Full/1H:Poses-IK Full-1H
+aaae8141-b120-440d-9a70-0484f089fe22:Poses/IK Full/2H:Poses-IK Full-2H
+f10b4cc6-1114-480e-90e8-bfa81a96453b:Poses/IK Full/Archer:Poses-IK Full-Archer
+9a8204b4-54dd-4e26-8fb2-1042ca52f928:Poses/IK Full/Crossbow:Poses-IK Full-Crossbow
+8e327d93-dcab-4246-ad5f-17ffa5b62432:Poses/IK Full/Javeling:Poses-IK Full-Javeling
+044c83f9-1356-4609-9236-30b66b6d1734:Poses/IK Full/Mounted:Poses-IK Full-Mounted
+0fc6b8f3-a75d-4585-bdfc-762d0fdf9a9b:Poses/IK Full/Polearm:Poses-IK Full-Polearm
+8a025104-c2ea-42da-b90a-42926ea4b6f6:Poses/IK Full/Spears:Poses-IK Full-Spears
+9d0c360f-9861-447b-bb57-99ec0f56b77c:Poses/IK Orcs Full:Poses-IK Orcs Full
+1d05083c-9d71-4489-8e78-efae69b3fa0e:Poses/IK Orcs Full/1H:Poses-IK Orcs Full-1H
+4cc029ce-4389-4f73-9dc7-cf4401044c4b:Poses/IK Orcs Full/2H:Poses-IK Orcs Full-2H
+3bcf8f43-9407-4dd7-ba3a-bf3eb93950f3:Poses/IK Orcs Full/Archer:Poses-IK Orcs Full-Archer
+621ad716-8d7f-429f-bddd-b6a20a27083b:Poses/IK Orcs Full/Crossbow:Poses-IK Orcs Full-Crossbow
+86deab78-d490-4ac5-8968-92299806d29a:Poses/IK Orcs Full/Javeling:Poses-IK Orcs Full-Javeling
+2dc0a7b0-33f9-42a0-a9f2-11f5724125a0:Poses/IK Orcs Full/Mounted:Poses-IK Orcs Full-Mounted
+2d023cef-d8c4-46ce-95a0-c990ac2c3395:Poses/IK Orcs Full/Polearm:Poses-IK Orcs Full-Polearm
+f843a39e-ff5a-42fd-a318-d3c065491619:Poses/IK Orcs Full/Spears:Poses-IK Orcs Full-Spears
+8b4a6e7c-497a-4a4d-8522-6f2d5ac92f92:Poses/Med2 Skeletons:Poses-Med2 Skeletons
+758ac604-923c-4a1b-b164-cd5aaefffc80:Poses/Med2 Skeletons/Arms:Poses-Med2 Skeletons-Arms
+d8d6ce4c-1e69-4046-a09f-7d6a73ff4c12:Poses/Med2 Skeletons/Head:Poses-Med2 Skeletons-Head
+ddf97ba2-2b7d-48de-bea5-f82c26c66f54:Poses/Med2 Skeletons/Legs:Poses-Med2 Skeletons-Legs

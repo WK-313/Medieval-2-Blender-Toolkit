@@ -1,10 +1,10 @@
 
 bl_info = {
-    "name" : "Medieval 2 Toolkit V1.0.3",
+    "name" : "Medieval 2 Toolkit V1.1.0",
     "author" : "WK",
     "description" : "Collection of tools and features for modders of Medieval 2: Total War",
     "blender" : (5, 0, 0),
-    "version" : (1, 0, 3),
+    "version" : (1, 1, 0),
     "location" : "",
     "warning" : "",
     "category" : "Generic"
@@ -13,12 +13,22 @@ bl_info = {
 import bpy
 from .directories import ensureDataFiles
 ensureDataFiles()
-from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel, unit_export_panel, qol_panel
+from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel, unit_export_panel, unit_info_panel, qol_panel, pose_panel
+from .panels import multi_panel
 from bpy.props import EnumProperty, PointerProperty
 
 
 class MED_2_TOOLKIT_Mode_Selection(bpy.types.PropertyGroup):
-    mode_selection: EnumProperty(items = [("unit_import", "Unit Import", ""), ("unit_export", "Unit Export", ""), ("settlements", "Settlements", ""), ("qol", "QOL", "")], name = "Mode selection", description = "Select the workmode")
+    # The values are what every panel's poll() tests, so they are kept as they
+    # were; only the order and the labels follow the strip.
+    mode_selection: EnumProperty(
+        items = [("unit_import", "Import", "Read a mod's units and models in - EDU and BMDB"),
+                 ("unit_export", "Export", "Take a finished unit back out to the mod"),
+                 ("settlements", "Settlement", "Settlement pieces"),
+                 ("qol", "QOL", "Rigging, renaming, weights, poses and the other everyday tools"),
+                 ("unit_info", "Unit Cards", "Build the card scene and render unit cards")],
+        name = "Mode selection", description = "Select the workmode", default = "unit_import")
+
 
 class MED_2_TOOLKIT_PT_Main_Panel(bpy.types.Panel):
     bl_idname = "MED_2_TOOLKIT_PT_Main_Panel"
@@ -28,11 +38,7 @@ class MED_2_TOOLKIT_PT_Main_Panel(bpy.types.Panel):
     bl_category = "Medieval 2 Toolkit"
 
     def draw(self, context):
-        layout=self.layout
-        layout.label(text = "Workmode:")
-        col = layout.column(align=True)
-        grid = col.grid_flow(row_major=True, columns=2, even_columns=True, even_rows=True, align=True)
-        grid.prop(context.scene.med2_toolkit_mode, "mode_selection", expand=True)
+        multi_panel.drawSectionStrip(context, self.layout)
 
 
 classes = [
@@ -49,9 +55,14 @@ def register():
     bmdb_panel.register()
     settlements_panel.register()
     unit_export_panel.register()
+    unit_info_panel.register()
     qol_panel.register()
+    pose_panel.register()
+    # last: it imports the panel classes the modules above define
+    multi_panel.register()
 
 def unregister():
+    multi_panel.unregister()
     for item in classes:
         bpy.utils.unregister_class(item)
     del bpy.types.Scene.med2_toolkit_mode
@@ -60,7 +71,9 @@ def unregister():
     bmdb_panel.unregister()
     settlements_panel.unregister()
     unit_export_panel.unregister()
+    unit_info_panel.unregister()
     qol_panel.unregister()
+    pose_panel.unregister()
 
 if __name__ == "__main__":
     register()

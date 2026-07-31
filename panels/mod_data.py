@@ -85,6 +85,8 @@ class MED2_TOOLKIT_OT_Properties(bpy.types.PropertyGroup):
     directory_models: StringProperty(name = "Unit output path", description = "Directory to save extracted unit models", default = file_paths["directory_models"], subtype = "DIR_PATH")
     directory_settlements: StringProperty(name = "Settlement output path", description = "Directory to save extracted settlement models", default = file_paths["directory_settlements"], subtype = "DIR_PATH")
     directory_unit_export: StringProperty(name = "Unit export output path", description = "Directory to save exported unit GLB/textures", default = file_paths["directory_unit_export"], subtype = "DIR_PATH")
+    # .get: directories.json files written by an older toolkit have no card path
+    directory_unit_cards: StringProperty(name = "Unit card output path", description = "Directory the rendered unit cards are written under, normally the mod's data\\ui folder", default = file_paths.get("directory_unit_cards", file_paths["directory_unit_export"]), subtype = "DIR_PATH")
     directory_iwte_task_template: StringProperty(name = "IWTE task template", description = "IWTE task template file used for GLB to .mesh conversion", default = file_paths["directory_iwte_task_template"], subtype = "FILE_PATH")
 
 
@@ -136,6 +138,9 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
             col.prop (context.scene.med2_toolkit_reader, "directory_unit_export", text="Export Output")
         elif mode == 'unit_import':
             col.prop (context.scene.med2_toolkit_reader, "directory_models", text="Unit Output")
+        elif mode == 'unit_info':
+            col.prop (context.scene.med2_toolkit_reader, "directory_models", text="Unit Output")
+            col.prop (context.scene.med2_toolkit_reader, "directory_unit_cards", text="Card Output")
         else:
             col.prop (context.scene.med2_toolkit_reader, "directory_settlements", text="Settlement Output")
         row = col.row(align=True)
@@ -153,7 +158,6 @@ classes = [
     MED2_TOOLKIT_OT_Properties,
     MED2_TOOLKIT_OT_Refresh_Mods,
     MED2_TOOLKIT_OT_Reader,
-    MED2_TOOLKIT_PT_Mod_Data,
     ]
 
 def register():

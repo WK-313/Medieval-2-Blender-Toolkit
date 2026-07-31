@@ -1,6 +1,8 @@
 import bpy
 from bpy.props import BoolProperty, EnumProperty, PointerProperty
 from ..tasks.armature_tools import skeletonItems, parentToSkeleton
+from ..tasks.control_rig import (CONTROL_RIG_TYPES, controlRigOf, controlledRigs, createControlRig,
+                                 deleteControlRig, isControlRig)
 from ..tasks.export_checks import (
     OPT_SUFFIX, splitNumberSuffix, hasOptSuffix, addOptSuffix, removeOptSuffix, splitOptSuffix,
 )
@@ -377,6 +379,93 @@ class MED_2_TOOLKIT_OT_Parent_Sample_Weights_Keep(bpy.types.Operator):
         return {'FINISHED'}
 
 
+def controlRigTargets(context):
+    """Med2 skeletons in the selection that a controller could be built for."""
+    targets = []
+    for obj in context.selected_objects:
+        rig = obj if obj.type == 'ARMATURE' else (obj.parent if obj.parent is not None and obj.parent.type == 'ARMATURE' else None)
+        if rig is not None and not isControlRig(rig) and rig not in targets:
+            targets.append(rig)
+    active = context.active_object
+    if not targets and active is not None and active.type == 'ARMATURE' and not isControlRig(active):
+        targets.append(active)
+    return targets
+
+
+class MED_2_TOOLKIT_OT_Create_Control_Rig(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.create_control_rig"
+    bl_label = "Add Control Rig"
+    bl_description = ("Build the IK controller for the selected Medieval 2 skeleton and constrain the rig to it. "
+                      "Most of the bundled pose library is written against this controller's bones")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    rig_type: EnumProperty(name = "Control rig", description = "Which of the three IK layouts to build", items = CONTROL_RIG_TYPES, default = 'infantry')
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT' and bool(controlRigTargets(context))
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=340)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "rig_type")
+        targets = controlRigTargets(context)
+        layout.label(text="Builds a controller for %d rig(s):" % len(targets), icon='CON_KINEMATIC')
+        for rig in targets[:6]:
+            layout.label(text=rig.name, icon='ARMATURE_DATA')
+        if len(targets) > 6:
+            layout.label(text="... and %d more" % (len(targets) - 6))
+
+    def execute(self, context):
+        targets = controlRigTargets(context)
+        if not targets:
+            self.report({'ERROR'}, "Select a Medieval 2 armature first")
+            return {'CANCELLED'}
+        built = 0
+        for rig in targets:
+            controller, results = createControlRig(context, rig, self.rig_type)
+            if controller is not None and not any(level == 'WARNING' and 'already has' in message for level, message in results):
+                built += 1
+            for level, message in results:
+                self.report({level}, message)
+        if built == 0:
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Built %d control rig(s)" % built)
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Delete_Control_Rig(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.delete_control_rig"
+    bl_label = "Remove Control Rig"
+    bl_description = "Delete the control rig of the selection, un-parenting and un-constraining the skeletons it drives"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if context.mode != 'OBJECT':
+            return False
+        return any(controlRigOf(obj) is not None for obj in context.selected_objects if obj.type == 'ARMATURE')
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        controllers = []
+        for obj in context.selected_objects:
+            if obj.type != 'ARMATURE':
+                continue
+            controller = controlRigOf(obj)
+            if controller is not None and controller not in controllers:
+                controllers.append(controller)
+        freed = 0
+        for controller in controllers:
+            freed += deleteControlRig(controller)
+        self.report({'INFO'}, "Removed %d control rig(s), freeing %d skeleton(s)" % (len(controllers), freed))
+        return {'FINISHED'}
+
+
 class MED_2_TOOLKIT_PT_Weight_Transfer(bpy.types.Panel):
     bl_idname = "MED_2_TOOLKIT_PT_Weight_Transfer"
     bl_parent_id = "MED_2_TOOLKIT_PT_Main_Panel"
@@ -417,6 +506,17 @@ class MED_2_TOOLKIT_PT_Armature(bpy.types.Panel):
         col.operator("medieval2toolkit.parent_to_skeleton", icon='ARMATURE_DATA')
         col.operator("medieval2toolkit.parent_sample_weights", icon='MOD_DATA_TRANSFER')
         col.operator("medieval2toolkit.parent_sample_weights_keep", icon='COMMUNITY')
+
+        box = layout.box()
+        box.label(text="IK Control Rig", icon='CON_KINEMATIC')
+        existing = [controlRigOf(obj) for obj in context.selected_objects if obj.type == 'ARMATURE']
+        existing = [rig for rig in existing if rig is not None]
+        col = box.column(align=True)
+        col.operator("medieval2toolkit.create_control_rig", icon='ADD')
+        col.operator("medieval2toolkit.delete_control_rig", icon='TRASH')
+        if existing:
+            box.label(text="Selected: %s" % existing[0].name, icon='OUTLINER_OB_ARMATURE')
+            box.label(text="Drives %d skeleton(s)" % len(controlledRigs(existing[0])))
 
 
 class MED_2_TOOLKIT_PT_Rename_Tools(bpy.types.Panel):
@@ -481,10 +581,8 @@ classes = [
     MED_2_TOOLKIT_OT_Parent_To_Skeleton,
     MED_2_TOOLKIT_OT_Parent_Sample_Weights,
     MED_2_TOOLKIT_OT_Parent_Sample_Weights_Keep,
-    MED_2_TOOLKIT_PT_Weight_Transfer,
-    MED_2_TOOLKIT_PT_Armature,
-    MED_2_TOOLKIT_PT_Rename_Tools,
-    MED_2_TOOLKIT_PT_QOL_Advanced,
+    MED_2_TOOLKIT_OT_Create_Control_Rig,
+    MED_2_TOOLKIT_OT_Delete_Control_Rig,
     ]
 
 def register():

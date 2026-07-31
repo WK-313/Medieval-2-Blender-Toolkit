@@ -192,6 +192,7 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
         # upgrades of the same unit are in the scene - the list's delete
         # option needs it to find the right rig
         item.object_name = root_object.name if root_object else unit_name
+        item.faction = faction_id
         if unit_attachment == 'unused':
             item.icon = unit_attachment
         else:

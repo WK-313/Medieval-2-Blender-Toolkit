@@ -1,0 +1,129 @@
+"""Turn a folder of game textures into asset-marked materials.
+
+Ported from the v0.9.x toolkit's textures_to_assets.py. Changes: the normal-map
+suffix matching and node wiring now follow the importer's materialWorkflow (so a
+converted texture looks the same whether it arrived through a unit import or
+through here), paths are joined properly instead of concatenated, and materials
+that already exist are reused rather than silently duplicated.
+"""
+
+import os
+import bpy
+from pathlib import Path
+
+# Matched against the file name without its extension, so the same suffixes work
+# for the game's .dds and for the .png/.tga people keep working copies in.
+NORMAL_SUFFIXES = ('_normal', '_norm', '_nrm', '_bump')
+TEXTURE_TYPES = ('.dds', '.png', '.tga')
+
+
+def splitTextures(texture_folder):
+    """(diffuse files, normal files) in the folder, by name suffix."""
+    diffuse = []
+    normals = []
+    try:
+        listing = sorted(os.listdir(texture_folder))
+    except OSError:
+        return diffuse, normals
+    for file_name in listing:
+        if not file_name.lower().endswith(TEXTURE_TYPES):
+            continue
+        stem = os.path.splitext(file_name)[0].lower()
+        if stem.endswith(NORMAL_SUFFIXES):
+            normals.append(file_name)
+        else:
+            diffuse.append(file_name)
+    return diffuse, normals
+
+
+def matchingNormal(texture, normals):
+    """The normal map that belongs to a diffuse texture, or None. The normal is
+    allowed to be a different file type than the diffuse."""
+    stem, extension = os.path.splitext(texture)
+    wanted = [(stem + suffix).lower() for suffix in NORMAL_SUFFIXES]
+    # prefer the same file type, then anything else that matches
+    for candidate in sorted(normals, key=lambda name: os.path.splitext(name)[1].lower() != extension.lower()):
+        if os.path.splitext(candidate)[0].lower() in wanted:
+            return candidate
+    return None
+
+
+def buildMaterial(texture_folder, texture, normal_texture):
+    material_name = texture.replace('.', '_')
+    material = bpy.data.materials.get(material_name)
+    if material is not None:
+        return material, False
+    material = bpy.data.materials.new(material_name)
+    material.use_nodes = True
+    material.preview_render_type = 'FLAT'
+    material.use_backface_culling = True
+    nodes = material.node_tree.nodes
+    new_link = material.node_tree.links.new
+
+    shader_node = nodes["Principled BSDF"]
+    shader_node.inputs['Metallic'].default_value = 0
+    shader_node.inputs['Roughness'].default_value = 0.5
+
+    texture_image = nodes.new("ShaderNodeTexImage")
+    texture_image.name = 'Diffuse Texture'
+    texture_image.location = (-506, 444)
+    texture_image.image = bpy.data.images.load(os.path.join(texture_folder, texture), check_existing=True)
+    new_link(shader_node.inputs['Base Color'], texture_image.outputs['Color'])
+    new_link(shader_node.inputs['Alpha'], texture_image.outputs['Alpha'])
+
+    rgb_curve = nodes.new("ShaderNodeRGBCurve")
+    rgb_curve.location = (-506, 124)
+    # flip the green channel: the game's normal maps are the other handedness
+    curve_g = rgb_curve.mapping.curves[1]
+    curve_g.points[0].location = (0, 1)
+    curve_g.points[1].location = (1, 0)
+    normal_map = nodes.new("ShaderNodeNormalMap")
+    normal_map.location = (-206, 124)
+    normal_image = nodes.new("ShaderNodeTexImage")
+    normal_image.name = 'Normal Texture'
+    normal_image.location = (-836, 124)
+    if normal_texture is not None:
+        normal_image.image = bpy.data.images.load(os.path.join(texture_folder, normal_texture), check_existing=True)
+        normal_image.image.colorspace_settings.name = 'Non-Color'
+        new_link(rgb_curve.inputs['Color'], normal_image.outputs['Color'])
+        new_link(normal_map.inputs['Color'], rgb_curve.outputs['Color'])
+        new_link(shader_node.inputs['Normal'], normal_map.outputs['Normal'])
+    return material, True
+
+
+def texturesToAssets(texture_folder, mark_assets=True, catalog_id=""):
+    """Build one material per diffuse texture in the folder. Returns a list of
+    (level, message) results."""
+    texture_folder = bpy.path.abspath(texture_folder)
+    if not Path(texture_folder).is_dir():
+        return [('ERROR', "Texture folder not found: %s" % texture_folder)]
+    diffuse, normals = splitTextures(texture_folder)
+    if not diffuse:
+        return [('WARNING', "No .dds/.png/.tga textures in %s" % texture_folder)]
+    created = 0
+    reused = 0
+    without_normal = 0
+    for texture in diffuse:
+        normal_texture = matchingNormal(texture, normals)
+        if normal_texture is None:
+            without_normal += 1
+        material, is_new = buildMaterial(texture_folder, texture, normal_texture)
+        if is_new:
+            created += 1
+        else:
+            reused += 1
+            continue
+        if mark_assets:
+            material.asset_mark()
+            material.asset_generate_preview()
+            material.asset_data.description = "Generated by the Medieval 2 Toolkit"
+            if catalog_id:
+                material.asset_data.catalog_id = catalog_id
+    results = [('INFO', "Created %d material(s) from %d texture(s)" % (created, len(diffuse)))]
+    if reused:
+        results.append(('INFO', "%d material(s) already existed and were left alone" % reused))
+    if without_normal:
+        results.append(('WARNING', "%d texture(s) had no matching normal map" % without_normal))
+    if mark_assets and created:
+        results.append(('INFO', "Marked as assets - save this .blend inside an asset library folder to keep them"))
+    return results

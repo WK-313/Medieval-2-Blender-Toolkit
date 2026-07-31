@@ -1,9 +1,11 @@
 import bpy
 import json
+from bpy.app.handlers import persistent
 from bpy.props import StringProperty, BoolProperty, BoolVectorProperty, PointerProperty, CollectionProperty, IntProperty, EnumProperty
 from pathlib import Path
 
 from..directories import saveFolderPaths, saveSettings, readJsonCached
+from ..tasks.control_rig import controlRigOf, controlledRigs, isControlRig
 from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport
 from ..tasks.task_writer import unitTaskWriter, engineTaskWriter
 
@@ -84,6 +86,12 @@ def deleteImportedObjects(item):
     if target is None:
         return 0
     doomed = list(target.children_recursive) + [target]
+    # the unit is parented UNDER its control rig, so deleting the unit would
+    # otherwise strand the controller in the scene
+    controller = controlRigOf(target)
+    if controller is not None and controller is not target:
+        if all(rig in doomed for rig in controlledRigs(controller)):
+            doomed.append(controller)
     removed = 0
     for obj in doomed:
         try:
@@ -94,11 +102,89 @@ def deleteImportedObjects(item):
     return removed
 
 
+#   ---------------------------  #
+#   Imported models list upkeep    #
+#   ---------------------------  #
+
+# Set while the deferred prune is queued, so the depsgraph handler does not
+# stack one timer per update.
+_prune_queued = False
+
+
+def staleEntries(scene):
+    """Indices of list entries whose object is no longer in the file.
+
+    Only a full disappearance from bpy.data counts: an object merely unlinked
+    from the scene, or sitting in an excluded collection, is still there and its
+    entry has to stay.
+    """
+    stale = []
+    for index, item in enumerate(scene.med2_toolkit_import_list):
+        name = item.object_name or item.name
+        if name and bpy.data.objects.get(name) is None:
+            stale.append(index)
+    return stale
+
+
+def pruneImportList(scene):
+    """Drop entries for deleted objects. Returns how many went."""
+    stale = staleEntries(scene)
+    for index in reversed(stale):
+        scene.med2_toolkit_import_list.remove(index)
+    if stale:
+        scene.med2_toolkit_import_list_index = min(scene.med2_toolkit_import_list_index,
+                                                   max(0, len(scene.med2_toolkit_import_list) - 1))
+    return len(stale)
+
+
+def runQueuedPrune():
+    global _prune_queued
+    _prune_queued = False
+    for scene in bpy.data.scenes:
+        units = getattr(scene, "med2_toolkit_units", None)
+        if units is None or not units.auto_prune_list:
+            continue
+        removed = pruneImportList(scene)
+        if removed:
+            print("Medieval 2 Toolkit: dropped %d imported models entr%s whose object was deleted"
+                  % (removed, "y" if removed == 1 else "ies"))
+    return None
+
+
+@persistent
+def watchImportList(scene, depsgraph=None):
+    """Queue a prune when an entry's object has gone.
+
+    The check itself is a dict lookup per entry and runs on every depsgraph
+    update, so the common case (nothing stale) costs nothing. The removal is
+    deferred to a timer because writing scene data from inside
+    depsgraph_update_post retriggers the handler.
+    """
+    global _prune_queued
+    if _prune_queued or scene is None:
+        return
+    units = getattr(scene, "med2_toolkit_units", None)
+    if units is None or not units.auto_prune_list:
+        return
+    if not scene.med2_toolkit_import_list or not staleEntries(scene):
+        return
+    _prune_queued = True
+    bpy.app.timers.register(runQueuedPrune, first_interval=0)
+
+
+@persistent
+def pruneAfterLoad(_file_path):
+    # a saved file can carry entries for objects that were deleted in a session
+    # that never ran the handler (or with the toggle off at the time)
+    runQueuedPrune()
+
+
 class MED_2_TOOLKIT_Unit_data(bpy.types.PropertyGroup):
     with open(script_folder/('text/menu_settings.json'), 'r') as settings_input:
             bool_settings = json.load(settings_input)
     single_import_upgrades: BoolVectorProperty(name = "Upgrade levels", description = "Armour upgrade levels to import", size = UPGRADE_SLOTS, default = (True,) + (False,)*(UPGRADE_SLOTS-1))
     delete_with_item: BoolProperty(name = "Delete objects", description = "Also delete the armature and every object parented to it when removing entries from the imported models list", default = bool_settings.get('delete_with_item', True))
+    auto_prune_list: BoolProperty(name = "Drop entries for deleted objects", description = "Remove an entry from the imported models list as soon as the armature it points at is deleted from the file", default = bool_settings.get('auto_prune_list', True))
     import_faction: EnumProperty(name = "Faction list", description = "List of factions", items = sortFactions)
     import_unit: EnumProperty(name = "Unit list", description = "List of units in faction", items = sortUnits)
     import_filter: EnumProperty(name = "Ownership filter", description = "Unit ownership filter", items = [('ownership','Ownership',''),('era 0','Era 0',''),('era 1','Era 1',''),('era 2','Era 2','')], default = 1)
@@ -377,13 +463,18 @@ class MED_2_TOOLKIT_PT_EDU_Import(bpy.types.Panel):
         col = layout.column(align=True)
         col.operator("medieval2toolkit.variations", text="Shuffle variations")
         layout.label(text = "Imported Models")
+        drawImportListFilters(layout, context)
         row = layout.row()
         row.template_list("MED_2_TOOLKIT_UL_Import_List", "Import_list", context.scene, "med2_toolkit_import_list", context.scene, "med2_toolkit_import_list_index")
+        row = layout.row(align=True)
+        row.operator("medieval2toolkit.add_armature_to_list", text="Add Selected").selection_only = True
+        row.operator("medieval2toolkit.add_armature_to_list", text="Add All Unlisted").selection_only = False
         if context.scene.med2_toolkit_import_list_index >= 0 and context.scene.med2_toolkit_import_list:
             unit = context.scene.med2_toolkit_import_list[context.scene.med2_toolkit_import_list_index]
             col = layout.column()
             col.prop (unit, "id")
         layout.prop (context.scene.med2_toolkit_units, "delete_with_item", text="Delete objects with the entry")
+        layout.prop (context.scene.med2_toolkit_units, "auto_prune_list", text="Drop entries for deleted objects")
         row = layout.row(align=True)
         row.operator("medieval2toolkit.remove_item", text="Remove item")
         row.operator("medieval2toolkit.purge_list", text="Purge list")
@@ -394,20 +485,204 @@ class MED_2_TOOLKIT_List_Items(bpy.types.PropertyGroup):
     name: StringProperty(name="Name", description="Names of the imported units")
     id: StringProperty(name="Unit ID", description="IDs of the imported units")
     object_name: StringProperty(name="Object name", description="Name of the armature object this entry was imported as")
+    # the card renderer needs it: units with no card_pic_dir/info_pic_dir in the
+    # EDU are written into the owning faction's card folder
+    faction: StringProperty(name="Faction", description="Faction codename this entry was imported for")
+    use: BoolProperty(name="Include", description="Include this unit when creating card cameras", default=True)
     icon: StringProperty(name="Menu icon", description="")
+
+
+# item.icon values, as an ownership-style filter for the list
+UNIT_TYPE_FILTERS = [
+    ('ALL', "All types", "Show every imported model"),
+    ('unused', "Foot", "Units with no mount or engine"),
+    ('mount', "Mounted", "Units riding a mount"),
+    ('engine', "Engine", "Units crewing a siege engine"),
+    ('custom', "Added by hand", "Armatures added to the list with Add Selected Armatures"),
+]
+
+SORT_ORDERS = [
+    ('NONE', "Import order", "Leave the list in the order things were imported", 'SORTSIZE', 0),
+    ('AZ', "A to Z", "Sort the list alphabetically", 'SORTALPHA', 1),
+    ('ZA', "Z to A", "Sort the list reverse-alphabetically", 'SORT_DESC', 2),
+]
+
+def unitTypeIcon(item):
+    if item.icon == 'mount':
+        return 'SNAP_OFF'
+    if item.icon == 'engine':
+        return 'MOD_TINT'
+    if item.icon == 'custom':
+        return 'OUTLINER_OB_ARMATURE'
+    return 'ARMATURE_DATA'
+
+
+class MED_2_TOOLKIT_List_Filter(bpy.types.PropertyGroup):
+    """Search / sort / type filter for the imported models list.
+
+    These live on the scene rather than on the UIList so both the Unit Import and
+    Unit Info panels can draw them above the list - a UIList's own draw_filter is
+    hidden behind the little funnel arrow, which is where they used to be.
+    """
+    search: StringProperty(name = "Search", description = "Only show entries whose name matches", options = {'TEXTEDIT_UPDATE'})
+    sort_order: EnumProperty(name = "Sort", description = "Order the list is shown in", items = SORT_ORDERS, default = 'NONE')
+    unit_type: EnumProperty(name = "Type", description = "Only show imported models of this type", items = UNIT_TYPE_FILTERS, default = 'ALL')
+
+
+def drawImportListFilters(layout, context):
+    settings = context.scene.med2_toolkit_list_filter
+    column = layout.column(align=True)
+    column.prop(settings, "search", text="", icon='VIEWZOOM')
+    row = column.row(align=True)
+    row.prop(settings, "unit_type", text="")
+    sort = row.row(align=True)
+    for identifier, _label, _description, _icon, _number in SORT_ORDERS:
+        sort.prop_enum(settings, "sort_order", identifier, text="")
+
+
+class MED_2_TOOLKIT_OT_Check_Import_Items(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.check_import_items"
+    bl_label = "Tick imported models"
+    bl_description = "Tick, untick or invert the include boxes in the imported models list."
+    bl_options = {"REGISTER", "UNDO"}
+
+    mode: EnumProperty(items = [('ALL', "All", ""), ('NONE', "None", ""), ('INVERT', "Invert", "")], default = 'ALL')
+
+    @classmethod
+    def poll(cls, context):
+        return len(context.scene.med2_toolkit_import_list) > 0
+
+    def execute(self, context):
+        for item in context.scene.med2_toolkit_import_list:
+            if self.mode == 'ALL':
+                item.use = True
+            elif self.mode == 'NONE':
+                item.use = False
+            else:
+                item.use = not item.use
+        return {"FINISHED"}
+
+
+def listedObjectNames(scene):
+    names = set()
+    for item in scene.med2_toolkit_import_list:
+        if item.object_name:
+            names.add(item.object_name)
+        if item.name:
+            names.add(item.name)
+    return names
+
+
+def unlistedArmatures(context, selection_only):
+    """Armatures in the scene that no import list entry points at.
+
+    Control rigs are skipped and resolved to the skeleton they drive - the card
+    tools want the unit, not its controller.
+    """
+    listed = listedObjectNames(context.scene)
+    source = context.selected_objects if selection_only else context.scene.objects
+    found = []
+    for obj in source:
+        if obj.type != 'ARMATURE':
+            continue
+        rigs = controlledRigs(obj) if isControlRig(obj) else [obj]
+        for rig in rigs:
+            if rig.name not in listed and rig not in found:
+                found.append(rig)
+    return found
+
+
+class MED_2_TOOLKIT_OT_Add_Armature_To_List(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.add_armature_to_list"
+    bl_label = "Add Armatures"
+    bl_description = ("Add armatures that are in the scene but not in the imported models list, so hand-built "
+                      "or hand-imported rigs can get a unit card too")
+    bl_options = {"REGISTER", "UNDO"}
+
+    selection_only: BoolProperty(
+        name = "Selected only",
+        description = "Add only the selected armatures. Untick to add every unlisted armature in the scene",
+        default = True)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT'
+
+    @classmethod
+    def description(cls, context, properties):
+        if properties.selection_only:
+            return "Add the selected armatures to the imported models list so they can be given a unit card"
+        return "Add every armature in the scene that is not already in the imported models list"
+
+    def execute(self, context):
+        armatures = unlistedArmatures(context, self.selection_only)
+        if not armatures:
+            if self.selection_only and not any(obj.type == 'ARMATURE' for obj in context.selected_objects):
+                self.report({'WARNING'}, "No armature selected")
+            else:
+                self.report({'INFO'}, "Every armature in the scene is already in the list")
+            return {'CANCELLED'}
+        faction = ""
+        cards = getattr(context.scene, "med2_toolkit_cards", None)
+        if cards is not None:
+            faction = cards.card_faction
+        for armature in armatures:
+            item = context.scene.med2_toolkit_import_list.add()
+            item.name = armature.name
+            # the card renderer files a card under this id, and looks it up in the
+            # unit dictionary - a hand-built rig simply will not be in there, and
+            # buildRenderQueue already falls back to the faction folder for those
+            item.id = armature.name
+            item.object_name = armature.name
+            item.faction = faction
+            item.use = True
+            item.icon = 'custom'
+        context.scene.med2_toolkit_import_list_index = len(context.scene.med2_toolkit_import_list) - 1
+        self.report({'INFO'}, "Added %d armature(s): %s" % (len(armatures), ", ".join(a.name for a in armatures[:5])))
+        return {'FINISHED'}
+
 
 class MED_2_TOOLKIT_UL_Import_List(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
-        unit_type = 'ARMATURE_DATA'
-        if item.icon == 'mount':
-            unit_type = 'SNAP_OFF'
-        elif item.icon == 'engine':
-            unit_type = 'MOD_TINT'
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
-            layout.label(text=item.name, icon = unit_type)
+            row = layout.row(align=True)
+            row.prop(item, "use", text="")
+            row.label(text=item.name, icon=unitTypeIcon(item))
         elif self.layout_type in {'GRID'}:
             layout.alignment = 'CENTER'
             layout.label(text = "")
+
+    def draw_filter(self, context, layout):
+        # the same controls the panel draws above the list, so the funnel menu
+        # is not a second set of settings that disagree with it
+        drawImportListFilters(layout, context)
+        layout.prop(self, "use_filter_invert", text="Invert filter", icon='ARROW_LEFTRIGHT')
+
+    def filter_items(self, context, data, propname):
+        items = getattr(data, propname)
+        settings = context.scene.med2_toolkit_list_filter
+        helper = bpy.types.UI_UL_list
+        flags = []
+        if settings.search:
+            # reverse= here inverts which entries MATCH, not the sort order; the
+            # sort direction is settings.sort_order and must not be fed to it
+            flags = helper.filter_items_by_name(settings.search, self.bitflag_filter_item, items, "name")
+        if not flags:
+            flags = [self.bitflag_filter_item] * len(items)
+        if settings.unit_type != 'ALL':
+            for index, item in enumerate(items):
+                # entries imported before the icon field existed read as foot units
+                if (item.icon or 'unused') != settings.unit_type:
+                    flags[index] &= ~self.bitflag_filter_item
+        order = []
+        if settings.sort_order != 'NONE':
+            order = helper.sort_items_by_name(items, "name")
+            if settings.sort_order == 'ZA':
+                # sort_items_by_name returns each item's new position, so Z-A is
+                # that position counted from the other end
+                last = len(order) - 1
+                order = [last - position for position in order]
+        return flags, order
 
 classes = [
     MED_2_TOOLKIT_Unit_data,
@@ -418,8 +693,10 @@ classes = [
     MED_2_TOOLKIT_OT_Variations,
     MED_2_TOOLKIT_OT_Remove_Item,
     MED_2_TOOLKIT_OT_Purge_List,
-    MED_2_TOOLKIT_PT_EDU_Import,
+    MED_2_TOOLKIT_OT_Check_Import_Items,
+    MED_2_TOOLKIT_OT_Add_Armature_To_List,
     MED_2_TOOLKIT_List_Items,
+    MED_2_TOOLKIT_List_Filter,
     MED_2_TOOLKIT_UL_Import_List,
     ]
 
@@ -429,10 +706,20 @@ def register():
     bpy.types.Scene.med2_toolkit_units = PointerProperty(type=MED_2_TOOLKIT_Unit_data)
     bpy.types.Scene.med2_toolkit_import_list = CollectionProperty(type = MED_2_TOOLKIT_List_Items)
     bpy.types.Scene.med2_toolkit_import_list_index = IntProperty(name = "Index of imported units", default = 0)
+    bpy.types.Scene.med2_toolkit_list_filter = PointerProperty(type = MED_2_TOOLKIT_List_Filter)
+    if watchImportList not in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.append(watchImportList)
+    if pruneAfterLoad not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(pruneAfterLoad)
 
 def unregister():
+    if watchImportList in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(watchImportList)
+    if pruneAfterLoad in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(pruneAfterLoad)
     for item in classes:
         bpy.utils.unregister_class(item)
     del bpy.types.Scene.med2_toolkit_units
     del bpy.types.Scene.med2_toolkit_import_list
     del bpy.types.Scene.med2_toolkit_import_list_index
+    del bpy.types.Scene.med2_toolkit_list_filter

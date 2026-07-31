@@ -894,10 +894,6 @@ classes = [
     MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh,
     MED_2_TOOLKIT_OT_Open_Export_Folder,
     MED_2_TOOLKIT_OT_Browse_Task_Template,
-    MED_2_TOOLKIT_PT_Unit_Export,
-    MED_2_TOOLKIT_PT_Export_Materials,
-    MED_2_TOOLKIT_PT_Export_BMDB,
-    MED_2_TOOLKIT_PT_Export_Run,
     ]
 
 def register():

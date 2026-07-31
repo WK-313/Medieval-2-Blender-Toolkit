@@ -196,7 +196,6 @@ class MED_2_TOOLKIT_UL_BMDB_List(bpy.types.UIList):
 classes = [
     MED_2_TOOLKIT_OT_Model_Importer,
     MED_2_TOOLKIT_BMDB_data,
-    MED_2_TOOLKIT_PT_BMDB_Import,
     MED2_TOOLKIT_OT_BMDB_Filter,
     MED2_TOOLKIT_OT_Model_Folder,
     MED_2_TOOLKIT_BMDB_List_Items,
