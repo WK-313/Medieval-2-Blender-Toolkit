@@ -148,12 +148,11 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                                                       "outline - and switch the unit itself on if it was hidden. Everything is put back before the "
                                                                       "next camera. Without this a neighbouring unit reaching into the frame ends up on the card"),
                                default = True)
-    isolate_visible_only: BoolProperty(name = "Visible only", description = ("Render the scene the way the viewport shows it. Anything hidden by hand - the eye, the "
-                                                                              "monitor toggle, a hidden or excluded collection - is switched off for the render instead "
-                                                                              "of being switched back on, so props and scenery left visible around the unit end up on "
-                                                                              "the card. Only units ticked in the Card Units list are rendered: an unticked rig standing "
-                                                                              "there visible still stays out of the frame. The camera and its light are the only things "
-                                                                              "forced back on"),
+    isolate_visible_only: BoolProperty(name = "Visible only", description = ("Card only the VISIBLE part of the unit. The rest of the scene is switched off in the "
+                                                                              "viewport as well as for the render, so the unit is left standing there on its own while "
+                                                                              "its card renders, and everything is put back before the next one. Nothing hidden is put "
+                                                                              "back on: a variation mesh, shield or helmet switched off by hand stays off the card, "
+                                                                              "which the plain Isolate unit undoes. Only the camera and its light are ever forced on"),
                                        default = False)
     add_line_art: BoolProperty(name = "Line art outline", description = ("Add a Grease Pencil Line Art object per unit collection, each set to Collection source "
                                                                           "so it only outlines its own unit. Contour plus material borders, edge marks and loose "
@@ -784,7 +783,7 @@ class MED_2_TOOLKIT_PT_Card_Render(bpy.types.Panel):
         sub.prop(settings, "isolate_visible_only", text="Visible only", toggle=1)
         sub.enabled = settings.isolate_unit
         if settings.isolate_unit and settings.isolate_visible_only:
-            col.label(text="Renders what the viewport shows, ticked units only", icon='HIDE_OFF')
+            col.label(text="Hidden parts stay off the card", icon='HIDE_ON')
 
         if _card_job is not None:
             job = _card_job
