@@ -955,8 +955,12 @@ def buildRenderQueue(context):
         faction = camera.get(FACTION_TAG, "") or settings.card_faction
         target = cameraTarget(scene, camera)
         if target is None and settings.isolate_unit:
-            results.append(('WARNING', "Could not tell which rig '%s' belongs to - its card is rendered "
-                                       "with the whole scene visible" % unit_id))
+            if settings.isolate_visible_only:
+                results.append(('WARNING', "Could not tell which rig '%s' belongs to - its card is rendered "
+                                           "with everything the viewport shows, minus the unticked units" % unit_id))
+            else:
+                results.append(('WARNING', "Could not tell which rig '%s' belongs to - its card is rendered "
+                                           "with the whole scene visible" % unit_id))
         unit = index.get(unit_id)
         directories = cardFolders(target)
         if directories:
@@ -1144,6 +1148,73 @@ def unitFamily(target):
     return family
 
 
+def listedModels(scene, ticked_only=False):
+    """The models the imported models list points at. `ticked_only` narrows it to
+    the ones ticked in the Card Units list - the same entries the card tools
+    already act on. An entry can point at a lone mesh rather than a rig, which is
+    why this is not just a walk over the scene's armatures."""
+    models = set()
+    for item in scene.med2_toolkit_import_list:
+        if ticked_only and not item.use:
+            continue
+        model = bpy.data.objects.get(item.object_name) if item.object_name else None
+        if model is None:
+            model = bpy.data.objects.get(item.name)
+        if model is not None:
+            models.add(model)
+    return models
+
+
+def unitRoots(scene):
+    """Everything in the scene that stands for a unit: every armature plus
+    whatever the imported models list points at."""
+    roots = set(obj for obj in scene.objects if obj.type == 'ARMATURE')
+    roots.update(listedModels(scene))
+    return roots
+
+
+def untickedFamilies(scene, target):
+    """Every object belonging to a unit that is not ticked in the Card Units list.
+
+    A rig left unticked is not one the card tools were pointed at, so it has no
+    business in anyone's card even when it is sitting there visible. The unit
+    being rendered is always spared, ticked or not, and so is a control rig or a
+    mesh belonging to a ticked unit - those come out of the ticked families
+    rather than being roots of their own. Nothing is dropped while nothing is
+    ticked, which is the same "no ticks means no filter" rule cardTargets uses.
+    """
+    ticked = listedModels(scene, ticked_only=True)
+    if not ticked:
+        return set()
+    allowed = set()
+    for model in ticked:
+        allowed.update(unitFamily(model))
+    if target is not None:
+        allowed.update(unitFamily(target))
+    drop = set()
+    for root in unitRoots(scene):
+        if root in allowed:
+            continue
+        drop.update(unitFamily(root))
+    return drop - allowed
+
+
+def visibleObjects(context):
+    """Everything the viewport is currently showing. visible_get folds in the eye,
+    the monitor toggle and the collections above the object, so a unit hidden any
+    of those three ways counts as invisible here."""
+    view_layer = context.view_layer
+    visible = set()
+    for obj in view_layer.objects:
+        try:
+            if obj.visible_get(view_layer=view_layer):
+                visible.add(obj)
+        except RuntimeError:
+            # an object that is not in this view layer cannot be asked
+            continue
+    return visible
+
+
 def parentCollections(scene):
     """{collection name: [collections it is linked into]}."""
     parents = {}
@@ -1169,7 +1240,7 @@ def collectionChain(scene, collections):
     return chain
 
 
-def isolateUnit(context, camera, target):
+def isolateUnit(context, camera, target, visible_only=False):
     """Switch off everything the card should not show, and switch the unit on.
 
     Every card camera looks at the same scene, so a neighbouring unit reaching
@@ -1179,14 +1250,36 @@ def isolateUnit(context, camera, target):
     Anything the unit needs that was switched off by hand is switched back on,
     including the render toggle on the collections it lives in.
 
+    `visible_only` renders the scene the way the viewport shows it instead:
+    whatever is hidden by hand - the eye, the monitor toggle, a hidden or
+    excluded collection - is switched off for the render rather than switched
+    back on, so the card shows the props and scenery left visible around the
+    unit. Only the units ticked in the Card Units list are let through, so an
+    unticked neighbour standing there visible still stays out of the frame.
+    Nothing is ever forced back on in this mode except the camera and the light
+    it carries, without which the render is black.
+
     Returns the state restoreVisibility puts back.
     """
     scene = context.scene
-    keep = unitFamily(target) if target is not None else set()
-    keep.add(camera)
-    keep.update(camera.children)
+    # the camera and the light hanging off it are what makes a card render at
+    # all, so they are switched on in either mode
+    essential = {camera}
+    essential.update(camera.children)
+    if visible_only:
+        keep = visibleObjects(context)
+        keep.update(essential)
+        keep.difference_update(untickedFamilies(scene, target))
+        # only the essentials are switched back on; everything else is left at
+        # whatever the user set and merely switched off when it is not visible
+        force_on = essential
+    else:
+        keep = unitFamily(target) if target is not None else set()
+        keep.update(essential)
+        force_on = keep
+
     kept_collections = set()
-    for obj in keep:
+    for obj in force_on:
         kept_collections.update(obj.users_collection)
     kept_names = {collection.name for collection in kept_collections}
     # the outline is its own object, tagged with the collection it traces
@@ -1197,6 +1290,8 @@ def isolateUnit(context, camera, target):
     objects = {}
     for obj in scene.objects:
         hidden = obj not in keep
+        if not hidden and obj not in force_on:
+            continue
         if obj.hide_render != hidden:
             objects[obj.name] = obj.hide_render
             obj.hide_render = hidden
@@ -1300,7 +1395,8 @@ def renderCard(context, entry, width, height, supersample):
     previous_suns = isolateSun(scene, entry['id'])
     # nested inside the sun pass on purpose: it stores whatever isolateSun left
     # behind and hands it straight back, so restoreSuns still has the last word
-    isolated = isolateUnit(context, camera, entry.get('target')) if settings.isolate_unit else None
+    isolated = isolateUnit(context, camera, entry.get('target'),
+                           settings.isolate_visible_only) if settings.isolate_unit else None
     scene.camera = camera
     try:
         context.view_layer.update()

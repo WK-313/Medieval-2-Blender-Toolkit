@@ -148,6 +148,13 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                                                       "outline - and switch the unit itself on if it was hidden. Everything is put back before the "
                                                                       "next camera. Without this a neighbouring unit reaching into the frame ends up on the card"),
                                default = True)
+    isolate_visible_only: BoolProperty(name = "Visible only", description = ("Render the scene the way the viewport shows it. Anything hidden by hand - the eye, the "
+                                                                              "monitor toggle, a hidden or excluded collection - is switched off for the render instead "
+                                                                              "of being switched back on, so props and scenery left visible around the unit end up on "
+                                                                              "the card. Only units ticked in the Card Units list are rendered: an unticked rig standing "
+                                                                              "there visible still stays out of the frame. The camera and its light are the only things "
+                                                                              "forced back on"),
+                                       default = False)
     add_line_art: BoolProperty(name = "Line art outline", description = ("Add a Grease Pencil Line Art object per unit collection, each set to Collection source "
                                                                           "so it only outlines its own unit. Contour plus material borders, edge marks and loose "
                                                                           "edges, following the scene camera - the setup unit_card_sample.blend uses"), default = True)
@@ -771,7 +778,13 @@ class MED_2_TOOLKIT_PT_Card_Render(bpy.types.Panel):
                 box.label(text="%d of %d pinned by hand" % (pinned, len(targets)), icon='PINNED')
         else:
             box.label(text="Tick units to change their folder", icon='INFO')
-        layout.prop(settings, "isolate_unit", text="Isolate unit while rendering", toggle=1)
+        col = layout.column(align=True)
+        col.prop(settings, "isolate_unit", text="Isolate unit while rendering", toggle=1)
+        sub = col.row(align=True)
+        sub.prop(settings, "isolate_visible_only", text="Visible only", toggle=1)
+        sub.enabled = settings.isolate_unit
+        if settings.isolate_unit and settings.isolate_visible_only:
+            col.label(text="Renders what the viewport shows, ticked units only", icon='HIDE_OFF')
 
         if _card_job is not None:
             job = _card_job
