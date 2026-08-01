@@ -128,10 +128,10 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
     card_type: EnumProperty(name = "Card type", description = "Which image the renderer writes, and where", items = CARD_TYPE_ITEMS)
     custom_size: BoolProperty(name = "Custom size", description = "Use a hand-picked card resolution instead of the card type's standard size", default = False)
     card_width: IntProperty(name = "Width", description = "Card width in pixels", default = 48, min = 1, soft_max = 512)
-    card_height: IntProperty(name = "Height", description = "Card height in pixels", default = 64, min = 1, soft_max = 512)
+    card_height: IntProperty(name = "Height", description = "Card height in pixels", default = 66, min = 1, soft_max = 512)
     supersample: IntProperty(name = "Supersampling", description = ("Render this many times the card size. The compositor's rescale Transform takes it "
                                                                     "back down, so everything after it - the sharpen especially - still acts at final "
-                                                                    "card pixel size. 10 is the 480x640 render the old card .blend files used"),
+                                                                    "card pixel size. 10 is the 480x660 render the old card .blend files used"),
                              default = 10, min = 1, max = 16)
     render_samples: IntProperty(name = "Render samples", description = "EEVEE render samples used for the cards", default = 64, min = 1, soft_max = 512)
     save_full_size: BoolProperty(name = "Keep full-size render", description = ("Also save the render before the compositor scales it down to card size, as an "
@@ -143,7 +143,7 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                                                    "the pass, and the camera is widened so nothing the card shows falls outside the "
                                                                    "frame. It doubles the render time" % HD_FOLDER),
                           default = False)
-    hd_preset: EnumProperty(name = "HD size", description = "Resolution of the HD pass, as a whole multiple of the 48x64 unit card", items = HD_PRESETS, default = '20')
+    hd_preset: EnumProperty(name = "HD size", description = "Resolution of the HD pass, as a whole multiple of the 48x66 unit card", items = HD_PRESETS, default = '20')
     isolate_unit: BoolProperty(name = "Isolate unit", description = ("While a card renders, switch off everything except that unit, its camera, its sun and its "
                                                                       "outline - and switch the unit itself on if it was hidden. Everything is put back before the "
                                                                       "next camera. Without this a neighbouring unit reaching into the frame ends up on the card"),
@@ -160,7 +160,7 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
     line_art_thickness: FloatProperty(name = "Line thickness", description = ("Outline thickness measured in finished-card pixels, so 1.0 is a one pixel outline on "
                                                                                "the card whatever the supersampling or card size. Grease Pencil v3 radii are world "
                                                                                "space, which is why this is not the old modifier's Line Thickness number. The default "
-                                                                               "0.29 is the line unit_card_sample.blend draws"),
+                                                                               "0.30 is the line unit_card_sample.blend draws"),
                                       default = LINE_ART_THICKNESS, min = 0.05, soft_max = 5.0)
     add_sun: BoolProperty(name = "Add light", description = "Give each card camera its own light, aimed the same way as the camera. Only the light of the unit being rendered is lit", default = True)
     light_type: EnumProperty(name = "Light", description = "Which lamp each card camera carries", items = CARD_LIGHT_TYPES,

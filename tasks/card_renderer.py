@@ -5,9 +5,9 @@ Ported from the v0.9.x toolkit's "Unit Cards" panel. Two things changed:
 * Blender 5 dropped `Scene.node_tree` in favour of `Scene.compositing_node_group`,
   removed the Gamma and Mix RGB compositor nodes, turned the Filter node's
   `filter_type` into a menu socket, and - most importantly - the compositor output
-  is now always the scene render resolution. The old setup rendered at 480x640,
+  is now always the scene render resolution. The old setup rendered at 480x660,
   scaled the image to 10% with a Transform node and let an Alpha Over against a
-  48x64 (fully transparent) reference image crop the canvas down to card size.
+  48x66 (fully transparent) reference image crop the canvas down to card size.
   The rescale half of that still works and is what the graph does: the render is
   a whole multiple of the card, the Transform takes it back to card size, and
   everything after it - the sharpen in particular - therefore acts at final card
@@ -33,13 +33,20 @@ from .recurlayercollection import linkBeside, recurLayerCollection
 
 script_folder = Path(__file__).parent.parent
 CARD_FOLDER = script_folder/'cards'
+ASSET_FOLDER = script_folder/'assets'
 
 COMPOSITOR_NAME = "Medieval 2 Unit Cards"
 # Bumped whenever buildCompositor's graph changes, so a scene carrying a group
 # from an older toolkit gets rebuilt instead of silently keeping the old chain.
 COMPOSITOR_VERSION_TAG = "med2_compositor_version"
 COMPOSITOR_VERSION = 3
-CAMERA_GUIDE = "unit card guide.png"
+# 480x660 - the game's own card UI chrome (experience chevrons, the numbers, the
+# weapon and shield icons) over a 10x card frame, so the framing can be checked
+# against what the interface leaves visible.
+CAMERA_GUIDE = "Camera Preview.png"
+# The guide that shipped before the 48x66 correction. 480x640, so it is the wrong
+# shape now, but it is what an older install still has on disk.
+LEGACY_CAMERA_GUIDE = "unit card guide.png"
 # The rescale Transform, by name, so the render settings can retune it without
 # rebuilding the whole graph and the full-size and HD passes can switch it off.
 RESCALE_NODE = "Card Rescale"
@@ -56,13 +63,13 @@ CAMERA_ORTHO_SCALE = 1.2
 
 # card type -> (width, height, ui subfolder, file name pattern, EDU directory key)
 CARD_TYPES = {
-    'unit_card':       (48, 64, 'units', '#%s.tga', 'Unit Card'),
+    'unit_card':       (48, 66, 'units', '#%s.tga', 'Unit Card'),
     'unit_card_large': (68, 90, 'units', '#%s.tga', 'Unit Card'),
     'info_card':       (180, 230, 'unit_info', '%s_info.tga', 'Info Card'),
 }
 
 CARD_TYPE_ITEMS = [
-    ('unit_card', "Unit Card (48x64)", "Battle UI unit card, written to units/<dir>/#<unit>.tga"),
+    ('unit_card', "Unit Card (48x66)", "Battle UI unit card, written to units/<dir>/#<unit>.tga"),
     ('unit_card_large', "Unit Card (68x90)", "Larger unit card some mods use, written to units/<dir>/#<unit>.tga"),
     ('info_card', "Info Card (180x230)", "Unit info panel image, written to unit_info/<dir>/<unit>_info.tga"),
 ]
@@ -83,15 +90,15 @@ def cardResolution(settings):
     return CARD_TYPES[settings.card_type][:2]
 
 
-# The HD pass is a whole multiple of the 48x64 unit card rather than a 16:9
+# The HD pass is a whole multiple of the 48x66 unit card rather than a 16:9
 # screen size, so it frames exactly what the card frames - see hdOrthoScale, which
-# on a 48x64 card then leaves the camera alone entirely.
-HD_BASE = (48, 64)
+# on a 48x66 card then leaves the camera alone entirely.
+HD_BASE = (48, 66)
 HD_PRESETS = [
-    ('10', "10x", "480 x 640"),
-    ('20', "20x", "960 x 1280"),
-    ('30', "30x", "1440 x 1920"),
-    ('40', "40x", "1920 x 2560"),
+    ('10', "10x", "480 x 660"),
+    ('20', "20x", "960 x 1320"),
+    ('30', "30x", "1440 x 1980"),
+    ('40', "40x", "1920 x 2640"),
 ]
 HD_DEFAULT_MULTIPLE = 20
 
@@ -104,7 +111,7 @@ def hdMultiple(settings):
 
 
 def hdResolution(settings):
-    """Pixel size of the HD pass: 48x64 times the chosen multiple."""
+    """Pixel size of the HD pass: 48x66 times the chosen multiple."""
     multiple = hdMultiple(settings)
     return HD_BASE[0]*multiple, HD_BASE[1]*multiple
 
@@ -144,15 +151,20 @@ def cardOutputParts(settings):
 #   -----------------  #
 
 def guideImage():
-    """The 480x640 framing overlay shown through the camera. Optional - the setup
-    still works without it, the user just loses the on-screen guide."""
-    image = bpy.data.images.get(CAMERA_GUIDE)
-    if image is not None:
-        return image
-    guide_path = CARD_FOLDER/CAMERA_GUIDE
-    if not guide_path.exists():
-        return None
-    return bpy.data.images.load(str(guide_path))
+    """The 480x660 framing overlay shown through the camera. Optional - the setup
+    still works without it, the user just loses the on-screen guide.
+
+    The pre-48x66 guide in cards/ is the fallback, so an install that has not
+    picked up the new asset still gets an overlay rather than none at all.
+    """
+    for folder, name in ((ASSET_FOLDER, CAMERA_GUIDE), (CARD_FOLDER, LEGACY_CAMERA_GUIDE)):
+        image = bpy.data.images.get(name)
+        if image is not None:
+            return image
+        guide_path = folder/name
+        if guide_path.exists():
+            return bpy.data.images.load(str(guide_path))
+    return None
 
 
 # Marker properties: a card camera and its sun carry the unit they belong to, so
@@ -332,8 +344,12 @@ def createCardCamera(context, unit_id, faction, target, add_sun=True, light_stre
     camera.data.type = 'ORTHO'
     camera.data.ortho_scale = ortho_scale
     guide = guideImage()
-    if guide is not None and not camera.data.background_images:
-        background = camera.data.background_images.new()
+    if guide is not None:
+        # assigned on a refresh too, not just on a new camera: one built before
+        # the 48x66 correction is still showing the 480x640 guide, which is the
+        # wrong shape for the card it now renders
+        background = camera.data.background_images[0] if camera.data.background_images \
+            else camera.data.background_images.new()
         background.image = guide
         background.display_depth = 'FRONT'
         background.alpha = 1
@@ -391,12 +407,14 @@ def buildCompositor(group, scene, scale=1.0):
     render comes back out at card size and the sharpen after it therefore bites
     at final card pixel size, which is what gives those cards their look.
 
-    The old "Border Size" frame - an Image node holding a fully transparent 48x64
-    reference, an Alpha Over and a Mix - is not reproduced. It carried nothing
+    The old "Border Size" frame - an Image node holding a fully transparent 48x66
+    reference (assets/Empty Preview.png), an Alpha Over and a Mix - is not
+    reproduced, which is why that image is bundled but unused. It carried nothing
     visual; it existed purely to force the compositor canvas down to card size,
     and in Blender 5 no node can do that any more (Transform, Alpha Over and Crop
     all hand back an image the size of the render). saveCard cuts the card out of
-    the middle of the full-size frame instead.
+    the middle of the full-size frame instead, from the card size directly, so
+    the border it produces is exact whatever the card is set to.
     """
     nodes = group.nodes
     new_link = group.links.new
@@ -496,9 +514,9 @@ LINE_ART_TAG = "med2_card_line_art"
 LINE_ART_SUFFIX = " Line Art"
 # Outline thickness in finished-card pixels. Measured off unit_card_sample.blend
 # rather than guessed: that file's stroke is 0.0055 world units wide in a frame
-# 1.21424 units across, i.e. 0.453% of the frame, which on a 64 pixel tall card
-# is 0.29 of a pixel.
-LINE_ART_THICKNESS = 0.29
+# 1.21424 units across, i.e. 0.453% of the frame, which on a 66 pixel tall card
+# is 0.30 of a pixel.
+LINE_ART_THICKNESS = 0.30
 
 
 def lineArtRadius(thickness, ortho_scale, card_size):
@@ -512,7 +530,7 @@ def lineArtRadius(thickness, ortho_scale, card_size):
       so the width comes back out as `radius`. There is no 0.5 to apply.
     - `ortho_scale` frames the LONGER side of the render, so a card pixel is
       ortho_scale/max(width, height) world units - not ortho_scale/width. On a
-      48x64 card the old divisor was out by 64/48.
+      48x66 card the old divisor was out by 66/48.
     """
     if card_size <= 0:
         return LINE_ART_THICKNESS
@@ -1102,7 +1120,7 @@ def saveCard(context, target_path, width, height, supersample, full_path=None):
         source.pixels.foreach_get(pixels)
         pixels = pixels.reshape(source_height, source_width, 4)
         # the Transform scales about the middle of the canvas, so the card is the
-        # middle of the frame - the same block the old Border Size frame's 48x64
+        # middle of the frame - the same block the old Border Size frame's 48x66
         # reference image used to cut out
         left = (source_width - width)//2
         bottom = (source_height - height)//2
@@ -1357,7 +1375,7 @@ def copyCard(source_path, paths):
 def saveHDRender(context, camera, hd_path, width, height, ortho_scale):
     """Render the same camera again at HD size and save it as a PNG.
 
-    A second pass rather than a scale-up of the card render: the card is 48x64
+    A second pass rather than a scale-up of the card render: the card is 48x66
     and no amount of resampling puts detail back. The camera's ortho scale is
     widened for the pass and put back afterwards, for the HD sizes that frame a
     different shape than the card does - see hdOrthoScale. The compositor's
