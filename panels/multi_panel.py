@@ -32,8 +32,9 @@ from .pose_panel import MED_2_TOOLKIT_PT_Poses, MED_2_TOOLKIT_PT_Texture_Assets
 from .qol_panel import (MED_2_TOOLKIT_PT_Armature, MED_2_TOOLKIT_PT_QOL_Advanced,
                         MED_2_TOOLKIT_PT_Rename_Tools, MED_2_TOOLKIT_PT_Weight_Transfer)
 from .settlements_panel import MED_2_TOOLKIT_PT_Settlements_Panel
-from .unit_export_panel import (MED_2_TOOLKIT_PT_Export_BMDB, MED_2_TOOLKIT_PT_Export_Materials,
-                                MED_2_TOOLKIT_PT_Export_Run, MED_2_TOOLKIT_PT_Unit_Export)
+from .unit_export_panel import (MED_2_TOOLKIT_PT_Export_BMDB, MED_2_TOOLKIT_PT_Export_Install,
+                                MED_2_TOOLKIT_PT_Export_Materials, MED_2_TOOLKIT_PT_Export_Run,
+                                MED_2_TOOLKIT_PT_Unit_Export)
 from .unit_info_panel import (MED_2_TOOLKIT_PT_Card_Render, MED_2_TOOLKIT_PT_Card_Scene,
                               MED_2_TOOLKIT_PT_Unit_Info)
 
@@ -55,12 +56,13 @@ SECTIONS = [
 # flat list and the polls sort it out.
 EMBEDDED_PANELS = [
     MED2_TOOLKIT_PT_Mod_Data,
-    MED_2_TOOLKIT_PT_BMDB_Import,
     MED_2_TOOLKIT_PT_EDU_Import,
+    MED_2_TOOLKIT_PT_BMDB_Import,
     MED_2_TOOLKIT_PT_Unit_Export,
     MED_2_TOOLKIT_PT_Export_Materials,
     MED_2_TOOLKIT_PT_Export_BMDB,
     MED_2_TOOLKIT_PT_Export_Run,
+    MED_2_TOOLKIT_PT_Export_Install,
     MED_2_TOOLKIT_PT_Settlements_Panel,
     MED_2_TOOLKIT_PT_Weight_Transfer,
     MED_2_TOOLKIT_PT_Armature,

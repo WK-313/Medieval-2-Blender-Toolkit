@@ -193,14 +193,23 @@ def generateBlankNormal(texconv, tex_dir, out_name, size):
         return "Blank normal %s not converted: %s" % (out_name, error)
     return None
 
-def writeBMDBEntry(context, out_dir, plan):
+def bmdbEntryText(context, plan=None):
+    """The battle_models.modeldb entry for the active rig's export settings.
+
+    Returns (entry_text, entry_name, relative_path, error) - the same text the
+    export writes to <name>_bmdb.txt and the installer writes into the mod, so
+    the two can never drift apart."""
     armature = activeExportArmature(context)
+    if armature is None:
+        return None, "", "", "Select an Armature"
     export_data = armature.med2_toolkit_unit_export
     factions = [item.faction_id for item in armature.med2_toolkit_export_factions if item.enabled]
     if not factions:
-        return "BMDB entry skipped: no factions selected for ownership"
+        return None, "", "", "no factions selected for ownership"
     if not export_data.bmdb_unit_path:
-        return "BMDB entry skipped: no unit path set"
+        return None, "", "", "no unit path set"
+    if plan is None:
+        plan = texturePlan(context)
     relative = parseRelativeUnitPath(export_data.bmdb_unit_path)
     main_name = plan['main'][1]
     main_norm_name = plan['main_norm'][1] or (export_data.out_main_norm if export_data.gen_blank_normals else "")
@@ -219,12 +228,19 @@ def writeBMDBEntry(context, out_dir, plan):
         factions=factions,
         mesh_name=export_data.export_glb_name,
     )
+    return entry, entry_name, relative, None
+
+def writeBMDBEntry(context, out_dir, plan):
+    export_data = activeExportArmature(context).med2_toolkit_unit_export
+    entry, entry_name, _relative, error = bmdbEntryText(context, plan)
+    if error:
+        return "BMDB entry skipped: %s" % error
     entry_path = os.path.join(out_dir, export_data.export_glb_name + "_bmdb.txt")
     with open(entry_path, "w", encoding="utf-8") as f:
         f.write(entry + "\n")
     existing = bmdbEntryNames(bpy.path.abspath(selectedModFolder(context)))
     if existing is not None and entry_name.lower() in existing:
-        return "BMDB entry '%s' already exists in the mod's battle_models.modeldb - replace the old entry instead of appending" % entry_name
+        return "BMDB entry '%s' already exists in the mod's battle_models.modeldb - use Install to Mod to replace or rename it" % entry_name
     return None
 
 def exportArmatureGLB(context):
@@ -377,7 +393,9 @@ def exportArmatureGLB(context):
             if error:
                 notes.append(error)
 
-    if export_data.generate_bmdb:
+    # In install mode the entry is written into the mod's modeldb from the
+    # Install to Mod panel instead, after IWTE has produced the .mesh
+    if export_data.generate_bmdb and export_data.bmdb_mode == 'txt':
         error = writeBMDBEntry(context, out_dir, plan)
         if error:
             notes.append(error)
