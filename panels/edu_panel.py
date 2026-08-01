@@ -1,10 +1,12 @@
 import bpy
 import json
+import uuid
 from bpy.app.handlers import persistent
 from bpy.props import StringProperty, BoolProperty, BoolVectorProperty, PointerProperty, CollectionProperty, IntProperty, EnumProperty
 from pathlib import Path
 
 from..directories import saveFolderPaths, saveSettings, readJsonCached
+from ..tasks.card_renderer import TARGET_TAG
 from ..tasks.control_rig import controlRigOf, controlledRigs, isControlRig
 from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport
 from ..tasks.task_writer import unitTaskWriter, engineTaskWriter
@@ -28,6 +30,9 @@ def sortFactions(self, context):
     for faction in factions:
         entry = (factions[faction], faction, "")
         faction_list.append(entry)
+    # descr_sm_factions order is nobody's idea of findable - the dropdown is
+    # alphabetical, here and everywhere else a faction is picked
+    faction_list.sort(key=lambda entry: entry[1].lower())
     _faction_enum_items = faction_list
     return _faction_enum_items
 
@@ -78,11 +83,7 @@ def selectedUpgrades(context):
 def deleteImportedObjects(item):
     """Delete the rig an import list entry points at, plus everything parented
     to it. Returns the number of objects removed."""
-    target = bpy.data.objects.get(item.object_name) if item.object_name else None
-    if target is None:
-        # entries imported before object_name existed, and any rig that was
-        # never renamed, still match on the list name
-        target = bpy.data.objects.get(item.name)
+    target = trackedObject(item)
     if target is None:
         return 0
     doomed = list(target.children_recursive) + [target]
@@ -106,77 +107,174 @@ def deleteImportedObjects(item):
 #   Imported models list upkeep    #
 #   ---------------------------  #
 
-# Set while the deferred prune is queued, so the depsgraph handler does not
+# Custom property tying an entry to its object. Object names are the only thing
+# the list used to have, so renaming an armature stranded the entry - and with
+# auto-prune on, deleted it. The entry and the object share a uid instead, which
+# a rename cannot touch; names are only used to find the object the first time.
+LIST_UID_KEY = "med2_list_uid"
+
+# Set while the deferred sync is queued, so the depsgraph handler does not
 # stack one timer per update.
-_prune_queued = False
+_sync_queued = False
+
+# Entries the sync could not resolve. A genuinely deleted object with auto-prune
+# off would otherwise queue a fresh pass on every depsgraph update forever.
+_unresolved = set()
 
 
-def staleEntries(scene):
-    """Indices of list entries whose object is no longer in the file.
+def entryKey(item):
+    return item.uid or item.object_name or item.name
 
-    Only a full disappearance from bpy.data counts: an object merely unlinked
-    from the scene, or sitting in an excluded collection, is still there and its
-    entry has to stay.
+
+def taggedObjects(uid):
+    """Every object carrying a uid. More than one means the rig was duplicated
+    after it was listed, and the copy took the tag with it."""
+    if not uid:
+        return []
+    return [obj for obj in bpy.data.objects if obj.get(LIST_UID_KEY) == uid]
+
+
+def trackedObject(item):
+    """The object an import list entry points at, following renames.
+
+    The name is tried first because it is a dict lookup; the scan over
+    bpy.data.objects only runs once the name has gone, which is exactly the
+    renamed-or-deleted case. An ambiguous uid (a duplicated rig) is left alone
+    rather than guessed at, so the entry behaves as it did before uids existed.
     """
+    name = item.object_name or item.name
+    obj = bpy.data.objects.get(name) if name else None
+    if obj is not None and (not item.uid or obj.get(LIST_UID_KEY) in (None, item.uid)):
+        return obj
+    matches = taggedObjects(item.uid)
+    return matches[0] if len(matches) == 1 else None
+
+
+def tagEntry(item, obj, fresh=False):
+    """Give an entry and its object a shared uid. Returns True if it wrote one.
+
+    `fresh` mints a new id instead of adopting the object's: a rig duplicated
+    after it was listed brings the original's tag along with it, and the copy has
+    to have its own before it goes into the list under its own entry.
+    """
+    uid = (None if fresh else (item.uid or obj.get(LIST_UID_KEY))) or uuid.uuid4().hex[:12]
+    written = False
+    if item.uid != uid:
+        item.uid = uid
+        written = True
+    if obj.get(LIST_UID_KEY) != uid:
+        obj[LIST_UID_KEY] = uid
+        written = True
+    return written
+
+
+def retargetCardCameras(old_name, new_name):
+    """Point card cameras that named a rig at its new name. Without this a rename
+    drops the camera back on the guess-by-collection fallback, which can hand a
+    collection's other unit back."""
+    for obj in bpy.data.objects:
+        if obj.type == 'CAMERA' and obj.get(TARGET_TAG, "") == old_name:
+            obj[TARGET_TAG] = new_name
+
+
+def syncImportList(scene, prune=True):
+    """Follow renames and, when `prune` is on, drop entries whose object really
+    is gone. Returns (renamed, pruned).
+
+    Only a full disappearance from bpy.data counts as gone: an object merely
+    unlinked from the scene, or sitting in an excluded collection, is still there
+    and its entry has to stay.
+    """
+    renamed = 0
     stale = []
+    seen = set()
     for index, item in enumerate(scene.med2_toolkit_import_list):
-        name = item.object_name or item.name
-        if name and bpy.data.objects.get(name) is None:
+        obj = trackedObject(item)
+        if obj is None:
             stale.append(index)
-    return stale
-
-
-def pruneImportList(scene):
-    """Drop entries for deleted objects. Returns how many went."""
-    stale = staleEntries(scene)
+            _unresolved.add(entryKey(item))
+            continue
+        _unresolved.discard(entryKey(item))
+        tagEntry(item, obj)
+        if item.uid in seen:
+            # two entries pointing at one id: a duplicated rig carried the tag
+            tagEntry(item, obj, fresh=True)
+        seen.add(item.uid)
+        old_name = item.object_name or item.name
+        if obj.name != old_name:
+            item.object_name = obj.name
+            # an entry labelled with the object's own name follows it; a unit
+            # imported from the EDU keeps the unit name it was listed under
+            if item.name == old_name:
+                item.name = obj.name
+            retargetCardCameras(old_name, obj.name)
+            renamed += 1
+    if not prune:
+        return renamed, 0
     for index in reversed(stale):
         scene.med2_toolkit_import_list.remove(index)
     if stale:
         scene.med2_toolkit_import_list_index = min(scene.med2_toolkit_import_list_index,
                                                    max(0, len(scene.med2_toolkit_import_list) - 1))
-    return len(stale)
+    return renamed, len(stale)
 
 
-def runQueuedPrune():
-    global _prune_queued
-    _prune_queued = False
+def runQueuedSync():
+    global _sync_queued
+    _sync_queued = False
     for scene in bpy.data.scenes:
         units = getattr(scene, "med2_toolkit_units", None)
-        if units is None or not units.auto_prune_list:
+        if units is None:
             continue
-        removed = pruneImportList(scene)
+        renamed, removed = syncImportList(scene, prune=units.auto_prune_list)
+        if renamed:
+            print("Medieval 2 Toolkit: followed %d rename%s in the imported models list"
+                  % (renamed, "" if renamed == 1 else "s"))
         if removed:
             print("Medieval 2 Toolkit: dropped %d imported models entr%s whose object was deleted"
                   % (removed, "y" if removed == 1 else "ies"))
     return None
 
 
+def pendingEntries(scene):
+    """Entries the deferred pass could still do something about: one whose object
+    is not where it was (renamed or deleted), or that has no uid yet."""
+    pending = []
+    for item in scene.med2_toolkit_import_list:
+        name = item.object_name or item.name
+        if not item.uid or (name and bpy.data.objects.get(name) is None):
+            pending.append(item)
+    return pending
+
+
 @persistent
 def watchImportList(scene, depsgraph=None):
-    """Queue a prune when an entry's object has gone.
+    """Queue a sync when an entry's object has been renamed or has gone.
 
     The check itself is a dict lookup per entry and runs on every depsgraph
-    update, so the common case (nothing stale) costs nothing. The removal is
-    deferred to a timer because writing scene data from inside
+    update, so the common case (everything where it was) costs nothing. The work
+    is deferred to a timer because writing scene data from inside
     depsgraph_update_post retriggers the handler.
     """
-    global _prune_queued
-    if _prune_queued or scene is None:
+    global _sync_queued
+    if _sync_queued or scene is None:
         return
     units = getattr(scene, "med2_toolkit_units", None)
-    if units is None or not units.auto_prune_list:
+    if units is None or not scene.med2_toolkit_import_list:
         return
-    if not scene.med2_toolkit_import_list or not staleEntries(scene):
+    pending = pendingEntries(scene)
+    if not pending or all(entryKey(item) in _unresolved for item in pending):
         return
-    _prune_queued = True
-    bpy.app.timers.register(runQueuedPrune, first_interval=0)
+    _sync_queued = True
+    bpy.app.timers.register(runQueuedSync, first_interval=0)
 
 
 @persistent
 def pruneAfterLoad(_file_path):
-    # a saved file can carry entries for objects that were deleted in a session
-    # that never ran the handler (or with the toggle off at the time)
-    runQueuedPrune()
+    # a saved file can carry entries for objects that were renamed or deleted in
+    # a session that never ran the handler (or with the toggle off at the time)
+    _unresolved.clear()
+    runQueuedSync()
 
 
 class MED_2_TOOLKIT_Unit_data(bpy.types.PropertyGroup):
@@ -485,6 +583,9 @@ class MED_2_TOOLKIT_List_Items(bpy.types.PropertyGroup):
     name: StringProperty(name="Name", description="Names of the imported units")
     id: StringProperty(name="Unit ID", description="IDs of the imported units")
     object_name: StringProperty(name="Object name", description="Name of the armature object this entry was imported as")
+    # shared with the object as a custom property, so renaming the rig does not
+    # strand (or, with auto-prune on, delete) its entry
+    uid: StringProperty(name="Tracking id", description="Id shared with the object this entry points at", options={'HIDDEN'})
     # the card renderer needs it: units with no card_pic_dir/info_pic_dir in the
     # EDU are written into the owning faction's card folder
     faction: StringProperty(name="Faction", description="Faction codename this entry was imported for")
@@ -637,6 +738,9 @@ class MED_2_TOOLKIT_OT_Add_Armature_To_List(bpy.types.Operator):
             item.faction = faction
             item.use = True
             item.icon = 'custom'
+            # entries made by the importer are tagged by the deferred sync on the
+            # next depsgraph update; these can be tagged straight away
+            tagEntry(item, armature, fresh=True)
         context.scene.med2_toolkit_import_list_index = len(context.scene.med2_toolkit_import_list) - 1
         self.report({'INFO'}, "Added %d armature(s): %s" % (len(armatures), ", ".join(a.name for a in armatures[:5])))
         return {'FINISHED'}

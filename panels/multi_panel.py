@@ -23,18 +23,18 @@ Two things worth knowing:
 """
 
 import bpy
-from bpy.props import StringProperty
+from bpy.props import EnumProperty, StringProperty
 
 from .bmdb_panel import MED_2_TOOLKIT_PT_BMDB_Import
 from .edu_panel import MED_2_TOOLKIT_PT_EDU_Import
 from .mod_data import MED2_TOOLKIT_PT_Mod_Data
 from .pose_panel import MED_2_TOOLKIT_PT_Poses, MED_2_TOOLKIT_PT_Texture_Assets
-from .qol_panel import (MED_2_TOOLKIT_PT_Armature, MED_2_TOOLKIT_PT_QOL_Advanced,
-                        MED_2_TOOLKIT_PT_Rename_Tools, MED_2_TOOLKIT_PT_Weight_Transfer)
+from .qol_panel import (MED_2_TOOLKIT_PT_Armature, MED_2_TOOLKIT_PT_Interface,
+                        MED_2_TOOLKIT_PT_QOL_Advanced, MED_2_TOOLKIT_PT_Rename_Tools,
+                        MED_2_TOOLKIT_PT_Weight_Transfer)
 from .settlements_panel import MED_2_TOOLKIT_PT_Settlements_Panel
-from .unit_export_panel import (MED_2_TOOLKIT_PT_Export_BMDB, MED_2_TOOLKIT_PT_Export_Install,
-                                MED_2_TOOLKIT_PT_Export_Materials, MED_2_TOOLKIT_PT_Export_Run,
-                                MED_2_TOOLKIT_PT_Unit_Export)
+from .unit_export_panel import (MED_2_TOOLKIT_PT_Export_BMDB, MED_2_TOOLKIT_PT_Export_Materials,
+                                MED_2_TOOLKIT_PT_Export_Run, MED_2_TOOLKIT_PT_Unit_Export)
 from .unit_info_panel import (MED_2_TOOLKIT_PT_Card_Render, MED_2_TOOLKIT_PT_Card_Scene,
                               MED_2_TOOLKIT_PT_Unit_Info)
 
@@ -62,7 +62,6 @@ EMBEDDED_PANELS = [
     MED_2_TOOLKIT_PT_Export_Materials,
     MED_2_TOOLKIT_PT_Export_BMDB,
     MED_2_TOOLKIT_PT_Export_Run,
-    MED_2_TOOLKIT_PT_Export_Install,
     MED_2_TOOLKIT_PT_Settlements_Panel,
     MED_2_TOOLKIT_PT_Weight_Transfer,
     MED_2_TOOLKIT_PT_Armature,
@@ -70,6 +69,7 @@ EMBEDDED_PANELS = [
     MED_2_TOOLKIT_PT_QOL_Advanced,
     MED_2_TOOLKIT_PT_Poses,
     MED_2_TOOLKIT_PT_Texture_Assets,
+    MED_2_TOOLKIT_PT_Interface,
     MED_2_TOOLKIT_PT_Unit_Info,
     MED_2_TOOLKIT_PT_Card_Scene,
     MED_2_TOOLKIT_PT_Card_Render,
@@ -78,6 +78,91 @@ EMBEDDED_PANELS = [
 # Written into the collapsed list the first time anything is toggled, so an empty
 # string can keep meaning "never touched, use the panels' own DEFAULT_CLOSED".
 INIT_MARKER = "#"
+
+
+#   ------------  #
+#   Panel layout   #
+#   ------------  #
+
+# The addon's own module name, which is what preferences.addons is keyed by. Taken
+# from this module's package rather than hardcoded, since the folder is whatever
+# the install produced.
+ADDON_PACKAGE = __package__.rsplit('.', 1)[0]
+
+# Panels registered with Blender while the classic layout is on. Empty in the
+# strip layout, where drawSectionStrip draws them itself.
+_registered_panels = []
+
+
+def toolkitPreferences(context=None):
+    entry = (context or bpy.context).preferences.addons.get(ADDON_PACKAGE)
+    return entry.preferences if entry is not None else None
+
+
+def usingClassicPanels(context=None):
+    preferences = toolkitPreferences(context)
+    return preferences is not None and preferences.panel_layout == 'classic'
+
+
+def applyPanelLayout(classic=None):
+    """Register the tool panels as real Blender sub-panels (classic layout) or
+    take them back out again (strip layout, where they are drawn by hand).
+
+    Every one of them already carries `bl_parent_id`, a poll() on the workmode
+    and its own bl_options - being embedded never took that away - so the classic
+    layout is simply the same classes handed to Blender.
+    """
+    if classic is None:
+        classic = usingClassicPanels()
+    if classic and not _registered_panels:
+        for panel in EMBEDDED_PANELS:
+            try:
+                bpy.utils.register_class(panel)
+            except (ValueError, RuntimeError) as error:
+                print("Medieval 2 Toolkit: could not register %s: %s" % (panelId(panel), error))
+                continue
+            _registered_panels.append(panel)
+    elif not classic and _registered_panels:
+        # children first, so nothing is left pointing at a parent that has gone
+        for panel in reversed(_registered_panels):
+            try:
+                bpy.utils.unregister_class(panel)
+            except RuntimeError:
+                pass
+        _registered_panels.clear()
+
+
+def panelLayoutChanged(self, context):
+    # registering panel classes from inside a draw-driven update callback is not
+    # safe - the sidebar is mid-draw - so the swap happens on the next pass of
+    # the event loop, the same trick the keymap and asset library use
+    def run():
+        applyPanelLayout()
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    area.tag_redraw()
+        return None
+    bpy.app.timers.register(run, first_interval=0)
+
+
+class MED_2_TOOLKIT_Preferences(bpy.types.AddonPreferences):
+    bl_idname = ADDON_PACKAGE
+
+    panel_layout: EnumProperty(
+        name = "Panel layout",
+        description = "How the toolkit's workmodes and panels are laid out in the sidebar",
+        items = [('strip', "Section Strip",
+                  "The current layout: a column of letter buttons down the left, with only the "
+                  "selected workmode's panels beside it"),
+                 ('classic', "Classic Workmode Buttons",
+                  "The original layout: a grid of workmode buttons at the top of the main panel, "
+                  "with the workmode's panels as ordinary Blender sub-panels underneath")],
+        default = 'strip',
+        update = panelLayoutChanged)
+
+    def draw(self, context):
+        self.layout.prop(self, "panel_layout", expand=True)
 
 
 def panelId(panel):
@@ -131,6 +216,22 @@ class EmbeddedPanel:
         self.layout = layout
 
 
+def drawWorkmodeGrid(context, layout):
+    """The classic layout's main panel: nothing but the workmode buttons, with
+    the sections drawn underneath by Blender as registered sub-panels."""
+    layout.label(text = "Workmode:")
+    col = layout.column(align=True)
+    grid = col.grid_flow(row_major=True, columns=2, even_columns=True, even_rows=True, align=True)
+    grid.prop(context.scene.med2_toolkit_mode, "mode_selection", expand=True)
+
+
+def drawMainPanel(context, layout):
+    if usingClassicPanels(context):
+        drawWorkmodeGrid(context, layout)
+    else:
+        drawSectionStrip(context, layout)
+
+
 def drawSectionStrip(context, layout):
     """The column of letter buttons down the left, and the active section beside it."""
     scene = context.scene
@@ -174,6 +275,7 @@ def drawSectionStrip(context, layout):
 
 
 classes = [
+    MED_2_TOOLKIT_Preferences,
     MED_2_TOOLKIT_OT_Toggle_Section_Panel,
 ]
 
@@ -185,9 +287,14 @@ def register():
         name = "Collapsed panels",
         description = "Which embedded panels are folded shut, as a comma separated list of panel ids",
         default = "")
+    # the preference is only readable once its class is registered, and an addon
+    # enabled at startup gets here before the preferences are loaded, so the
+    # layout is applied on the first pass of the event loop instead
+    bpy.app.timers.register(lambda: applyPanelLayout() or None, first_interval=0)
 
 
 def unregister():
+    applyPanelLayout(classic=False)
     for item in classes:
         bpy.utils.unregister_class(item)
     del bpy.types.Scene.med2_toolkit_collapsed

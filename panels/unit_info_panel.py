@@ -154,7 +154,7 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                                                               "its card renders, and everything is put back before the next one. Nothing hidden is put "
                                                                               "back on: a variation mesh, shield or helmet switched off by hand stays off the card, "
                                                                               "which the plain Isolate unit undoes. Only the camera and its light are ever forced on"),
-                                       default = False)
+                                       default = True)
     open_renders: BoolProperty(name = "Open renders when finished", description = ("When the render finishes, load every card it wrote and show them in a new window's "
                                                                                      "Image Editor. Use the image browse dropdown in that window to flip through them"),
                                 default = True)
@@ -175,6 +175,10 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
     add_control_rig: BoolProperty(name = "Add control rig", description = ("Also build each unit's IK control rig, so it can be posed before the card is rendered. "
                                                                            "Units that already have one are left alone"), default = False)
     control_rig_type: EnumProperty(name = "Control rig", description = "Which IK layout to build for the units", items = CONTROL_RIG_TYPES, default = 'infantry')
+    lift_sunken: BoolProperty(name = "Lift sunken units", description = ("Set a unit standing in the ground down on it - raised by exactly how far its "
+                                                                          "lowest point is below z=0 - so the card camera frames it like every other "
+                                                                          "unit. A unit fully above the floor, or one parked below the scene, is left "
+                                                                          "alone"), default = True)
     card_zoom: FloatProperty(name = "Card zoom", description = "Orthographic width of the card cameras. Lower zooms in", default = CAMERA_ORTHO_SCALE, min = 0.01, soft_max = 10.0, update = cardZoomChanged)
     card_faction: EnumProperty(name = "Faction", description = "Faction to import units for, and the card folder used by units with no card_pic_dir", items = sortFactions)
     card_filter: EnumProperty(name = "Ownership filter", description = "Unit ownership filter", items = OWNERSHIP_FILTERS, default = 1)
@@ -197,7 +201,9 @@ def factionFolderList():
     mod that was last read, plus the mercenary folder."""
     factions = readJsonCached(script_folder/('text/available_factions.json'))
     entries = []
-    for display_name, faction_id in factions.items():
+    # alphabetical, like every other faction list; Mercs is appended afterwards
+    # because it is not a descr_sm_factions faction at all
+    for display_name, faction_id in sorted(factions.items(), key=lambda entry: entry[0].lower()):
         if 'spawning' in display_name.lower() or 'spawning' in faction_id.lower():
             continue
         entries.append((display_name, faction_id))
@@ -289,7 +295,8 @@ class MED_2_TOOLKIT_OT_Create_Card_Cameras(bpy.types.Operator):
             return {'CANCELLED'}
         rig_type = settings.control_rig_type if settings.add_control_rig else None
         results = createCardCameras(context, targets, settings.add_sun, settings.sun_strength,
-                                    settings.card_zoom, rig_type, settings.light_type)
+                                    settings.card_zoom, rig_type, settings.light_type,
+                                    settings.lift_sunken)
         results.append(('INFO', "Built from %d %s" % (len(targets), source)))
         reportResults(self, context, "Card cameras: %d unit(s)" % len(targets), results)
         return {'FINISHED'}
@@ -527,6 +534,11 @@ class MED_2_TOOLKIT_OT_Render_Cards(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     _timer = None
+    # Set while stop() is running. Opening the render window spawns a new window,
+    # which pumps events from inside stop() - a TIMER queued before the job was
+    # cleared can re-enter modal() there, and used to land in renderNext with
+    # _card_job already None ("'NoneType' object is not subscriptable").
+    _stopping = False
 
     @classmethod
     def poll(cls, context):
@@ -558,6 +570,8 @@ class MED_2_TOOLKIT_OT_Render_Cards(bpy.types.Operator):
 
     def renderNext(self, context):
         job = _card_job
+        if job is None or job['index'] >= len(job['entries']):
+            return
         entry = job['entries'][job['index']]
         reason = renderCard(context, entry, job['width'], job['height'], job['supersample'])
         if reason is None:
@@ -568,6 +582,11 @@ class MED_2_TOOLKIT_OT_Render_Cards(bpy.types.Operator):
         job['index'] += 1
 
     def modal(self, context, event):
+        if self._stopping:
+            # re-entered from inside stop(); the outer call finishes the job
+            return {'PASS_THROUGH'}
+        if _card_job is None:
+            return {'FINISHED'}
         if event.type == 'ESC':
             _card_job['results'].append(('WARNING', "Cancelled after %d card(s)" % _card_job['written']))
             return self.stop(context)
@@ -582,6 +601,7 @@ class MED_2_TOOLKIT_OT_Render_Cards(bpy.types.Operator):
         return self.stop(context)
 
     def stop(self, context):
+        self._stopping = True
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
         wm.progress_end()
@@ -617,6 +637,9 @@ class MED_2_TOOLKIT_OT_Open_Card_Folder(bpy.types.Operator):
 
 class MED_2_TOOLKIT_PT_Unit_Info(bpy.types.Panel):
     bl_idname = "MED_2_TOOLKIT_PT_Unit_Info"
+    # ignored while the panel is embedded in the section strip; it is what puts
+    # this under the main panel in the classic layout, like every other panel
+    bl_parent_id = "MED_2_TOOLKIT_PT_Main_Panel"
     bl_label = "Card Units"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -651,6 +674,12 @@ class MED_2_TOOLKIT_PT_Unit_Info(bpy.types.Panel):
         sub.enabled = unlisted > 0
         sub.operator("medieval2toolkit.add_armature_to_list",
                      text="Add All Unlisted (%d)" % unlisted).selection_only = False
+        # same list, so the same upkeep buttons the Unit Import panel has - a unit
+        # that should not be carded has to be removable from here too
+        row = layout.row(align=True)
+        row.operator("medieval2toolkit.remove_item", text="Remove item", icon='X')
+        row.operator("medieval2toolkit.purge_list", text="Purge list", icon='TRASH')
+        layout.prop(context.scene.med2_toolkit_units, "delete_with_item", text="Delete objects with the entry")
         if context.mode != 'OBJECT':
             layout.enabled = False
 
@@ -726,6 +755,7 @@ class MED_2_TOOLKIT_PT_Card_Scene(bpy.types.Panel):
         sub = row.row(align=True)
         sub.prop(settings, "control_rig_type", text="")
         sub.enabled = settings.add_control_rig
+        col.prop(settings, "lift_sunken", text="Set units standing in the ground onto it", toggle=1)
         targets, source = cardTargets(context)
         col = box.column(align=True)
         col.operator("medieval2toolkit.create_card_cameras", icon='CON_CAMERASOLVER')

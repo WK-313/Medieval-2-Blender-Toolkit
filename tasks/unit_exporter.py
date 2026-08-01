@@ -394,8 +394,9 @@ def exportArmatureGLB(context):
                 notes.append(error)
 
     # In install mode the entry is written into the mod's modeldb from the
-    # Install to Mod panel instead, after IWTE has produced the .mesh
-    if export_data.generate_bmdb and export_data.bmdb_mode == 'txt':
+    # Install to Mod panel instead, after IWTE has produced the .mesh. 'both'
+    # writes the txt here as well as installing it later
+    if export_data.generate_bmdb and export_data.bmdb_mode in {'txt', 'both'}:
         error = writeBMDBEntry(context, out_dir, plan)
         if error:
             notes.append(error)

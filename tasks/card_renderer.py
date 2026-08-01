@@ -27,6 +27,8 @@ import shutil
 import numpy as np
 from pathlib import Path
 
+from mathutils import Vector
+
 from ..directories import readJsonCached
 from .control_rig import controlRigOf, createControlRig, isControlRig
 from .recurlayercollection import linkBeside, recurLayerCollection
@@ -60,6 +62,17 @@ BLUR_NODE = "Card Smoothing"
 CAMERA_LOCATION = (0.016065, 2.67329, 1.633482)
 CAMERA_ROTATION = (1.4926, 0.0133, 3.146288)
 CAMERA_ORTHO_SCALE = 1.2
+
+# Some skeletons import sunk into the ground: the model's own z offset lands the
+# unit half above and half below z=0. The card camera sits at a fixed height, so
+# that unit is framed low - head cropped, legs in nothing. The fix is to set it
+# down on the floor: lift it by exactly how far its lowest point is below z=0.
+#
+# How far below a unit has to reach before it counts as sunk (a boot sole a hair
+# under the floor is not), and how much of it may be down there before it is
+# something parked below the scene rather than a unit standing in the floor.
+SUNK_DEPTH = 0.05
+MAX_SUNK_SHARE = 0.75
 
 # card type -> (width, height, ui subfolder, file name pattern, EDU directory key)
 CARD_TYPES = {
@@ -891,7 +904,7 @@ def setupCardScene(context, rebuild=False, targets=None):
 
 def createCardCameras(context, targets, add_sun=True, light_strength=SUN_STRENGTH,
                       ortho_scale=CAMERA_ORTHO_SCALE, control_rig_type=None,
-                      light_type='SUN'):
+                      light_type='SUN', lift_sunken=True):
     """Give every (unit_id, faction, object) in `targets` its own card camera.
     Also lays down the compositor and render settings, so this one button is
     enough to go from imported units to renderable cards.
@@ -907,7 +920,16 @@ def createCardCameras(context, targets, add_sun=True, light_strength=SUN_STRENGT
     refreshed = 0
     rigged = 0
     already_rigged = 0
+    lifted = []
+    if lift_sunken:
+        # the bounds are read off the evaluated objects, so anything moved or
+        # posed since the last redraw has to be solved for first
+        context.view_layer.update()
     for unit_id, faction, model in targets:
+        if lift_sunken:
+            moved = liftSunkenUnit(context, model)
+            if moved:
+                lifted.append((unit_id, moved))
         _camera, is_new = createCardCamera(context, unit_id, faction, model, add_sun, light_strength,
                                            ortho_scale, light_type)
         if is_new:
@@ -925,6 +947,10 @@ def createCardCameras(context, targets, add_sun=True, light_strength=SUN_STRENGT
         # bury the camera summary on a faction-sized import
         results.extend(entry for entry in rig_results if entry[0] != 'INFO')
     results.append(('INFO', "Created %d camera(s), refreshed %d" % (created, refreshed)))
+    if lifted:
+        preview = ", ".join("%s +%.2f" % entry for entry in lifted[:4]) + (", ..." if len(lifted) > 4 else "")
+        results.append(('WARNING', "Set %d unit(s) that were standing in the ground down on it: %s"
+                        % (len(lifted), preview)))
     if add_sun:
         label = dict(CARD_LIGHT_TYPES[i][:2] for i in range(len(CARD_LIGHT_TYPES))).get(light_type, light_type)
         results.append(('INFO', "Each camera carries a %.1f strength %s light aimed the same way"
@@ -1174,6 +1200,61 @@ def unitFamily(target):
     if controller is not None:
         family.add(controller)
     return family
+
+
+def unitBounds(context, target):
+    """(lowest z, highest z) of everything a unit draws, in world space, or None
+    when it has no geometry to measure.
+
+    The evaluated objects are measured, not the originals: a skinned mesh's own
+    bounding box is its undeformed one, and a unit that has already been posed
+    would report where it used to be.
+    """
+    depsgraph = context.evaluated_depsgraph_get()
+    lowest = None
+    highest = None
+    for obj in unitFamily(target):
+        if obj.type not in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META'}:
+            continue
+        evaluated = obj.evaluated_get(depsgraph)
+        matrix = evaluated.matrix_world
+        for corner in evaluated.bound_box:
+            z = (matrix @ Vector(corner)).z
+            if lowest is None or z < lowest:
+                lowest = z
+            if highest is None or z > highest:
+                highest = z
+    if lowest is None:
+        return None
+    return lowest, highest
+
+
+def liftSunkenUnit(context, target):
+    """Set a unit standing in the ground down on it: raise it by exactly how far
+    its lowest point is below z=0, so its feet land on the floor.
+
+    The card camera is a fixed pose, so a unit whose feet are below the floor is
+    framed low and loses its head off the top of the card. Only a genuine
+    straddle is touched - some of the unit under the floor, most of it above -
+    so a unit deliberately parked somewhere else in the scene is left alone.
+    Returns the distance moved, 0.0 when nothing was.
+    """
+    bounds = unitBounds(context, target)
+    if bounds is None:
+        return 0.0
+    lowest, highest = bounds
+    if highest <= 0 or lowest > -SUNK_DEPTH:
+        return 0.0
+    height = highest - lowest
+    if height <= 0 or (-lowest)/height > MAX_SUNK_SHARE:
+        return 0.0
+    # the controller is the unit's parent, so moving the rig underneath it would
+    # leave the two disagreeing about where the unit is
+    root = controlRigOf(target) or target
+    matrix = root.matrix_world.copy()
+    matrix.translation.z += -lowest
+    root.matrix_world = matrix
+    return -lowest
 
 
 def listedModels(scene, ticked_only=False):
@@ -1470,6 +1551,32 @@ def renderedPaths(entry):
     return [path for path in paths if path]
 
 
+def fitImageToArea(area):
+    """Zoom an image editor so the card fills it.
+
+    A 48x66 card opens at 1:1 - a postage stamp in the middle of a whole window.
+    `image.view_all(fit_view=True)` is the View > Frame All item, and it needs a
+    WINDOW region of that area overridden in, not just the area. It is run off a
+    timer because a freshly retyped (or brand new) area has no usable region size
+    until it has drawn once, and zooming to a zero-sized region does nothing.
+    """
+    def run():
+        try:
+            window = next((w for w in bpy.context.window_manager.windows
+                           if area in list(w.screen.areas)), None)
+            region = next((r for r in area.regions if r.type == 'WINDOW'), None)
+            if window is None or region is None:
+                return None
+            if region.width <= 1 or region.height <= 1:
+                return 0.05
+            with bpy.context.temp_override(window=window, screen=window.screen, area=area, region=region):
+                bpy.ops.image.view_all(fit_view=True)
+        except (RuntimeError, ReferenceError, StopIteration):
+            pass
+        return None
+    bpy.app.timers.register(run, first_interval=0.05)
+
+
 def openRendersWindow(context, paths):
     """Load every rendered card and show them in a new Image Editor window.
 
@@ -1502,6 +1609,7 @@ def openRendersWindow(context, paths):
                    for area in window.screen.areas if area.type == 'IMAGE_EDITOR'), None)
     if reused is not None:
         reused.spaces.active.image = images[0]
+        fitImageToArea(reused)
         return ('INFO', "Showed %d render(s) in the open image window - use the image dropdown "
                 "there to flip through them" % len(images))
 
@@ -1528,6 +1636,7 @@ def openRendersWindow(context, paths):
     target = max(areas, key=lambda a: a.width * a.height)
     target.type = 'IMAGE_EDITOR'
     target.spaces.active.image = images[0]
+    fitImageToArea(target)
     return ('INFO', "Opened %d render(s) in a new window - use the image dropdown there to "
             "flip through them" % len(images))
 

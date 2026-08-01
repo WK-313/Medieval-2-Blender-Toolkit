@@ -86,6 +86,7 @@ def copyFactionItems(self, context):
     global _copy_faction_items
     factions = readJsonCached(script_folder/'text'/'available_factions.json')
     items = [(faction_id, display_name, '') for display_name, faction_id in factions.items()]
+    items.sort(key=lambda item: item[1].lower())
     if not items:
         items = [('none', 'None', 'Run Read Mod Data first')]
     _copy_faction_items = items
@@ -196,7 +197,8 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
         name = "Entry goes to",
         description = "What happens with the entry this panel builds",
         items = [('txt', 'Text File', "Write the entry beside the export as <mesh name>_bmdb.txt, to paste into battle_models.modeldb by hand. Nothing in the mod is touched"),
-                 ('install', 'Install to Mod', "Write the entry straight into the mod's battle_models.modeldb and copy the mesh and textures into the mod, from the Install to Mod panel. Adds, renames or replaces an entry and keeps the file's entry count correct")],
+                 ('install', 'Install to Mod', "Write the entry straight into the mod's battle_models.modeldb and copy the mesh and textures into the mod, from the Install to Mod panel. Adds, renames or replaces an entry and keeps the file's entry count correct"),
+                 ('both', 'Both', "Write the <mesh name>_bmdb.txt beside the export AND install into the mod from the Install to Mod panel. The same entry text either way, so the txt is a record of what was installed")],
         default = 'txt')
     bmdb_unit_path: StringProperty(name = "Mesh Path", description = "Folder for the unit's mesh inside the mod's data folder; only the part after \\data\\ is used. Remembered as the default for new rigs", subtype = 'DIR_PATH', update = bmdbUnitPathChanged)
     bmdb_sprite: StringProperty(name = "Sprite", description = "Sprite path for the entry, e.g. unit_sprites/example_sprite.spr")
@@ -359,7 +361,9 @@ class MED_2_TOOLKIT_OT_Export_Factions_Refresh(bpy.types.Operator):
         collection = activeExportArmature(context).med2_toolkit_export_factions
         previous = {item.faction_id: item.enabled for item in collection}
         collection.clear()
-        for display_name, faction_id in factions.items():
+        # alphabetical, like every other faction list; Mercs is appended after
+        # the sort because it is not a descr_sm_factions faction at all
+        for display_name, faction_id in sorted(factions.items(), key=lambda entry: entry[0].lower()):
             if 'spawning' in display_name.lower() or 'spawning' in faction_id.lower():
                 continue
             item = collection.add()
@@ -557,8 +561,8 @@ def buildInstallPlan(context):
         return None, "Select an Armature"
     if not export_data.generate_bmdb:
         return None, "Turn on Generate BMDB Entry first - there is no entry to install"
-    if export_data.bmdb_mode != 'install':
-        return None, "BMDB Entry is set to Text File - switch it to Install to Mod first"
+    if export_data.bmdb_mode not in {'install', 'both'}:
+        return None, "BMDB Entry is set to Text File - switch it to Install to Mod (or Both) first"
     entry_text, _entry_name, relative, error = bmdbEntryText(context)
     if error:
         return None, "No BMDB entry to install: %s" % error
@@ -589,9 +593,11 @@ def planSummary(plan):
 
 class MED_2_TOOLKIT_OT_BMDB_Check_Install(bpy.types.Operator):
     bl_idname = "medieval2toolkit.bmdb_check_install"
-    bl_label = "Check Install"
-    bl_description = ("Work out what installing this entry would do - name clashes, files already in "
-                      "the mod, models that share them - without changing anything.")
+    bl_label = "Probe BMDB"
+    bl_description = ("Read the mod's battle_models.modeldb and report what installing this entry would "
+                      "do - whether the name clashes and what the Rename / Overwrite / Skip choice above "
+                      "would then do, which files are already in the mod and which models share them. "
+                      "Nothing is written.")
 
     @classmethod
     def poll(cls, context):
@@ -606,7 +612,7 @@ class MED_2_TOOLKIT_OT_BMDB_Check_Install(bpy.types.Operator):
         results = plan.results() + fileResults(plan)
         for level, message in results:
             self.report({level}, message)
-        showResultsPopup(context, "Install check: %s" % planSummary(plan), results)
+        showResultsPopup(context, "BMDB probe: %s" % planSummary(plan), results)
         return {'FINISHED'}
 
 
@@ -1056,10 +1062,10 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
             return
 
         layout.prop(export_data, "bmdb_mode", expand=True)
-        if export_data.bmdb_mode == 'txt':
-            layout.label(text="Export writes %s_bmdb.txt to paste in by hand"
-                         % (export_data.export_glb_name or "<mesh name>"), icon='FILE_TEXT')
-        else:
+        mesh_name = export_data.export_glb_name or "<mesh name>"
+        if export_data.bmdb_mode != 'install':
+            layout.label(text="Export writes %s_bmdb.txt to paste in by hand" % mesh_name, icon='FILE_TEXT')
+        if export_data.bmdb_mode != 'txt':
             layout.label(text="Written into the mod from the Install to Mod panel", icon='EXPORT')
 
         row = layout.row(align=True)
@@ -1111,6 +1117,61 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
         # useful in either mode: text-file mode can start from an existing entry too
         layout.operator("medieval2toolkit.bmdb_load_entry", icon='IMPORT')
 
+        if export_data.bmdb_mode != 'txt':
+            drawInstallSection(layout, context, export_data)
+
+
+def drawInstallSection(layout, context, export_data):
+    """The write-into-the-mod half of the BMDB Entry panel: what the mod already
+    has under this name, how a clash is handled, and the probe/install buttons.
+
+    This used to be a panel of its own at the bottom of the export section, which
+    meant the mode switch said "Install to Mod" in one place and everything it
+    controlled lived in another.
+    """
+    layout.separator()
+    box = layout.box()
+    # writing into a mod is an object-mode job, same rule the Export panel uses
+    box.enabled = context.mode == 'OBJECT'
+    box.label(text="Install to Mod", icon='EXPORT')
+    mod_folder = bpy.path.abspath(selectedModFolder(context))
+    box.label(text="Mod: %s" % os.path.basename(os.path.dirname(mod_folder.rstrip("\\/")) or mod_folder),
+              icon='FILE_FOLDER')
+    relative = parseRelativeUnitPath(export_data.bmdb_unit_path) if export_data.bmdb_unit_path else ""
+    if not relative:
+        box.label(text="Set a Mesh Path above first", icon='ERROR')
+        return
+    box.label(text="Files go to data/%s" % relative, icon='FILE_FOLDER')
+
+    entry_name = export_data.bmdb_entry_name or export_data.export_glb_name
+    # cached by file mtime, so this stays cheap on every redraw - the full parse
+    # only ever happens inside the probe and install operators
+    existing = bmdbEntryNames(mod_folder)
+    if existing is None:
+        box.label(text="No battle_models.modeldb in this mod", icon='CANCEL')
+        return
+    clash = entry_name and entry_name.lower() in existing
+
+    col = box.column(align=True)
+    if clash:
+        col.label(text="Entry '%s' already exists in this mod" % entry_name, icon='ERROR')
+        col.prop(export_data, "install_on_conflict", text="If it exists")
+        if export_data.install_on_conflict == bmdb_install.CONFLICT_RENAME:
+            row = col.row(align=True)
+            row.prop(export_data, "install_new_name", text="Add as")
+            row.operator("medieval2toolkit.bmdb_suggest_name", icon='FILE_REFRESH', text="")
+    else:
+        col.label(text="Entry '%s' is new to this mod" % entry_name, icon='CHECKMARK')
+
+    col = box.column(align=True)
+    col.prop(export_data, "install_asset_conflict", text="If a file exists")
+    col.prop(export_data, "install_backup")
+
+    box.operator("medieval2toolkit.bmdb_check_install", icon='VIEWZOOM')
+    box.operator("medieval2toolkit.bmdb_install", icon='EXPORT')
+    if export_data.install_summary:
+        box.label(text="Last probe: %s" % export_data.install_summary, icon='INFO')
+
 
 class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
     bl_idname = "MED_2_TOOLKIT_PT_Export_Run"
@@ -1131,7 +1192,7 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
         if export_data is None:
             layout.label(text="Select an armature to export", icon='INFO')
             return
-        if export_data.generate_bmdb and export_data.bmdb_mode == 'txt':
+        if export_data.generate_bmdb and export_data.bmdb_mode in {'txt', 'both'}:
             layout.operator("medieval2toolkit.export_unit_glb", icon='EXPORT', text="Export GLB + Convert Textures + BMDB")
         else:
             layout.operator("medieval2toolkit.export_unit_glb", icon='EXPORT')
@@ -1158,75 +1219,6 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
                             text="%s %s... %ds" % (verb, _iwte_job['mesh_name'], int(elapsed)))
         else:
             layout.operator("medieval2toolkit.export_unit_iwte_mesh", icon='MOD_ARMATURE')
-        if context.mode != 'OBJECT':
-            layout.enabled = False
-
-
-class MED_2_TOOLKIT_PT_Export_Install(bpy.types.Panel):
-    bl_idname = "MED_2_TOOLKIT_PT_Export_Install"
-    bl_parent_id = "MED_2_TOOLKIT_PT_Main_Panel"
-    bl_label = "Install to Mod"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "Medieval 2 Toolkit"
-    bl_options = {"DEFAULT_CLOSED"}
-
-    @classmethod
-    def poll(cls, context):
-        return context.scene.med2_toolkit_mode.mode_selection == 'unit_export'
-
-    def draw(self, context):
-        layout = self.layout
-        armature = activeExportArmature(context)
-        if not armature:
-            layout.label(text="Select an armature to install its entry", icon='INFO')
-            return
-        export_data = armature.med2_toolkit_unit_export
-        if not export_data.generate_bmdb:
-            layout.label(text="Turn on Generate BMDB Entry above", icon='INFO')
-            return
-        if export_data.bmdb_mode != 'install':
-            layout.label(text="BMDB Entry is set to Text File", icon='FILE_TEXT')
-            layout.label(text="Switch it to Install to Mod to write into the mod")
-            layout.prop(export_data, "bmdb_mode", expand=True)
-            return
-
-        mod_folder = bpy.path.abspath(selectedModFolder(context))
-        layout.label(text="Mod: %s" % os.path.basename(os.path.dirname(mod_folder.rstrip("\\/")) or mod_folder),
-                     icon='FILE_FOLDER')
-        relative = parseRelativeUnitPath(export_data.bmdb_unit_path) if export_data.bmdb_unit_path else ""
-        if not relative:
-            layout.label(text="Set a Mesh Path under BMDB Entry first", icon='ERROR')
-            return
-        layout.label(text="Files go to data/%s" % relative, icon='FILE_FOLDER')
-
-        entry_name = export_data.bmdb_entry_name or export_data.export_glb_name
-        # cached by file mtime, so this stays cheap on every redraw
-        existing = bmdbEntryNames(mod_folder)
-        if existing is None:
-            layout.label(text="No battle_models.modeldb in this mod", icon='CANCEL')
-            return
-        clash = entry_name and entry_name.lower() in existing
-
-        col = layout.column(align=True)
-        if clash:
-            col.label(text="Entry '%s' already exists in this mod" % entry_name, icon='ERROR')
-            col.prop(export_data, "install_on_conflict", text="If it exists")
-            if export_data.install_on_conflict == bmdb_install.CONFLICT_RENAME:
-                row = col.row(align=True)
-                row.prop(export_data, "install_new_name", text="Add as")
-                row.operator("medieval2toolkit.bmdb_suggest_name", icon='FILE_REFRESH', text="")
-        else:
-            col.label(text="Entry '%s' is new to this mod" % entry_name, icon='CHECKMARK')
-
-        col = layout.column(align=True)
-        col.prop(export_data, "install_asset_conflict", text="If a file exists")
-        col.prop(export_data, "install_backup")
-
-        layout.operator("medieval2toolkit.bmdb_check_install", icon='VIEWZOOM')
-        layout.operator("medieval2toolkit.bmdb_install", icon='EXPORT')
-        if export_data.install_summary:
-            layout.label(text="Last check: %s" % export_data.install_summary, icon='INFO')
         if context.mode != 'OBJECT':
             layout.enabled = False
 

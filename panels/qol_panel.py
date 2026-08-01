@@ -568,6 +568,37 @@ class MED_2_TOOLKIT_PT_QOL_Advanced(bpy.types.Panel):
         col.operator("medieval2toolkit.remove_baked_suffix", icon='X')
 
 
+class MED_2_TOOLKIT_PT_Interface(bpy.types.Panel):
+    """Addon-wide preferences, parked at the bottom of QOL because that is where
+    the everyday settings live - the same properties are also in Blender's own
+    Add-ons preferences."""
+    bl_idname = "MED_2_TOOLKIT_PT_Interface"
+    bl_parent_id = "MED_2_TOOLKIT_PT_Main_Panel"
+    bl_label = "Interface"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Medieval 2 Toolkit"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.med2_toolkit_mode.mode_selection == 'qol'
+
+    def draw(self, context):
+        # imported here, not at module level: multi_panel imports this module for
+        # its panel list, so the other direction has to stay a late import
+        from .multi_panel import toolkitPreferences
+        layout = self.layout
+        preferences = toolkitPreferences(context)
+        if preferences is None:
+            layout.label(text="Add-on preferences are not available", icon='INFO')
+            return
+        layout.label(text="Panel layout:")
+        layout.prop(preferences, "panel_layout", expand=True)
+        layout.label(text="Kept in your Blender preferences,", icon='PREFERENCES')
+        layout.label(text="so it holds for every .blend file.")
+
+
 classes = [
     MED_2_TOOLKIT_QOL_Data,
     MED_2_TOOLKIT_OT_Weight_Transfer,
