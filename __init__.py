@@ -1,10 +1,10 @@
 
 bl_info = {
-    "name" : "Medieval 2 Toolkit V1.1.2",
+    "name" : "Medieval 2 Toolkit V1.1.3",
     "author" : "WK",
     "description" : "Collection of tools and features for modders of Medieval 2: Total War",
     "blender" : (5, 0, 0),
-    "version" : (1, 1, 2),
+    "version" : (1, 1, 3),
     "location" : "",
     "warning" : "",
     "category" : "Generic"
@@ -38,7 +38,7 @@ class MED_2_TOOLKIT_PT_Main_Panel(bpy.types.Panel):
     bl_category = "Medieval 2 Toolkit"
 
     def draw(self, context):
-        multi_panel.drawSectionStrip(context, self.layout)
+        multi_panel.drawMainPanel(context, self.layout)
 
 
 classes = [
