@@ -45,6 +45,15 @@ Take a rigged model from Blender back into the game:
 - Any texture that cannot be converted is reported with a reason in the completion popup instead of failing silently
 - Output renaming for all textures, and blank normal-map generation for materials without one
 - BMDB entry generator: faction ownership toggles, sprite/footer copying from existing units, duplicate-entry warning against the mod's modeldb
+- The entry can go to either of two places, switched per rig with **Text File** / **Install to Mod**:
+  - **Text File** (the default, and what earlier versions did): the export writes `<mesh name>_bmdb.txt` beside it, to paste into `battle_models.modeldb` by hand. Nothing in the mod is touched
+  - **Install to Mod**: the toolkit writes it into the mod itself, described below
+- **Load Entry From Mod** pulls an existing `battle_models.modeldb` entry — mesh path, texture names, sprite, animation footer and faction ownership — straight into those fields, so an entry can be edited in Blender and written back. It works in either mode, so a hand-pasted entry can start from an existing one too
+- **Install to Mod** writes the entry into `battle_models.modeldb` and copies the `.mesh` and `.texture` files into the mod for you, with the entry count in the file header kept correct. Nothing is written before you have seen the full plan:
+  - an entry of the same name that is byte-identical is left alone; one that differs can be **renamed** (first free `name_2`, `name_3`, ...), **overwritten** or **skipped**
+  - an overwrite says what it costs first: extra LODs dropped, faction skins lost, skeleton changes, and which EDU units use the entry
+  - every file is byte-compared against the mod's copy — identical ones are not recopied, differing ones are either kept or overwritten, and a differing file shared with other models names those models before it re-skins them
+  - `battle_models.modeldb` is backed up to a timestamped `.bak` and rewritten through a temp file, so a failure cannot leave a half-written modeldb
 - GLB → `.mesh` conversion driven through IWTE task files, with progress monitoring
 - All export settings are stored per-armature, so multiple units can live in one .blend
 
@@ -70,6 +79,7 @@ Render a whole faction's unit cards and unit info images without leaving Blender
 - **Keep HD render** renders each unit a second time at a whole multiple of 48x66 — 10x, 20x, 30x or 40x, so up to 1920x2640 — into an `hd` subfolder. A picture of the unit rather than a card: the rescale and the smoothing blur are both switched off for the pass, and the camera widens so nothing the card frames falls outside it
 - The compositor group is left fully tweakable — anything changed in it survives, and it is only rebuilt when the toolkit's own node chain changes version or **Rebuild compositor** is ticked
 - **Render Cards** renders one image per card camera straight into `units\<dir>\#<unit>.tga` / `unit_info\<dir>\<unit>_info.tga`, honouring each unit's `card_pic_dir` / `info_pic_dir` and falling back to the owning faction's folder. Point the Card Output path at the mod's `data\ui` folder and the files land where the game expects them
+- **Open renders when finished** (on by default) loads every card the run wrote — including the full-size and HD passes — and shows them in a second window's Image Editor, so a batch can be checked without hunting through folders. Its image dropdown steps through the rest, and the next render refills that same window instead of stacking up another one
 
 ![Unit Info — paths, Card Units list and the pose library](./images/Unit_Card1.png)
 
