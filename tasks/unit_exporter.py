@@ -63,11 +63,27 @@ def ddsFourcc(path):
         return ""
     return header[84:88].decode('ascii', errors='ignore').strip('\x00')
 
+def ddsMipCount(path):
+    """Number of mip levels in a .dds on disk. 1 means the base image only.
+    dwMipMapCount is only meaningful when DDSD_MIPMAPCOUNT (0x20000) is set -
+    plenty of writers leave a stale count behind with the flag cleared."""
+    try:
+        with open(path, "rb") as dds_input:
+            header = dds_input.read(32)
+    except OSError:
+        return 0
+    if len(header) < 32 or header[0:4] != b'DDS ':
+        return 0
+    flags, = struct.unpack("<I", header[8:12])
+    if not flags & 0x20000:
+        return 1
+    return max(1, struct.unpack("<I", header[28:32])[0])
+
 def runTexconv(texconv, source, tex_dir, out_base):
-    """Convert an image to DXT5 at tex_dir/out_base.dds and return that path,
-    or None when texconv fails. The output is staged in a temp folder first so
-    this also works when source IS the destination (a .dds being recompressed
-    in place), which texconv itself refuses to do."""
+    """Convert an image to DXT5 with a full mipmap chain at tex_dir/out_base.dds
+    and return that path, or None when texconv fails. The output is staged in a
+    temp folder first so this also works when source IS the destination (a .dds
+    being recompressed in place), which texconv itself refuses to do."""
     staging = os.path.join(tex_dir, "_texconv")
     shutil.rmtree(staging, ignore_errors=True)
     os.makedirs(staging, exist_ok=True)
@@ -76,7 +92,7 @@ def runTexconv(texconv, source, tex_dir, out_base):
             [
                 str(texconv),
                 "-f", "DXT5",
-                "-m", "1",
+                "-m", "0",
                 "-nologo",
                 "-y",
                 "-o", staging,
@@ -161,12 +177,16 @@ def texturePlan(context):
     }
     return plan
 
-def generateBlankNormal(texconv_unused, tex_dir, out_name, size):
+def generateBlankNormal(texconv, tex_dir, out_name, size):
     blank = addon_folder/'normals'/('%d.dds' % size)
     if not blank.exists():
         return "No blank normal available for %dx%d (only 512/1024/2048)" % (size, size)
     dds_path = os.path.join(tex_dir, out_name + ".dds")
     shutil.copy2(blank, dds_path)
+    # the bundled blanks ship mipped, but a hand-replaced one may not be
+    if ddsFourcc(dds_path) not in DXT_FOURCCS or ddsMipCount(dds_path) <= 1:
+        if runTexconv(texconv, dds_path, tex_dir, out_name) is None:
+            return "Blank normal %s not converted: texconv could not convert it" % out_name
     with open(dds_path, "rb") as f:
         error = writeTexture(os.path.join(tex_dir, out_name + ".texture"), f.read())
     if error:
@@ -325,8 +345,11 @@ def exportArmatureGLB(context):
             dds = dst
             # a .dds is not automatically game-ready: uncompressed, BC7 and
             # DX10-header files all load fine in Blender but the game only
-            # reads DXT1/DXT3/DXT5, so recompress those the same way a png
-            if ddsFourcc(dst) not in DXT_FOURCCS:
+            # reads DXT1/DXT3/DXT5, so recompress those the same way a png.
+            # A flat DXT file is recompressed too - the game picks a mip level
+            # by distance, so one without a chain shimmers and stays at full
+            # resolution at every range. Everything texconv writes is mipped.
+            if ddsFourcc(dst) not in DXT_FOURCCS or ddsMipCount(dst) <= 1:
                 dds = runTexconv(texconv, dst, tex_dir, out_base)
         else:
             continue
