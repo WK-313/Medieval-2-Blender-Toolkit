@@ -66,7 +66,8 @@ class InstallPlan:
         self.on_conflict = CONFLICT_RENAME
         self.asset_conflict = ASSET_KEEP
         self.backup = True
-        self.backup_path = ''
+        self.backup_path = ''         # the .bak beside the mod's modeldb
+        self.export_backup_path = ''  # the copy kept with the exported files
         self.errors = []
         self.warnings = []
         self.notes = []
@@ -302,6 +303,10 @@ def _planFiles(plan, db, new_entry):
         plan.notes.append("%d file(s) are already in place unchanged and are not recopied"
                           % len(identical))
 
+    if plan.backup and plan.entry_action != 'identical':
+        plan.notes.append("battle_models.modeldb is backed up as it is now, both beside itself in "
+                          "the mod and with the exported files - either one puts it back")
+
 
 def _identical(src, dst):
     try:
@@ -349,13 +354,31 @@ def applyInstall(plan):
     path = modeldb.modeldbPath(plan.mod_folder)
     if plan.entry_action != 'identical':
         if plan.backup:
-            plan.backup_path = "%s.%s.bak" % (path, time.strftime("%Y%m%d_%H%M%S"))
+            # both copies are taken here, before the entry is appended, so either
+            # one restores the modeldb exactly as it was
+            stamp = time.strftime("%Y%m%d_%H%M%S")
+            plan.backup_path = "%s.%s.bak" % (path, stamp)
             try:
                 shutil.copy2(path, plan.backup_path)
                 results.append(('INFO', "Backed up battle_models.modeldb -> %s"
                                 % os.path.basename(plan.backup_path)))
             except OSError as backup_error:
                 return [('ERROR', "Could not back up battle_models.modeldb: %s" % backup_error)]
+
+            # a second copy in the EXPORT folder, beside the mesh and textures
+            # this install came from: the one inside the mod sits among the mod's
+            # own files and is easy to lose track of, this one travels with the
+            # exported unit. Failing to write it does not stop the install
+            plan.export_backup_path = os.path.join(
+                plan.out_dir, "%s.%s.bak" % (os.path.basename(path), stamp))
+            try:
+                shutil.copy2(path, plan.export_backup_path)
+                results.append(('INFO', "Kept the pre-install battle_models.modeldb with the "
+                                        "exported files -> %s" % os.path.basename(plan.export_backup_path)))
+            except OSError as backup_error:
+                plan.export_backup_path = ''
+                results.append(('WARNING', "Could not keep a copy of battle_models.modeldb in the "
+                                           "export folder: %s" % backup_error))
 
         try:
             entry = modeldb.parse_entry_text(plan.entry_text)

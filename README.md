@@ -55,7 +55,7 @@ Take a rigged model from Blender back into the game:
   - an entry of the same name that is byte-identical is left alone; one that differs can be **renamed** (first free `name_2`, `name_3`, ...), **overwritten** or **skipped**
   - an overwrite says what it costs first: extra LODs dropped, faction skins lost, skeleton changes, and which EDU units use the entry
   - every file is byte-compared against the mod's copy — identical ones are not recopied, differing ones are either kept or overwritten, and a differing file shared with other models names those models before it re-skins them
-  - `battle_models.modeldb` is backed up to a timestamped `.bak` and rewritten through a temp file, so a failure cannot leave a half-written modeldb
+  - `battle_models.modeldb` is backed up to a timestamped `.bak` **twice** before the entry is written — once next to itself in the mod, and once into the export folder beside the mesh and textures the install came from, so the copy travels with the exported unit and is not buried among the mod's own files. Either one puts the modeldb back byte for byte. It is rewritten through a temp file, so a failure cannot leave a half-written modeldb
 - GLB → `.mesh` conversion driven through IWTE task files, with progress monitoring
 - All export settings are stored per-armature, so multiple units can live in one .blend
 

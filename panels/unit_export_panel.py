@@ -223,7 +223,7 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
         items = [(bmdb_install.ASSET_KEEP, 'Keep Existing', "Leave the mod's file alone - the unit uses the mod's version"),
                  (bmdb_install.ASSET_OVERWRITE, 'Overwrite', "Replace the mod's file with the exported one, which also re-skins any other model sharing it")],
         default = bmdb_install.ASSET_KEEP)
-    install_backup: BoolProperty(name = "Back up modeldb", description = "Copy battle_models.modeldb next to itself as a timestamped .bak before writing", default = True)
+    install_backup: BoolProperty(name = "Back up modeldb", description = "Before the entry is written, copy battle_models.modeldb as a timestamped .bak - once next to itself in the mod, and once into the export folder beside the mesh and textures this install came from. Either copy puts the file back exactly as it was", default = True)
     install_summary: StringProperty(default = "", options = {'HIDDEN'})
 
 
@@ -1176,6 +1176,9 @@ def drawInstallSection(layout, context, export_data):
     col = box.column(align=True)
     col.prop(export_data, "install_asset_conflict", text="If a file exists")
     col.prop(export_data, "install_backup")
+    if export_data.install_backup:
+        col.label(text="A .bak of the modeldb is kept in the mod", icon='FILE_BACKUP')
+        col.label(text="and with the exported files, to revert to")
 
     # no second Probe button here: it is right above this box, in every mode
     box.operator("medieval2toolkit.bmdb_install", icon='EXPORT')
