@@ -231,6 +231,36 @@ def activeArmature(context):
     return None
 
 
+def constraintTargets(armature):
+    """The rigs this rig's bone constraints are driven by.
+
+    A controller leaves a Copy Transforms constraint on every bone it drives, so
+    this finds it whether or not it is the unit's parent and whether or not it
+    carries the med2_control_rig tag - a controller from the old addon, one that
+    was appended, or one whose parenting was undone is still wired up this way.
+    """
+    targets = []
+    for pose_bone in armature.pose.bones:
+        for constraint in pose_bone.constraints:
+            target = getattr(constraint, 'target', None)
+            if (target is not None and target is not armature
+                    and target.type == 'ARMATURE' and target not in targets):
+                targets.append(target)
+    return targets
+
+
+def constrainedRigs(controller, context):
+    """The rigs whose bones are constrained to this one - constraintTargets in
+    reverse, so a selected controller still offers the unit it drives."""
+    driven = []
+    for obj in context.scene.objects:
+        if obj.type != 'ARMATURE' or obj is controller:
+            continue
+        if controller in constraintTargets(obj):
+            driven.append(obj)
+    return driven
+
+
 def candidateArmatures(context):
     """Every rig a pose could reasonably land on, most likely first.
 
@@ -238,6 +268,11 @@ def candidateArmatures(context):
     Medieval 2 skeleton, so a selected unit has to offer its controller as well -
     and a selected controller has to offer the units it drives, for the handful
     of poses written against Med2 bone names.
+
+    The controller is looked for three ways, because only the first of them was
+    ever guaranteed: the parent tagged as a control rig, and - for anything this
+    version of the addon did not build - whatever the rig's bone constraints
+    point at, in both directions.
     """
     candidates = []
 
@@ -258,6 +293,10 @@ def candidateArmatures(context):
     for rig in list(candidates):
         add(controlRigOf(rig))
         for driven in controlledRigs(rig):
+            add(driven)
+        for source in constraintTargets(rig):
+            add(source)
+        for driven in constrainedRigs(rig, context):
             add(driven)
     return candidates
 
