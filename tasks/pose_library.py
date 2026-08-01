@@ -400,3 +400,36 @@ def applyPoseAction(armature, action):
     mode, which is what makes double-clicking a pose useful without a mode
     switch first."""
     armature.pose.apply_pose_from_action(action)
+
+
+def selectPoseTarget(context, armature):
+    """Make the rig a pose landed on the selected, active object.
+
+    Nearly every pose in the library moves IK bones, so double-clicking one with
+    a unit selected applies it to that unit's controller - and the controller is
+    what has to be in hand afterwards to adjust it. Pose mode follows along, so
+    posing several units in a row does not drop back to object mode each time.
+    Returns True when the selection moved.
+    """
+    view_layer = context.view_layer
+    if view_layer is None or armature.name not in view_layer.objects:
+        # linked into a collection this view layer excludes - nothing to select
+        return False
+    active = view_layer.objects.active
+    if active is armature and armature.select_get() and len(context.selected_objects) == 1:
+        return False
+    in_pose = active is not None and active.mode == 'POSE'
+    try:
+        if in_pose:
+            bpy.ops.object.mode_set(mode='OBJECT')
+        for obj in list(context.selected_objects):
+            if obj is not armature:
+                obj.select_set(False)
+        armature.select_set(True)
+        view_layer.objects.active = armature
+        if in_pose:
+            bpy.ops.object.mode_set(mode='POSE')
+    except RuntimeError:
+        # a hidden rig, or an asset browser context mode_set will not run in
+        return False
+    return True

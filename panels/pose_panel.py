@@ -7,7 +7,7 @@ from ..tasks.pose_library import (DEFAULT_CATALOG, LIBRARY_NAME, activeArmature,
                                   actionBoneNames, applyPoseAction, candidateArmatures, clearAnimation,
                                   closePoseBrowser, ensureAssetLibrary, libraryAvailable, openPoseBrowser,
                                   poseBrowserArea, poseCatalogs, poseTarget, refreshPoseBrowser,
-                                  registeredLibrary, withAssetAction)
+                                  registeredLibrary, selectPoseTarget, withAssetAction)
 from ..tasks.texture_assets import texturesToAssets
 from .unit_export_panel import SEVERITY_ORDER, showResultsPopup
 
@@ -48,6 +48,11 @@ class MED_2_TOOLKIT_Pose_Data(bpy.types.PropertyGroup):
         name = "Catalog",
         description = "Catalog the pose browser opens on",
         items = catalogItems)
+    select_pose_target: BoolProperty(
+        name = "Select the rig the pose lands on",
+        description = ("After applying a pose, select and activate the rig it was applied to. An IK pose "
+                       "lands on the unit's control rig, which is then the one in hand to adjust"),
+        default = True)
     show_pose_buttons: BoolProperty(
         name = "Viewport buttons",
         description = "Show the pose buttons in the bottom-left corner of the viewport whenever an armature is selected",
@@ -314,6 +319,8 @@ class MED_2_TOOLKIT_OT_Apply_Pose_Asset(bpy.types.Operator):
             applyPoseAction(target, action)
             outcome['target'] = target
             results.append(('INFO', "Applied '%s' to '%s' (%d bone(s))" % (asset.name, target.name, len(matched))))
+            if context.scene.med2_toolkit_poses.select_pose_target and selectPoseTarget(context, target):
+                results.append(('INFO', "Selected '%s'" % target.name))
             if missing:
                 results.append(('INFO', "%d bone(s) in the pose are not on that rig and were ignored" % len(missing)))
 
@@ -539,6 +546,7 @@ class MED_2_TOOLKIT_PT_Poses(bpy.types.Panel):
             box.label(text="Control rig: %s" % controlRigOf(armature).name, icon='CON_KINEMATIC')
 
         layout.prop(settings, "override_double_click")
+        layout.prop(settings, "select_pose_target")
         layout.prop(settings, "open_browser_with_pose_mode")
         layout.prop(settings, "show_pose_buttons")
         # the library lives inside the addon folder, which a reinstall replaces
