@@ -3,32 +3,46 @@ import os
 import json
 import subprocess
 from pathlib import Path
-from..directories import saveFolderPaths, saveSettings
+from..directories import saveFolderPaths, saveSettings, readJsonCached
 from ..tasks.task_writer import unitTaskWriter
 from ..tasks.importer import fileChecker, modelImporter, importedArmature, postImport
 from bpy.props import StringProperty, CollectionProperty, IntProperty, EnumProperty, PointerProperty
 
 script_folder = Path(__file__).parent.parent
 
+MODEL_DICTIONARY = script_folder/'text'/'model_dictionary.json'
+AVAILABLE_FACTIONS = script_folder/'text'/'available_factions.json'
+
+def modelDictionaryVersion():
+    """mtime of model_dictionary.json, so caches drop when Read Mod Data runs."""
+    try:
+        return os.path.getmtime(MODEL_DICTIONARY)
+    except OSError:
+        return None
+
+
+# Blender only keeps pointers to the strings an EnumProperty items callback
+# returns, so the list has to stay referenced until the next query or the
+# entries render blank. Same workaround as the EDU panel's faction/unit enums.
+_filter_faction_items = []
+
 def sortFactions(self, context):
-    with open(script_folder/('text/available_factions.json'), 'r') as import_factions_input:
-        factions = json.load(import_factions_input)
+    global _filter_faction_items
+    factions = readJsonCached(AVAILABLE_FACTIONS)
     faction_list = [('all', 'All', "")]
     for faction in factions:
         entry = (factions[faction], faction, "")
         faction_list.append(entry)
-    return(faction_list)
+    _filter_faction_items = faction_list
+    return(_filter_faction_items)
 
 
 def countModels():
-    with open(script_folder/('text/model_dictionary.json'), 'r') as import_bmdb_input:
-        bmdb_dictionary = json.load(import_bmdb_input)
-    return(len(bmdb_dictionary))
+    return(len(readJsonCached(MODEL_DICTIONARY)))
 
 
 def sortModels(self, context):
-    with open(script_folder/('text/model_dictionary.json'), 'r') as import_bmdb_input:
-        bmdb_dictionary = json.load(import_bmdb_input)
+    bmdb_dictionary = readJsonCached(MODEL_DICTIONARY)
     import_faction = context.scene.med2_toolkit_bmdb_data.filter_faction
     context.scene.med2_toolkit_bmdb_list.clear()
     context.scene.med2_toolkit_bmdb_list_index = 0
@@ -46,26 +60,28 @@ def sortModels(self, context):
     return{'FINISHED'}
 
 
-# Blender only keeps pointers to the strings an EnumProperty items callback
-# returns, so the list has to stay referenced until the next query or the
-# entries render blank. Same workaround as the EDU panel's faction/unit enums.
+# Same GC guard as above, plus a cache keyed by the selected model: this
+# callback runs several times per redraw, and scrolling the model list redraws
+# on every event, so rebuilding the variant labels each time lags the panel.
 _model_faction_items = []
+_model_faction_cache = {'key': None}
 
 def modelFactions(self, context):
     """Texture variants of the selected model, one entry per faction. Factions
     whose textures are identical to an earlier faction's are labelled
     "Faction (Same as Other)" so the genuinely unique variants stand out."""
     global _model_faction_items
-    with open(script_folder/('text/available_factions.json'), 'r') as import_factions_input:
-        factions_named = json.load(import_factions_input)
-    with open(script_folder/('text/model_dictionary.json'), 'r') as import_bmdb_input:
-        bmdb_dictionary = json.load(import_bmdb_input)
+    model = context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].name
+    key = (modelDictionaryVersion(), model)
+    if _model_faction_cache['key'] == key:
+        return _model_faction_items
+    factions_named = readJsonCached(AVAILABLE_FACTIONS)
+    bmdb_dictionary = readJsonCached(MODEL_DICTIONARY)
     # available_factions.json maps display name -> codename; invert it once
     # instead of scanning it per faction (and never fall through to the
     # previous loop's entry when a codename is missing from it)
     faction_names = {code: name for name, code in factions_named.items()}
     factions = []
-    model = context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].name
     model_textures = bmdb_dictionary[model]['Textures']
     first_use = {}
     for faction in model_textures:
@@ -81,6 +97,7 @@ def modelFactions(self, context):
             description = "Uses the same textures as %s: %s" % (original, ", ".join(model_textures[faction]))
         factions.append((faction, label, description))
     _model_faction_items = factions
+    _model_faction_cache['key'] = key
     return(_model_faction_items)
 
 
@@ -90,8 +107,6 @@ class MED_2_TOOLKIT_OT_Model_Importer(bpy.types.Operator):
     bl_description = "Import the selected model with the chosen textures."
     bl_options = {"REGISTER", "UNDO"}
     def execute(self, context):
-        with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
-            bmdb_dictionary = json.load(bmdb_input)
         model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
         faction = context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].factions
         model = context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].name
@@ -166,8 +181,7 @@ class MED2_TOOLKIT_OT_Model_Folder(bpy.types.Operator):
     bl_label = "Open model folder"
     bl_description = "Opens the model folder in the file explorer"
     def execute(self, context):
-        with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
-            bmdb_dictionary = json.load(bmdb_input)
+        bmdb_dictionary = readJsonCached(MODEL_DICTIONARY)
         mod_path = bpy.context.scene.med2_toolkit_reader.directory_mod_data
         model_name = context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].name
         model_mesh = bmdb_dictionary[model_name]['Mesh'].replace('.glb', '.mesh')
