@@ -554,14 +554,19 @@ class MED_2_TOOLKIT_OT_BMDB_Load_Entry(bpy.types.Operator):
         return {'FINISHED'}
 
 
-def buildInstallPlan(context):
-    """Plan an install of the active rig's BMDB entry. Returns (plan, error)."""
+def buildInstallPlan(context, for_install=True):
+    """Plan an install of the active rig's BMDB entry. Returns (plan, error).
+
+    `for_install=False` is the probe: planning writes nothing, so it is allowed
+    in Text File mode too - "would this entry clash with the mod?" is worth
+    answering whether or not the toolkit is the one pasting it in.
+    """
     export_data = exportSettings(context)
     if export_data is None:
         return None, "Select an Armature"
     if not export_data.generate_bmdb:
         return None, "Turn on Generate BMDB Entry first - there is no entry to install"
-    if export_data.bmdb_mode not in {'install', 'both'}:
+    if for_install and export_data.bmdb_mode not in {'install', 'both'}:
         return None, "BMDB Entry is set to Text File - switch it to Install to Mod (or Both) first"
     entry_text, _entry_name, relative, error = bmdbEntryText(context)
     if error:
@@ -594,22 +599,26 @@ def planSummary(plan):
 class MED_2_TOOLKIT_OT_BMDB_Check_Install(bpy.types.Operator):
     bl_idname = "medieval2toolkit.bmdb_check_install"
     bl_label = "Probe BMDB"
-    bl_description = ("Read the mod's battle_models.modeldb and report what installing this entry would "
-                      "do - whether the name clashes and what the Rename / Overwrite / Skip choice above "
-                      "would then do, which files are already in the mod and which models share them. "
-                      "Nothing is written.")
+    bl_description = ("Read the mod's battle_models.modeldb and report what this entry would do to it - "
+                      "whether the name clashes and what Rename / Overwrite / Skip would then do, which "
+                      "files are already in the mod and which models share them. Nothing is written, in "
+                      "any mode.")
 
     @classmethod
     def poll(cls, context):
         return activeExportArmature(context) is not None
 
     def execute(self, context):
-        plan, error = buildInstallPlan(context)
+        export_data = exportSettings(context)
+        plan, error = buildInstallPlan(context, for_install=False)
         if plan is None:
             self.report({'ERROR'}, error)
             return {'CANCELLED'}
-        exportSettings(context).install_summary = planSummary(plan)
+        export_data.install_summary = planSummary(plan)
         results = plan.results() + fileResults(plan)
+        if export_data.bmdb_mode == 'txt':
+            results.append(('INFO', "Text File mode: this is what an install WOULD do. Switch to "
+                            "Install to Mod, or Both, to actually write it"))
         for level, message in results:
             self.report({level}, message)
         showResultsPopup(context, "BMDB probe: %s" % planSummary(plan), results)
@@ -1114,8 +1123,9 @@ class MED_2_TOOLKIT_PT_Export_BMDB(bpy.types.Panel):
             col.operator("medieval2toolkit.copy_sprite_footer", icon='COPYDOWN')
 
         layout.separator()
-        # useful in either mode: text-file mode can start from an existing entry too
-        layout.operator("medieval2toolkit.bmdb_load_entry", icon='IMPORT')
+        # works in every mode - planning writes nothing, and "does this clash
+        # with the mod?" is worth asking before pasting an entry in by hand too
+        layout.operator("medieval2toolkit.bmdb_check_install", icon='VIEWZOOM')
 
         if export_data.bmdb_mode != 'txt':
             drawInstallSection(layout, context, export_data)
@@ -1167,7 +1177,7 @@ def drawInstallSection(layout, context, export_data):
     col.prop(export_data, "install_asset_conflict", text="If a file exists")
     col.prop(export_data, "install_backup")
 
-    box.operator("medieval2toolkit.bmdb_check_install", icon='VIEWZOOM')
+    # no second Probe button here: it is right above this box, in every mode
     box.operator("medieval2toolkit.bmdb_install", icon='EXPORT')
     if export_data.install_summary:
         box.label(text="Last probe: %s" % export_data.install_summary, icon='INFO')
