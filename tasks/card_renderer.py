@@ -1462,6 +1462,76 @@ def renderCard(context, entry, width, height, supersample):
         restoreSuns(scene, previous_suns)
 
 
+def renderedPaths(entry):
+    """Every file one card render writes, most interesting first. The extra
+    copies in other faction folders are the same picture again, so they are left
+    out - showing them would just pad the image list."""
+    paths = [entry.get('path'), entry.get('hd_path'), entry.get('full_path')]
+    return [path for path in paths if path]
+
+
+def openRendersWindow(context, paths):
+    """Load every rendered card and show them in a new Image Editor window.
+
+    Blender shows one image per editor, so they all go into `bpy.data.images`
+    and the window opens on the first - the editor's browse dropdown is then the
+    way through the rest. Returns a (level, message) pair."""
+    images = []
+    failed = []
+    for path in dict.fromkeys(paths):
+        if not os.path.isfile(path):
+            continue
+        try:
+            image = bpy.data.images.load(path, check_existing=True)
+            image.reload()          # a re-render of a card already loaded once
+        except RuntimeError as error:
+            failed.append("%s (%s)" % (os.path.basename(path), error))
+            continue
+        images.append(image)
+    if not images:
+        return ('WARNING', "No rendered files found to open"
+                + (": " + "; ".join(failed) if failed else ""))
+    if bpy.app.background or context.window is None:
+        return ('INFO', "%d render(s) loaded into the image list" % len(images))
+
+    window_manager = context.window_manager
+    # A second render should refill the window the first one opened rather than
+    # stack another one up, so look for an image editor in a side window first.
+    # windows[0] is the main window - never take that one over.
+    reused = next((area for window in list(window_manager.windows)[1:]
+                   for area in window.screen.areas if area.type == 'IMAGE_EDITOR'), None)
+    if reused is not None:
+        reused.spaces.active.image = images[0]
+        return ('INFO', "Showed %d render(s) in the open image window - use the image dropdown "
+                "there to flip through them" % len(images))
+
+    before = len(window_manager.windows)
+    # window_new duplicates the area it is called from, so it needs one to
+    # duplicate - the sidebar this runs from lives in a VIEW_3D
+    area = next((a for a in context.window.screen.areas if a.type == 'VIEW_3D'),
+                context.window.screen.areas[0] if context.window.screen.areas else None)
+    if area is not None:
+        try:
+            with context.temp_override(window=context.window, area=area):
+                bpy.ops.wm.window_new()
+        except RuntimeError as error:
+            return ('WARNING', "%d render(s) loaded into the image list, but a new window "
+                    "could not be opened: %s" % (len(images), error))
+    if len(window_manager.windows) <= before:
+        return ('WARNING', "%d render(s) loaded into the image list, but no new window opened"
+                % len(images))
+
+    window = window_manager.windows[-1]
+    areas = [a for a in window.screen.areas if a.type != 'STATUSBAR']
+    if not areas:
+        return ('WARNING', "%d render(s) loaded into the image list" % len(images))
+    target = max(areas, key=lambda a: a.width * a.height)
+    target.type = 'IMAGE_EDITOR'
+    target.spaces.active.image = images[0]
+    return ('INFO', "Opened %d render(s) in a new window - use the image dropdown there to "
+            "flip through them" % len(images))
+
+
 def shuffleImportedVariations(context, hideVariations):
     """Re-roll the variations of every rig in the imported models list. Cards are
     single frames, so a model still showing all of its variation meshes at once

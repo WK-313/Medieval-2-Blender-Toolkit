@@ -14,8 +14,9 @@ from ..tasks.card_renderer import (CAMERA_ORTHO_SCALE, CARD_LIGHT_TYPES, CARD_TY
                                    SUN_STRENGTH, applyRenderSettings, buildRenderQueue, cardCameras, cardFolders,
                                    cardOutputParts, cardResolution, cardSuns, createCardCameras, defaultCardFolders,
                                    defaultLightStrength, deleteCardCameras, hdOrthoScale, hdResolution,
-                                   lineArtObjects, renderCard, setCardFolders, setupCardScene,
-                                   shuffleImportedVariations, unitCardIndex)
+                                   lineArtObjects, openRendersWindow, renderCard, renderedPaths,
+                                   setCardFolders, setupCardScene, shuffleImportedVariations,
+                                   unitCardIndex)
 from ..tasks.importer import hideVariations, postImport, unitChecker, unitImporter
 from ..tasks.task_writer import engineTaskWriter, unitTaskWriter
 from ..tasks.unit_exporter import open_folder
@@ -154,6 +155,9 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                                                               "back on: a variation mesh, shield or helmet switched off by hand stays off the card, "
                                                                               "which the plain Isolate unit undoes. Only the camera and its light are ever forced on"),
                                        default = False)
+    open_renders: BoolProperty(name = "Open renders when finished", description = ("When the render finishes, load every card it wrote and show them in a new window's "
+                                                                                     "Image Editor. Use the image browse dropdown in that window to flip through them"),
+                                default = True)
     add_line_art: BoolProperty(name = "Line art outline", description = ("Add a Grease Pencil Line Art object per unit collection, each set to Collection source "
                                                                           "so it only outlines its own unit. Contour plus material borders, edge marks and loose "
                                                                           "edges, following the scene camera - the setup unit_card_sample.blend uses"), default = True)
@@ -539,7 +543,7 @@ class MED_2_TOOLKIT_OT_Render_Cards(bpy.types.Operator):
         _card_job = {
             'entries': entries, 'index': 0, 'results': results, 'written': 0,
             'width': width, 'height': height, 'supersample': supersample,
-            'scene_camera': context.scene.camera, 'start': time.time(),
+            'scene_camera': context.scene.camera, 'start': time.time(), 'paths': [],
         }
         if bpy.app.background or context.window is None:
             while _card_job['index'] < len(entries):
@@ -558,6 +562,7 @@ class MED_2_TOOLKIT_OT_Render_Cards(bpy.types.Operator):
         reason = renderCard(context, entry, job['width'], job['height'], job['supersample'])
         if reason is None:
             job['written'] += 1
+            job['paths'].extend(renderedPaths(entry))
         else:
             job['results'].append(('ERROR', "%s: %s" % (entry['id'], reason)))
         job['index'] += 1
@@ -593,6 +598,9 @@ class MED_2_TOOLKIT_OT_Render_Cards(bpy.types.Operator):
         elapsed = time.time() - job['start']
         failed = sum(1 for level, _ in results if level == 'ERROR')
         results.append(('INFO', "Wrote %d card(s) in %.1fs" % (job['written'], elapsed)))
+        # opened before the popup, so the results are read over the renders
+        if context.scene.med2_toolkit_cards.open_renders and job['paths']:
+            results.append(openRendersWindow(context, job['paths']))
         reportResults(self, context, "Card render: %d written, %d failed" % (job['written'], failed), results)
         return {'FINISHED'}
 
@@ -792,6 +800,7 @@ class MED_2_TOOLKIT_PT_Card_Render(bpy.types.Panel):
             layout.label(text="Esc to stop", icon='INFO')
         else:
             layout.operator("medieval2toolkit.render_cards", icon='RENDER_STILL')
+        layout.prop(settings, "open_renders")
         layout.operator("medieval2toolkit.open_card_folder", icon='FILE_FOLDER')
         if context.mode != 'OBJECT':
             layout.enabled = False
