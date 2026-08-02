@@ -3,6 +3,7 @@ from bpy.props import BoolProperty, EnumProperty, PointerProperty
 from ..tasks.armature_tools import skeletonItems, parentToSkeleton
 from ..tasks.control_rig import (CONTROL_RIG_TYPES, controlRigOf, controlledRigs, createControlRig,
                                  deleteControlRig, isControlRig)
+from ..tasks.unit_groups import createGroupControlRigs, groupParts, groupRoot
 from ..tasks.export_checks import (
     OPT_SUFFIX, splitNumberSuffix, hasOptSuffix, addOptSuffix, removeOptSuffix, splitOptSuffix,
 )
@@ -400,6 +401,13 @@ class MED_2_TOOLKIT_OT_Create_Control_Rig(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     rig_type: EnumProperty(name = "Control rig", description = "Which of the three IK layouts to build", items = CONTROL_RIG_TYPES, default = 'infantry')
+    whole_unit: BoolProperty(
+        name = "Whole unit",
+        description = ("Build a controller for every rider or crew member of a mount or siege engine, not just the "
+                       "armature that is selected. The mount or engine itself is skipped - none of its bones are on "
+                       "a human controller - and each controller is kept parented under the unit so the riders stay "
+                       "on it. Untick to build one for the selected armature alone"),
+        default = True)
 
     @classmethod
     def poll(cls, context):
@@ -411,28 +419,56 @@ class MED_2_TOOLKIT_OT_Create_Control_Rig(bpy.types.Operator):
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "rig_type")
-        targets = controlRigTargets(context)
+        targets = self.rigTargets(context)
+        layout.prop(self, "whole_unit")
         layout.label(text="Builds a controller for %d rig(s):" % len(targets), icon='CON_KINEMATIC')
         for rig in targets[:6]:
             layout.label(text=rig.name, icon='ARMATURE_DATA')
         if len(targets) > 6:
             layout.label(text="... and %d more" % (len(targets) - 6))
 
-    def execute(self, context):
+    def rigTargets(self, context):
+        """What the dialog lists. With Whole unit on, a mount and any of its
+        riders that are also selected collapse into the one unit."""
         targets = controlRigTargets(context)
+        if not self.whole_unit:
+            return targets
+        roots = []
+        for rig in targets:
+            root = groupRoot(rig) or rig
+            if root not in roots:
+                roots.append(root)
+        return roots
+
+    def execute(self, context):
+        targets = self.rigTargets(context)
         if not targets:
             self.report({'ERROR'}, "Select a Medieval 2 armature first")
             return {'CANCELLED'}
         built = 0
+        already = 0
+        skipped = []
         for rig in targets:
-            controller, results = createControlRig(context, rig, self.rig_type)
-            if controller is not None and not any(level == 'WARNING' and 'already has' in message for level, message in results):
-                built += 1
+            if self.whole_unit:
+                made, missed, had, results = createGroupControlRigs(context, rig, self.rig_type)
+                built += made
+                already += had
+                skipped.extend(missed)
+            else:
+                controller, results = createControlRig(context, rig, self.rig_type)
+                if controller is not None and not any(level == 'WARNING' and 'already has' in message
+                                                      for level, message in results):
+                    built += 1
             for level, message in results:
                 self.report({level}, message)
+        if skipped:
+            self.report({'INFO'}, "No controller for %s - not a Medieval 2 human skeleton" % ", ".join(skipped))
         if built == 0:
+            if already:
+                self.report({'WARNING'}, "%d armature(s) already have a control rig" % already)
             return {'CANCELLED'}
-        self.report({'INFO'}, "Built %d control rig(s)" % built)
+        self.report({'INFO'}, "Built %d control rig(s)%s"
+                    % (built, ", %d already had one" % already if already else ""))
         return {'FINISHED'}
 
 
@@ -517,6 +553,12 @@ class MED_2_TOOLKIT_PT_Armature(bpy.types.Panel):
         if existing:
             box.label(text="Selected: %s" % existing[0].name, icon='OUTLINER_OB_ARMATURE')
             box.label(text="Drives %d skeleton(s)" % len(controlledRigs(existing[0])))
+        # a mount or a siege engine is several armatures, and Add Control Rig
+        # covers all of them in one press
+        parts = max([len(groupParts(obj)) for obj in context.selected_objects
+                     if obj.type == 'ARMATURE' and not isControlRig(obj)] or [0])
+        if parts > 1:
+            box.label(text="Selected unit is %d armatures - one controller each" % parts, icon='GROUP')
 
 
 class MED_2_TOOLKIT_PT_Rename_Tools(bpy.types.Panel):

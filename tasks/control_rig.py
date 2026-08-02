@@ -81,6 +81,22 @@ def controlledRigs(controller):
     return [child for child in controller.children if child.type == 'ARMATURE']
 
 
+def controlRigMatchCount(armature, rig_type):
+    """How many of a skeleton's bones a controller layout actually models.
+
+    Zero means a controller would drive nothing at all - a horse, a catapult or
+    a ship shares no bone name with a Medieval 2 human skeleton. That is how the
+    group pass in unit_groups tells a mount apart from the riders sitting on it
+    without having to build a controller first to find out.
+    """
+    if armature is None or armature.type != 'ARMATURE' or rig_type not in RIGS:
+        return 0
+    layout = {bone[0] for bone in RIGS[rig_type]}
+    return sum(1 for pose_bone in armature.pose.bones
+               if pose_bone.name in layout
+               and not any(marker in pose_bone.name for marker in WEAPON_BONE_MARKERS))
+
+
 #   ---------  #
 #   Rig build  #
 #   ---------  #

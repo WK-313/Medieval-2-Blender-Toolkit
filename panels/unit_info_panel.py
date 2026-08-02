@@ -19,6 +19,7 @@ from ..tasks.card_renderer import (CAMERA_ORTHO_SCALE, CARD_LIGHT_TYPES, CARD_TY
                                    unitCardIndex)
 from ..tasks.importer import hideVariations, postImport, unitChecker, unitImporter
 from ..tasks.task_writer import engineTaskWriter, unitTaskWriter
+from ..tasks.unit_groups import groupParts, groupRoot
 from ..tasks.unit_exporter import open_folder
 from .edu_panel import drawImportListFilters, sortFactions, unlistedArmatures
 from .unit_export_panel import SEVERITY_ORDER, showResultsPopup
@@ -31,6 +32,14 @@ script_folder = Path(__file__).parent.parent
 _card_unit_enum_items = []
 
 OWNERSHIP_FILTERS = [('ownership', 'Ownership', ''), ('era 0', 'Era 0', ''), ('era 1', 'Era 1', ''), ('era 2', 'Era 2', '')]
+
+# How much of a multi-armature unit - a mount with its riders, an engine with its
+# crew - counts as "the unit" while its card renders.
+ISOLATE_SCOPES = [
+    ('unit', "Whole unit", "Keep every armature of the unit: a mount with everyone riding it, an engine with its whole crew"),
+    ('part', "Ticked parts", "Keep only the parts ticked under the unit in the imported models list, so a rider "
+                             "can be carded without its mount, or a mount without its rider"),
+]
 
 
 def cardUnits(self, context):
@@ -80,7 +89,12 @@ def cardLightChanged(self, context):
 def cardTargets(context):
     """[(unit_id, faction, object)] the card tools act on: ticked entries in the
     imported models list, or - when nothing is ticked - the selected armatures.
-    Returns (targets, description of where they came from)."""
+    Returns (targets, description of where they came from).
+
+    A mount or a siege engine is several armatures, and it gets ONE camera: the
+    sub-entries of a unit resolve to the unit's root, and the unit id dedupe then
+    folds them into a single target however many of its parts are ticked.
+    """
     scene = context.scene
     settings = scene.med2_toolkit_cards
     targets = []
@@ -98,8 +112,13 @@ def cardTargets(context):
         model = bpy.data.objects.get(item.object_name) if item.object_name else None
         if model is None:
             model = bpy.data.objects.get(item.name)
-        if model is not None:
-            add(item.id or item.name, item.faction, model)
+        if model is None:
+            continue
+        if item.is_part:
+            # ticking a rider means "card this unit showing that rider", not
+            # "give the rider a camera of its own"
+            model = groupRoot(model) or model
+        add(item.id or item.name, item.faction, model)
     if targets:
         return targets, "ticked entries"
 
@@ -120,7 +139,11 @@ def cardTargets(context):
             rig = obj
         if rig is None:
             continue
+        # selecting a rider is selecting its unit - one camera per mount, not
+        # one per armature sitting on it
         item = by_object.get(rig.name)
+        rig = groupRoot(rig) or rig
+        item = by_object.get(rig.name) or item
         add(item.id or item.name if item else rig.name, item.faction if item else "", rig)
     return targets, "selected armatures"
 
@@ -155,6 +178,11 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                                                               "back on: a variation mesh, shield or helmet switched off by hand stays off the card, "
                                                                               "which the plain Isolate unit undoes. Only the camera and its light are ever forced on"),
                                        default = True)
+    isolate_scope: EnumProperty(name = "Isolate", description = ("How much of a mount or siege engine counts as the unit while its card renders. "
+                                                                  "Whole unit keeps the mount and everyone riding it; Ticked parts keeps only the "
+                                                                  "armatures ticked under that unit in the imported models list. A unit that is a "
+                                                                  "single armature is unaffected either way"),
+                                items = ISOLATE_SCOPES, default = 'unit')
     open_renders: BoolProperty(name = "Open renders when finished", description = ("When the render finishes, load every card it wrote and show them in a new window's "
                                                                                      "Image Editor. Use the image browse dropdown in that window to flip through them"),
                                 default = True)
@@ -760,11 +788,17 @@ class MED_2_TOOLKIT_PT_Card_Scene(bpy.types.Panel):
         col = box.column(align=True)
         col.operator("medieval2toolkit.create_card_cameras", icon='CON_CAMERASOLVER')
         col.label(text="%d %s" % (len(targets), source), icon='CHECKBOX_HLT' if targets else 'CHECKBOX_DEHLT')
-        # everything above lands in each unit's own collection
-        rigged = sum(1 for _id, _faction, model in targets
-                     if model.type == 'ARMATURE' and controlRigOf(model) is not None)
+        # everything above lands in each unit's own collection. The count is per
+        # ARMATURE, not per unit: a mount's riders get a controller each and the
+        # mount itself never gets one, so counting units would read 0 of 12
+        # however many controllers are actually there
+        armatures = []
+        for _id, _faction, model in targets:
+            if model.type == 'ARMATURE':
+                armatures.extend(groupParts(model))
+        rigged = sum(1 for rig in armatures if controlRigOf(rig) is not None)
         if targets:
-            col.label(text="%d of %d already have a control rig" % (rigged, len(targets)), icon='CON_KINEMATIC')
+            col.label(text="%d of %d armature(s) already have a control rig" % (rigged, len(armatures)), icon='CON_KINEMATIC')
         existing = len(cardCameras(context.scene))
         if existing:
             col = box.column(align=True)
@@ -822,6 +856,18 @@ class MED_2_TOOLKIT_PT_Card_Render(bpy.types.Panel):
         sub.enabled = settings.isolate_unit
         if settings.isolate_unit and settings.isolate_visible_only:
             col.label(text="Hidden parts stay off the card", icon='HIDE_ON')
+        # only worth showing once something in the scene is more than one
+        # armature - a mount with riders, or a siege engine with its crew
+        multipart = sum(1 for _unit_id, _faction, model in targets if len(groupParts(model)) > 1)
+        if multipart:
+            sub = layout.row(align=True)
+            sub.prop(settings, "isolate_scope", expand=True)
+            sub.enabled = settings.isolate_unit
+            if settings.isolate_scope == 'part':
+                layout.label(text="%d mount/engine: untick riders in the list to leave them off"
+                                  % multipart, icon='GROUP')
+            else:
+                layout.label(text="%d mount/engine carded whole, riders and all" % multipart, icon='GROUP')
 
         if _card_job is not None:
             job = _card_job

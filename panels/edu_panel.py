@@ -10,6 +10,7 @@ from ..tasks.card_renderer import TARGET_TAG
 from ..tasks.control_rig import controlRigOf, controlledRigs, isControlRig
 from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport
 from ..tasks.task_writer import unitTaskWriter, engineTaskWriter
+from ..tasks.unit_groups import adoptGroup, deriveRole, groupId, groupParts, groupRoot, unitRole
 
 
 script_folder = Path(__file__).parent.parent
@@ -82,15 +83,28 @@ def selectedUpgrades(context):
 
 def deleteImportedObjects(item):
     """Delete the rig an import list entry points at, plus everything parented
-    to it. Returns the number of objects removed."""
+    to it. Returns the number of objects removed.
+
+    A root entry takes the whole unit with it - a mount takes its riders, an
+    engine takes its crew - which the plain child walk only covers while none of
+    them has a control rig; once one does, the part hangs off its controller
+    instead. A sub-entry takes only its own armature.
+    """
     target = trackedObject(item)
     if target is None:
         return 0
-    doomed = list(target.children_recursive) + [target]
-    # the unit is parented UNDER its control rig, so deleting the unit would
-    # otherwise strand the controller in the scene
-    controller = controlRigOf(target)
-    if controller is not None and controller is not target:
+    members = [target] if item.is_part else groupParts(target)
+    doomed = []
+    for member in members:
+        for obj in list(member.children_recursive) + [member]:
+            if obj not in doomed:
+                doomed.append(obj)
+    for member in members:
+        # the unit is parented UNDER its control rig, so deleting the unit would
+        # otherwise strand the controller in the scene
+        controller = controlRigOf(member)
+        if controller is None or controller in doomed:
+            continue
         if all(rig in doomed for rig in controlledRigs(controller)):
             doomed.append(controller)
     removed = 0
@@ -476,13 +490,22 @@ class MED_2_TOOLKIT_OT_Remove_Item(bpy.types.Operator):
     def execute(self, context):
         imported_list = context.scene.med2_toolkit_import_list
         imported_list_index = context.scene.med2_toolkit_import_list_index
+        # a unit entry takes its mount/rider sub-entries with it, or they would
+        # be left in the list hanging under nothing
+        doomed = entryGroupIndexes(imported_list, imported_list_index)
+        if not doomed:
+            return{"CANCELLED"}
         removed = 0
         if context.scene.med2_toolkit_units.delete_with_item:
+            # only the entry the user picked deletes objects: a unit root
+            # already takes its whole family, and the sub-entries point inside it
             removed = deleteImportedObjects(imported_list[imported_list_index])
-        imported_list.remove(imported_list_index)
+        for index in reversed(doomed):
+            imported_list.remove(index)
         context.scene.med2_toolkit_import_list_index = min(max(0, imported_list_index - 1), len(imported_list) -1)
         if context.scene.med2_toolkit_units.delete_with_item:
-            self.report({'INFO'}, "Removed item and deleted %d object(s)" % removed)
+            self.report({'INFO'}, "Removed %d entr%s and deleted %d object(s)"
+                        % (len(doomed), "y" if len(doomed) == 1 else "ies", removed))
         return{"FINISHED"}
 
 
@@ -501,6 +524,8 @@ class MED_2_TOOLKIT_OT_Purge_List(bpy.types.Operator):
         removed = 0
         if context.scene.med2_toolkit_units.delete_with_item:
             for item in imported_list:
+                # a sub-entry's armature is already inside its unit's family, so
+                # by the time the loop reaches it there is nothing left to delete
                 removed += deleteImportedObjects(item)
         imported_list.clear()
         context.scene.med2_toolkit_import_list_index = 0
@@ -591,6 +616,13 @@ class MED_2_TOOLKIT_List_Items(bpy.types.PropertyGroup):
     faction: StringProperty(name="Faction", description="Faction codename this entry was imported for")
     use: BoolProperty(name="Include", description="Include this unit when creating card cameras", default=True)
     icon: StringProperty(name="Menu icon", description="")
+    # A mount or a siege engine is several armatures - the mount plus a rider or
+    # crew member each - so its entry folds them underneath it. They all share
+    # the group id written onto the objects themselves by tasks/unit_groups.
+    group: StringProperty(name="Unit group", description="Id shared by every armature of a mount or siege engine", options={'HIDDEN'})
+    is_part: BoolProperty(name="Part of a unit", description="This entry is one armature of a mount or siege engine, not a unit of its own", options={'HIDDEN'})
+    role: StringProperty(name="Role", description="What this armature is within the unit - the mount itself, a rider, a crew member")
+    expanded: BoolProperty(name="Show the parts", description="Show the mount, riders and crew that make up this unit", default=False)
 
 
 # item.icon values, as an ownership-style filter for the list
@@ -609,6 +641,10 @@ SORT_ORDERS = [
 ]
 
 def unitTypeIcon(item):
+    if item.is_part:
+        # the row is already indented under its unit, so the icon says which
+        # armature of it this is rather than repeating the unit's type
+        return 'BONE_DATA'
     if item.icon == 'mount':
         return 'SNAP_OFF'
     if item.icon == 'engine':
@@ -616,6 +652,39 @@ def unitTypeIcon(item):
     if item.icon == 'custom':
         return 'OUTLINER_OB_ARMATURE'
     return 'ARMATURE_DATA'
+
+
+def groupIndexes(imported_list):
+    """({group id: unit entry index}, {group id: [sub-entry indexes]}) in one
+    pass over the list - the list runs to a whole faction, so nothing here may
+    scan it again per entry."""
+    roots = {}
+    parts = {}
+    for index, item in enumerate(imported_list):
+        if not item.group:
+            continue
+        if item.is_part:
+            parts.setdefault(item.group, []).append(index)
+        else:
+            roots.setdefault(item.group, index)
+    return roots, parts
+
+
+def groupEntries(imported_list):
+    """{group id: [indexes]} of the sub-entries in the list, in list order."""
+    return groupIndexes(imported_list)[1]
+
+
+def entryGroupIndexes(imported_list, index):
+    """Every index Remove item should take with `index`: a unit entry takes its
+    own sub-entries, a sub-entry goes on its own."""
+    if not (0 <= index < len(imported_list)):
+        return []
+    item = imported_list[index]
+    indexes = [index]
+    if item.group and not item.is_part:
+        indexes.extend(groupEntries(imported_list).get(item.group, []))
+    return sorted(set(indexes))
 
 
 class MED_2_TOOLKIT_List_Filter(bpy.types.PropertyGroup):
@@ -678,7 +747,9 @@ def unlistedArmatures(context, selection_only):
     """Armatures in the scene that no import list entry points at.
 
     Control rigs are skipped and resolved to the skeleton they drive - the card
-    tools want the unit, not its controller.
+    tools want the unit, not its controller. A rider or crew member is resolved
+    to the unit it belongs to, so a mount is offered once rather than once per
+    armature it carries; adding it brings its parts in as sub-entries.
     """
     listed = listedObjectNames(context.scene)
     source = context.selected_objects if selection_only else context.scene.objects
@@ -688,9 +759,23 @@ def unlistedArmatures(context, selection_only):
             continue
         rigs = controlledRigs(obj) if isControlRig(obj) else [obj]
         for rig in rigs:
-            if rig.name not in listed and rig not in found:
-                found.append(rig)
+            root = groupRoot(rig) or rig
+            if root.name in listed or root in found:
+                continue
+            found.append(root)
     return found
+
+
+def unitParts(root):
+    """[(object, role)] for the armatures a unit carries, tagging them if they
+    were never tagged - a mount imported before groups existed, or one built by
+    hand. Empty for a unit that is a single armature."""
+    parts = groupParts(root)
+    if len(parts) < 2:
+        return []
+    adoptGroup(root)
+    return [(part, unitRole(part) or deriveRole(root, part, index))
+            for index, part in enumerate(parts[1:], start=1)]
 
 
 class MED_2_TOOLKIT_OT_Add_Armature_To_List(bpy.types.Operator):
@@ -727,8 +812,14 @@ class MED_2_TOOLKIT_OT_Add_Armature_To_List(bpy.types.Operator):
         cards = getattr(context.scene, "med2_toolkit_cards", None)
         if cards is not None:
             faction = cards.card_faction
+        imported_list = context.scene.med2_toolkit_import_list
+        parts_added = 0
         for armature in armatures:
-            item = context.scene.med2_toolkit_import_list.add()
+            # a mount or an engine added by hand folds its riders in underneath
+            # it, the same way an imported one does
+            parts = unitParts(armature)
+            group = groupId(armature) if parts else ""
+            item = imported_list.add()
             item.name = armature.name
             # the card renderer files a card under this id, and looks it up in the
             # unit dictionary - a hand-built rig simply will not be in there, and
@@ -738,11 +829,28 @@ class MED_2_TOOLKIT_OT_Add_Armature_To_List(bpy.types.Operator):
             item.faction = faction
             item.use = True
             item.icon = 'custom'
+            item.group = group
             # entries made by the importer are tagged by the deferred sync on the
             # next depsgraph update; these can be tagged straight away
             tagEntry(item, armature, fresh=True)
-        context.scene.med2_toolkit_import_list_index = len(context.scene.med2_toolkit_import_list) - 1
-        self.report({'INFO'}, "Added %d armature(s): %s" % (len(armatures), ", ".join(a.name for a in armatures[:5])))
+            for part, role in parts:
+                part_item = imported_list.add()
+                part_item.name = role
+                part_item.id = armature.name
+                part_item.object_name = part.name
+                part_item.faction = faction
+                part_item.use = True
+                part_item.icon = 'custom'
+                part_item.group = group
+                part_item.role = role
+                part_item.is_part = True
+                tagEntry(part_item, part, fresh=True)
+                parts_added += 1
+        context.scene.med2_toolkit_import_list_index = len(imported_list) - 1
+        message = "Added %d armature(s): %s" % (len(armatures), ", ".join(a.name for a in armatures[:5]))
+        if parts_added:
+            message += " (+%d rider/crew armature(s))" % parts_added
+        self.report({'INFO'}, message)
         return {'FINISHED'}
 
 
@@ -750,8 +858,28 @@ class MED_2_TOOLKIT_UL_Import_List(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             row = layout.row(align=True)
+            if item.is_part:
+                # indented under its unit; filter_items only ever shows these
+                # while that unit's arrow is open
+                row.separator(factor=2.0)
+            elif item.group:
+                row.prop(item, "expanded", text="", emboss=False,
+                         icon='DISCLOSURE_TRI_DOWN' if item.expanded else 'DISCLOSURE_TRI_RIGHT')
+            else:
+                # keeps the tick boxes of ordinary units in the same column as
+                # the ones that have an arrow
+                row.label(text="", icon='BLANK1')
             row.prop(item, "use", text="")
             row.label(text=item.name, icon=unitTypeIcon(item))
+            if item.group and not item.is_part:
+                # counted once per draw in filter_items, never per row - this
+                # list runs to a whole faction and a scan per row is a scan
+                # squared
+                count = getattr(self, "_part_counts", {}).get(item.group, 0)
+                if count:
+                    sub = row.row()
+                    sub.alignment = 'RIGHT'
+                    sub.label(text="%d" % (count + 1))
         elif self.layout_type in {'GRID'}:
             layout.alignment = 'CENTER'
             layout.label(text = "")
@@ -766,6 +894,9 @@ class MED_2_TOOLKIT_UL_Import_List(bpy.types.UIList):
         items = getattr(data, propname)
         settings = context.scene.med2_toolkit_list_filter
         helper = bpy.types.UI_UL_list
+        roots, parts = groupIndexes(items)
+        # the row badge reads this rather than scanning the list again per row
+        self._part_counts = {group: len(indexes) for group, indexes in parts.items()}
         flags = []
         if settings.search:
             # reverse= here inverts which entries MATCH, not the sort order; the
@@ -778,15 +909,49 @@ class MED_2_TOOLKIT_UL_Import_List(bpy.types.UIList):
                 # entries imported before the icon field existed read as foot units
                 if (item.icon or 'unused') != settings.unit_type:
                     flags[index] &= ~self.bitflag_filter_item
+        # Sub-entries follow their unit rather than the filters: a rider is only
+        # ever shown when its unit is shown AND that unit's arrow is open, so a
+        # search that happens to match "Rider 1" cannot leave a row hanging
+        # under nothing.
+        for group, indexes in parts.items():
+            root_index = roots.get(group)
+            if root_index is None:
+                # the unit entry has gone; its parts stand on their own
+                continue
+            visible = (items[root_index].expanded
+                       and bool(flags[root_index] & self.bitflag_filter_item))
+            for index in indexes:
+                if visible:
+                    flags[index] |= self.bitflag_filter_item
+                else:
+                    flags[index] &= ~self.bitflag_filter_item
         order = []
         if settings.sort_order != 'NONE':
-            order = helper.sort_items_by_name(items, "name")
-            if settings.sort_order == 'ZA':
-                # sort_items_by_name returns each item's new position, so Z-A is
-                # that position counted from the other end
-                last = len(order) - 1
-                order = [last - position for position in order]
+            order = self.sortWithParts(items, parts, settings.sort_order == 'ZA')
         return flags, order
+
+    def sortWithParts(self, items, parts, reverse):
+        """Alphabetical by unit, with each unit's parts kept right underneath it.
+
+        Sorting the flat list would scatter a mount's riders across the whole
+        list - they are named "Rider 1", not after the unit - so only the unit
+        entries are sorted and their parts are re-emitted behind them.
+        """
+        roots = [(index, item) for index, item in enumerate(items) if not item.is_part]
+        roots.sort(key=lambda entry: entry[1].name.lower(), reverse=reverse)
+        remaining = dict(parts)
+        sequence = []
+        for index, item in roots:
+            sequence.append(index)
+            if item.group:
+                sequence.extend(remaining.pop(item.group, []))
+        # a part whose unit entry has been removed still has to land somewhere
+        for leftover in remaining.values():
+            sequence.extend(leftover)
+        neworder = [0] * len(items)
+        for position, index in enumerate(sequence):
+            neworder[index] = position
+        return neworder
 
 classes = [
     MED_2_TOOLKIT_Unit_data,

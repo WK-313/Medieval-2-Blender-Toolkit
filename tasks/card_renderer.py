@@ -30,8 +30,9 @@ from pathlib import Path
 from mathutils import Vector
 
 from ..directories import readJsonCached
-from .control_rig import controlRigOf, createControlRig, isControlRig
+from .control_rig import controlRigOf, isControlRig
 from .recurlayercollection import linkBeside, recurLayerCollection
+from .unit_groups import createGroupControlRigs, groupParts, groupRoot
 
 script_folder = Path(__file__).parent.parent
 CARD_FOLDER = script_folder/'cards'
@@ -911,7 +912,10 @@ def createCardCameras(context, targets, add_sun=True, light_strength=SUN_STRENGT
 
     `control_rig_type` additionally builds each unit's IK controller, since a
     card is a single frame and units almost always want posing before it - and
-    the bundled pose library only works through that controller.
+    the bundled pose library only works through that controller. On a mount or a
+    siege engine that means one controller per rider or crew member, built in the
+    same pass; the mount or engine itself is left alone, since no bone of it is
+    on a human controller. One camera still covers the whole unit.
     """
     # no targets here: the outlines are built at the end instead, once every unit
     # is in the collection each outline covers
@@ -920,6 +924,7 @@ def createCardCameras(context, targets, add_sun=True, light_strength=SUN_STRENGT
     refreshed = 0
     rigged = 0
     already_rigged = 0
+    skipped_rigs = []
     lifted = []
     if lift_sunken:
         # the bounds are read off the evaluated objects, so anything moved or
@@ -938,14 +943,13 @@ def createCardCameras(context, targets, add_sun=True, light_strength=SUN_STRENGT
             refreshed += 1
         if control_rig_type is None or model.type != 'ARMATURE':
             continue
-        if controlRigOf(model) is not None:
-            already_rigged += 1
-            continue
-        _controller, rig_results = createControlRig(context, model, control_rig_type)
-        rigged += 1
+        built, skipped, existing, rig_results = createGroupControlRigs(context, model, control_rig_type)
+        rigged += built
+        already_rigged += existing
+        skipped_rigs.extend(skipped)
         # only the failures are worth surfacing per unit; one line per rig would
         # bury the camera summary on a faction-sized import
-        results.extend(entry for entry in rig_results if entry[0] != 'INFO')
+        results.extend(rig_results)
     results.append(('INFO', "Created %d camera(s), refreshed %d" % (created, refreshed)))
     if lifted:
         preview = ", ".join("%s +%.2f" % entry for entry in lifted[:4]) + (", ..." if len(lifted) > 4 else "")
@@ -956,7 +960,11 @@ def createCardCameras(context, targets, add_sun=True, light_strength=SUN_STRENGT
         results.append(('INFO', "Each camera carries a %.1f strength %s light aimed the same way"
                                 % (light_strength, label.lower())))
     if control_rig_type is not None:
-        results.append(('INFO', "Built %d control rig(s), %d unit(s) already had one" % (rigged, already_rigged)))
+        results.append(('INFO', "Built %d control rig(s), %d armature(s) already had one" % (rigged, already_rigged)))
+        if skipped_rigs:
+            preview = ", ".join(skipped_rigs[:4]) + (", ..." if len(skipped_rigs) > 4 else "")
+            results.append(('INFO', "No controller for %d mount/engine armature(s) - none of their bones "
+                                    "are on a Medieval 2 human controller: %s" % (len(skipped_rigs), preview)))
     if context.scene.med2_toolkit_cards.add_line_art:
         results.extend(setupLineArt(context, targets))
     return results
@@ -1185,18 +1193,58 @@ def restoreSuns(scene, previous):
 #   ---------------  #
 
 def unitFamily(target):
-    """The objects that make up one unit: its rig, everything parented under it
-    and the control rig driving it. The rig itself draws nothing - the meshes are
-    its children, and the controller is its parent."""
+    """The objects that make up one unit: every armature of it, everything
+    parented under those and the control rigs driving them. The rig itself draws
+    nothing - the meshes are its children, and the controller is its parent.
+
+    A mount or a siege engine is several armatures, so the walk starts from all
+    of them rather than from the one the camera happens to name. Walking the
+    mount's children would cover its riders while none of them has a controller,
+    but the moment one does the rider hangs off that controller instead - and a
+    card with the rider missing off the horse is the whole reason this is a group
+    rather than a parent.
+    """
     family = set()
-    stack = [target]
+    parts = groupParts(target) or [target]
+    stack = list(parts)
     while stack:
         obj = stack.pop()
         if obj in family:
             continue
         family.add(obj)
         stack.extend(obj.children)
-    controller = controlRigOf(target)
+    for part in parts:
+        controller = controlRigOf(part)
+        if controller is not None:
+            family.add(controller)
+    return family
+
+
+def partFamily(part):
+    """One armature of a unit on its own: itself, the meshes hanging off it and
+    its own controller - but not the other armatures of the same unit.
+
+    They have to be cut out explicitly, because a rider is parented under the
+    mount (and, once it has one, under a controller that is itself parented
+    under the mount), so the plain child walk would drag the whole unit back in.
+    """
+    others = set()
+    for member in groupParts(part):
+        if member is part:
+            continue
+        others.add(member)
+        controller = controlRigOf(member)
+        if controller is not None:
+            others.add(controller)
+    family = set()
+    stack = [part]
+    while stack:
+        obj = stack.pop()
+        if obj in family or obj in others:
+            continue
+        family.add(obj)
+        stack.extend(obj.children)
+    controller = controlRigOf(part)
     if controller is not None:
         family.add(controller)
     return family
@@ -1249,29 +1297,70 @@ def liftSunkenUnit(context, target):
     if height <= 0 or (-lowest)/height > MAX_SUNK_SHARE:
         return 0.0
     # the controller is the unit's parent, so moving the rig underneath it would
-    # leave the two disagreeing about where the unit is
-    root = controlRigOf(target) or target
+    # leave the two disagreeing about where the unit is - and on a mount it is
+    # the mount that has to move, or its riders stay where they were
+    root = groupRoot(target) or target
+    root = controlRigOf(root) or root
     matrix = root.matrix_world.copy()
     matrix.translation.z += -lowest
     root.matrix_world = matrix
     return -lowest
 
 
-def listedModels(scene, ticked_only=False):
-    """The models the imported models list points at. `ticked_only` narrows it to
-    the ones ticked in the Card Units list - the same entries the card tools
-    already act on. An entry can point at a lone mesh rather than a rig, which is
-    why this is not just a walk over the scene's armatures."""
-    models = set()
+def listedEntries(scene):
+    """[(entry, object)] for the imported models list, skipping entries whose
+    object has gone. An entry can point at a lone mesh rather than a rig, which
+    is why this is not just a walk over the scene's armatures."""
+    entries = []
     for item in scene.med2_toolkit_import_list:
-        if ticked_only and not item.use:
-            continue
         model = bpy.data.objects.get(item.object_name) if item.object_name else None
         if model is None:
             model = bpy.data.objects.get(item.name)
         if model is not None:
-            models.add(model)
-    return models
+            entries.append((item, model))
+    return entries
+
+
+def listedModels(scene, ticked_only=False):
+    """The models the imported models list points at. `ticked_only` narrows it to
+    the ones ticked in the Card Units list - the same entries the card tools
+    already act on."""
+    return {model for item, model in listedEntries(scene)
+            if not (ticked_only and not item.use)}
+
+
+def tickedParts(scene, target):
+    """The armatures of a multi-part unit whose sub-entries are ticked.
+
+    This is what the 'part' isolation scope renders: untick a mount's rider and
+    the card shows the horse on its own, untick the mount and it shows the rider
+    on its own. A unit that is a single armature has no parts to choose between,
+    and a unit with every part unticked falls back to the whole thing - an empty
+    card is never what was meant.
+    """
+    parts = groupParts(target)
+    if len(parts) < 2:
+        return [target]
+    ticked = {model for item, model in listedEntries(scene) if item.use}
+    chosen = [part for part in parts if part in ticked]
+    return chosen or parts
+
+
+def cardFamily(scene, target, scope='unit'):
+    """What isolation keeps on screen for one card.
+
+    'unit' is the whole thing - a mount with everyone riding it. 'part' narrows
+    it to the armatures ticked in the imported models list, so one rider, or the
+    mount by itself, can be carded without deleting anything.
+    """
+    if target is None:
+        return set()
+    if scope != 'part':
+        return unitFamily(target)
+    family = set()
+    for part in tickedParts(scene, target):
+        family |= partFamily(part)
+    return family
 
 
 def tickedFamilies(scene):
@@ -1329,7 +1418,7 @@ def collectionChain(scene, collections):
     return chain
 
 
-def isolateUnit(context, camera, target, visible_only=False):
+def isolateUnit(context, camera, target, visible_only=False, family=None):
     """Switch off everything the card should not show, and switch the unit on.
 
     Every card camera looks at the same scene, so a neighbouring unit reaching
@@ -1349,6 +1438,10 @@ def isolateUnit(context, camera, target, visible_only=False):
     the only things ever forced on, without which the render is black. It is all
     put back before the next camera, the same as the default mode.
 
+    `family` is what counts as "the unit" - cardFamily works it out from the
+    isolation scope, so a mount can be kept whole or narrowed to the one
+    armature of it being carded. Left out, it is the whole unit.
+
     Returns the state restoreVisibility puts back.
     """
     scene = context.scene
@@ -1356,7 +1449,8 @@ def isolateUnit(context, camera, target, visible_only=False):
     # all, so they are switched on in either mode
     essential = {camera}
     essential.update(camera.children)
-    family = unitFamily(target) if target is not None else set()
+    if family is None:
+        family = unitFamily(target) if target is not None else set()
     if visible_only:
         # only what the viewport is actually showing of that unit
         keep = (family & visibleObjects(context)) | essential
@@ -1500,17 +1594,20 @@ def renderCard(context, entry, width, height, supersample):
     if camera.name not in scene.objects:
         return "Its camera was deleted"
     target = entry.get('target')
+    # what "the unit" means for this card: the whole mount and its riders, or
+    # only the parts of it ticked in the imported models list
+    family = cardFamily(scene, target, settings.isolate_scope)
     if settings.isolate_unit and settings.isolate_visible_only and target is not None:
         # nothing hidden is put back in this mode, so a unit switched off by hand
         # would quietly write an empty card
-        if not (unitFamily(target) & visibleObjects(context)):
+        if not (family & visibleObjects(context)):
             return "It is hidden in the viewport, and Visible only renders nothing that is hidden"
     previous_camera = scene.camera
     previous_suns = isolateSun(scene, entry['id'])
     # nested inside the sun pass on purpose: it stores whatever isolateSun left
     # behind and hands it straight back, so restoreSuns still has the last word
-    isolated = isolateUnit(context, camera, target,
-                           settings.isolate_visible_only) if settings.isolate_unit else None
+    isolated = isolateUnit(context, camera, target, settings.isolate_visible_only,
+                           family) if settings.isolate_unit else None
     scene.camera = camera
     try:
         context.view_layer.update()

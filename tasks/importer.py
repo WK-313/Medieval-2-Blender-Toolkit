@@ -4,6 +4,7 @@ import random
 from pathlib import Path
 from . import recurlayercollection
 from .task_writer import unitTaskAppend, unitTaskRun, engineTaskAppend, engineTaskRun
+from .unit_groups import tagGroup
 script_folder = Path(__file__).parent.parent
 
 def postImport(self, context):
@@ -106,6 +107,12 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
     model_info = bmdb_dictionary[model_id]
     result = 0
     root_object = None
+    # A mount or an engine imports as several armatures - the mount itself plus
+    # one per crew member. They are collected here as [(object, role)] and tied
+    # to the root by tagGroup below, so every tool downstream can treat the lot
+    # as one unit however they end up parented once they have control rigs.
+    parts = []
+    root_role = "Unit"
     # Every rig imported here is looked up by diffing the object set, never by
     # bpy.data.objects[unit_name]: each armour upgrade of a unit is named after
     # the same unit ID, so Blender hands the later ones a ".001" suffix and a
@@ -134,6 +141,7 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
             coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
         mount_object = importedArmature(existing)
         root_object = mount_object
+        root_role = "Mount"
         if mount_object:
             mount_object.location = coordinates
             mount_object.location[2] += z_offset
@@ -152,6 +160,7 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
             if rider_object:
                 rider_object.parent = mount_object
                 rider_object.location = rider_coordinates
+                parts.append((rider_object, 'Rider %d' % n))
             n += 1
     elif unit_attachment[0] == 'engine':
         engine_info = attachment_dictionary[unit_attachment[1]]
@@ -164,6 +173,7 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
             coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
         engine_object = importedArmature(existing)
         root_object = engine_object
+        root_role = "Engine"
         if engine_object:
             engine_object.location = coordinates
             engine_object.location[2] += z_offset
@@ -183,9 +193,13 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
                 crew_object.parent = engine_object
                 crew_object.location = rider_coordinates
                 crew_object.location[2] += z_offset
+                parts.append((crew_object, 'Crew %d' % n))
             n += 1
     if result == 2:
-        item = bpy.context.scene.med2_toolkit_import_list.add()
+        group = tagGroup(root_object, parts, root_role) if (root_object and parts) else ""
+        icon = unit_attachment if unit_attachment == 'unused' else unit_attachment[0]
+        import_list = bpy.context.scene.med2_toolkit_import_list
+        item = import_list.add()
         item.name = unit_name
         item.id = unit_info['ID']
         # the real object name, which carries a .001 suffix when several
@@ -193,10 +207,21 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
         # option needs it to find the right rig
         item.object_name = root_object.name if root_object else unit_name
         item.faction = faction_id
-        if unit_attachment == 'unused':
-            item.icon = unit_attachment
-        else:
-            item.icon = unit_attachment[0]
+        item.icon = icon
+        item.group = group
+        # One entry per armature of a multi-part unit, folded under the root's
+        # disclosure arrow. They carry the same unit id and type as the root, so
+        # searching and the type filter keep a unit and its crew together.
+        for part_object, role in parts:
+            part_item = import_list.add()
+            part_item.name = role
+            part_item.id = unit_info['ID']
+            part_item.object_name = part_object.name
+            part_item.faction = faction_id
+            part_item.icon = icon
+            part_item.group = group
+            part_item.role = role
+            part_item.is_part = True
     return(width)
 
 
