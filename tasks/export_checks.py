@@ -424,10 +424,14 @@ def objectMainAttach(obj, main_mat, attach_mat):
 # Substrings that mark a material as the attachment texture by name, e.g.
 # sword_at, shield_attach, cape_attachment.
 ATTACH_NAME_KEYWORDS = ('_at', 'attach')
+MAIN_NAME_KEYWORD = '_main'
 
 def looksLikeAttach(material_name):
     lowered = material_name.lower()
     return any(keyword in lowered for keyword in ATTACH_NAME_KEYWORDS)
+
+def looksLikeMain(material_name):
+    return MAIN_NAME_KEYWORD in material_name.lower() and not looksLikeAttach(material_name)
 
 def autoAssignMaterials(context):
     """Auto-detect the main/attach materials from naming, fill in the other
@@ -448,9 +452,24 @@ def autoAssignMaterials(context):
     main_mat = resolve(export_data.material_main)
     attach_mat = resolve(export_data.material_attach)
 
+    # An attachment material sitting in the main slot is treated as unset so
+    # detection can redo it: without this the _main material was folded into
+    # the _attach one and the attach slot was left empty.
+    if main_mat is not None and looksLikeAttach(main_mat.name) and any(looksLikeMain(m.name) for m in materials):
+        if attach_mat is None:
+            attach_mat = main_mat
+            try:
+                export_data.material_attach = main_mat.name
+            except TypeError:
+                pass
+        main_mat = None
+    if main_mat is not None and main_mat is attach_mat:
+        main_mat = None
+
+    # the name says main, so it wins over anything already in the slot
     if main_mat is None:
         for material in materials:
-            if '_main' in material.name.lower():
+            if looksLikeMain(material.name):
                 main_mat = material
                 try:
                     export_data.material_main = material.name
@@ -472,17 +491,20 @@ def autoAssignMaterials(context):
                     pass
                 break
 
-    # attach identified but main isn't, and exactly one other material
-    # remains: that has to be main
-    if main_mat is None and attach_mat is not None:
-        others = [m for m in materials if m is not attach_mat]
+    # main still unknown and exactly one material is not the attachment one:
+    # that has to be main
+    if main_mat is None:
+        others = [m for m in materials if m is not attach_mat and not looksLikeAttach(m.name)]
         if len(others) == 1:
             main_mat = others[0]
             try:
                 export_data.material_main = main_mat.name
-                report.append(('INFO', "Auto-assigned main material (only one other material found): %s" % main_mat.name))
+                report.append(('INFO', "Auto-assigned main material (only one non-attachment material found): %s" % main_mat.name))
             except TypeError:
                 pass
+
+    if main_mat is None:
+        report.append(('WARNING', "Main material could not be detected from the names - pick it in Materials + Textures. Rename it with _main (and the attachment one with _attach) to have it detected."))
 
     # extra materials beyond main/attach: fold each into whichever it looks
     # like by name, then reassign every object using it
@@ -646,7 +668,7 @@ def forceTextures(context):
         return [('ERROR', "No mesh objects found under the armature (check the Visible Only toggle)")]
 
     keepers = []
-    main_mat = bpy.data.materials.get(export_data.material_main)
+    main_mat = bpy.data.materials.get(export_data.material_main) if export_data.material_main != 'none' else None
     if main_mat:
         keepers.append(main_mat)
     attach_mat = bpy.data.materials.get(export_data.material_attach) if export_data.material_attach != 'none' else None

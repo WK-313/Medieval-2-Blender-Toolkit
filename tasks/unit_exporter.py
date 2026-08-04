@@ -157,7 +157,7 @@ def texturePlan(context):
     """Resolve the main/attach materials into (image, out_name) pairs and the
     effective texture names used for conversion and the BMDB entry."""
     export_data = exportSettings(context)
-    main_mat = bpy.data.materials.get(export_data.material_main)
+    main_mat = bpy.data.materials.get(export_data.material_main) if export_data.material_main != 'none' else None
     attach_mat = bpy.data.materials.get(export_data.material_attach) if export_data.material_attach != 'none' else None
     main_diff, main_norm = materialImages(main_mat) if main_mat else (None, None)
     attach_diff, attach_norm = materialImages(attach_mat) if attach_mat else (None, None)

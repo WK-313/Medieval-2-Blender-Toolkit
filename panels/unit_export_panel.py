@@ -26,9 +26,10 @@ def exportSetMaterials(context):
 
 def materialItems(self, context):
     global _material_items
-    items = [(m.name, m.name, '') for m in exportSetMaterials(context)]
-    if not items:
-        items = [('none', 'None', 'No materials found on the armature meshes')]
+    # 'None' first so an untouched rig has no main material rather than
+    # silently adopting whichever material happens to come first
+    items = [('none', 'None', 'No main material picked yet - run Check Model for Export or choose one')]
+    items += [(m.name, m.name, '') for m in exportSetMaterials(context)]
     _material_items = items
     return _material_items
 
@@ -47,7 +48,7 @@ def genBlankNormalsToggled(self, context):
     output name untouched."""
     if not self.gen_blank_normals:
         return
-    main_mat = bpy.data.materials.get(self.material_main)
+    main_mat = bpy.data.materials.get(self.material_main) if self.material_main != 'none' else None
     attach_mat = bpy.data.materials.get(self.material_attach) if self.material_attach != 'none' else None
     main_diff, main_norm = materialImages(main_mat) if main_mat else (None, None)
     attach_diff, attach_norm = materialImages(attach_mat) if attach_mat else (None, None)
@@ -994,9 +995,11 @@ class MED_2_TOOLKIT_PT_Export_Materials(bpy.types.Panel):
 
         col = layout.column(align=True)
         col.prop(export_data, "material_main", text="Main")
-        main_mat = bpy.data.materials.get(export_data.material_main)
+        main_mat = bpy.data.materials.get(export_data.material_main) if export_data.material_main != 'none' else None
         if main_mat:
             col.prop(main_mat, "name", text="Rename", icon='MATERIAL')
+        else:
+            col.label(text="No main material - run Check Model for Export or pick one", icon='ERROR')
         col.separator()
         col.prop(export_data, "material_attach", text="Attach")
         attach_mat = bpy.data.materials.get(export_data.material_attach) if export_data.material_attach != 'none' else None
