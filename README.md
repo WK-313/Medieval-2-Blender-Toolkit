@@ -39,7 +39,7 @@ Read any mod's data folder and pull its content into Blender:
 Take a rigged model from Blender back into the game:
 - One-click **Check Model for Export**: auto-fixes naming (`.001` suffixes, `x__y` part naming), collapses duplicate materials and material slots, validates weights, texture sizes and UV layout before anything leaves Blender
 - One consistent export naming rule: `name` → `name__name`, `name1_name2` → `name1__name2`, and number-suffixed parts (`hair1`, `hair_1`) → `name__name_number`, with unresolvable `.001` clashes renumbered to `base_01`, `base_02`, ...
-- Main/attach material auto-detection (`_at`/`attach`/`attachment` names, lone-material fallback) with any extra materials folded in automatically
+- Main/attach material auto-detection: `_main` picks the main texture, `_at`/`attach`/`attachment` the attachment one, with a lone-material fallback and any extra materials folded in automatically. Neither slot is filled by guesswork — a rig whose materials cannot be told apart by name says so instead of adopting whichever material came first
 - Per-texture UV checking: main-texture objects must sit in the first UV tile, attach-texture objects in the tile to the right, with an option to auto-select offending objects in the UV editor — plus an **Attempt to Auto-Assign UV** button
 - GLB export with automatic texture conversion to the game's `.texture` format (DXT5, via bundled texconv), including non-DXT `.dds` sources (uncompressed, BC7, DX10 header) which are recompressed rather than skipped
 - Any texture that cannot be converted is reported with a reason in the completion popup instead of failing silently
@@ -57,6 +57,7 @@ Take a rigged model from Blender back into the game:
   - every file is byte-compared against the mod's copy — identical ones are not recopied, differing ones are either kept or overwritten, and a differing file shared with other models names those models before it re-skins them
   - `battle_models.modeldb` is backed up to a timestamped `.bak` **twice** before the entry is written — once next to itself in the mod, and once into the export folder beside the mesh and textures the install came from, so the copy travels with the exported unit and is not buried among the mod's own files. Either one puts the modeldb back byte for byte. It is rewritten through a temp file, so a failure cannot leave a half-written modeldb
 - GLB → `.mesh` conversion driven through IWTE task files, with progress monitoring
+- **Sample task files** ship with the addon, one per QOL skeleton (2H, Archer, Crossbow, Jav, Spear, Sword). They carry that skeleton's bone order and case, which is what IWTE writes into the `.mesh`, so the right one matters. A rig parented through **Parent to Skeleton** is given its skeleton's file automatically; the Sample Task Files section at the bottom of the Export panel switches between them, and browsing to a task file of your own still overrides everything
 - All export settings are stored per-armature, so multiple units can live in one .blend
 
 ![Unit Export — paths and model check](./images/Unit_Export1_Path%2BArmature.png)
@@ -112,7 +113,7 @@ A pose asset library ships with the addon and registers itself the first time th
 
 ### QOL (rigging & cleanup tools)
 - Weight transfer between meshes with selectable vertex mapping, followed by an automatic vertex group smoothing pass on each target mesh
-- Parent meshes to bundled game skeletons: plain parenting, rigging with sample body weights, or a full setup that also brings in equipment props
+- Parent meshes to bundled game skeletons: plain parenting, rigging with sample body weights, or a full setup that also brings in equipment props. Whichever skeleton is used is remembered on the rig, and the Unit Export panel picks up that skeleton's IWTE sample task file by itself
 - **IK control rig**: build the `IK_Infantry`, `IK_Archer` or `IK_Dwarf` controller for a selected skeleton, the same three rigs the v0.9.x toolkit generated. The controller is parented over the unit and every non-weapon bone is constrained to it, so the unit follows the IK handles — and the bundled pose library, which is written against these bones, works. **Remove Control Rig** un-parents and un-constrains cleanly. **Whole unit** (on by default) covers a mount or a siege engine in one press: a controller for every rider and crew member, the mount or engine itself skipped, and each controller parented under the mount so the riders stay on it
 - Rename tools: clean `.001` number suffixes, switch bone case (`_R/_L` ↔ `_r/_l`), apply/swap game part prefixes (`weapon0__`, `shield0__`, ...), toggle the `__opt` optional-part suffix
 - SimpleBake helpers for texture baking workflows
