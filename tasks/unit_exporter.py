@@ -8,6 +8,7 @@ from pathlib import Path
 from .export_checks import deselectAll, materialImages, activeExportArmature, exportSettings
 from ..directories import loadStoredValue
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
+from .iwte_tasks import applySkeletonTask
 
 addon_folder = Path(__file__).parent.parent
 
@@ -415,7 +416,10 @@ def exportToMeshIWTE(context):
     glb_path = clean_path(export_data.last_exported_glb)
     iwte_dir = clean_path(reader.directory_iwte)
     if not export_data.iwte_task_template:
-        # adopt the last used / Paths template so the rig remembers it
+        # a rig on one of the QOL skeletons converts with that skeleton's
+        # bundled sample; anything else adopts the last used / Paths template
+        applySkeletonTask(activeExportArmature(context))
+    if not export_data.iwte_task_template:
         export_data.iwte_task_template = defaultTaskTemplate(reader)
     template = clean_path(export_data.iwte_task_template)
 

@@ -27,6 +27,37 @@ def skeletonItems(self, context):
     _skeleton_items = items
     return _skeleton_items
 
+def skeletonNames():
+    """The skeletons the QOL panel can parent to, by folder name."""
+    return [item[0] for item in skeletonItems(None, None) if item[0] != 'none']
+
+# Written onto a rig by parentToSkeleton so the rest of the addon can tell which
+# QOL skeleton it came from even after it has been renamed.
+SKELETON_TAG = 'med2_skeleton'
+
+def skeletonOf(armature):
+    """Which QOL skeleton a rig is on: the tag parentToSkeleton wrote, else the
+    name the skeleton GLBs import under (Armature_Sword, Sword, Sword.001).
+    '' when it is not one of them."""
+    if armature is None or getattr(armature, 'type', '') != 'ARMATURE':
+        return ''
+    known = skeletonNames()
+    tagged = armature.get(SKELETON_TAG)
+    if isinstance(tagged, str):
+        for name in known:
+            if name.lower() == tagged.lower():
+                return name
+    candidates = [armature.name]
+    if armature.data is not None:
+        candidates.append(armature.data.name)
+    for candidate in candidates:
+        # Blender's .001 duplicate suffix is not part of the skeleton's name
+        stem = candidate.split('.')[0].lower()
+        for name in known:
+            if stem in (name.lower(), 'armature_' + name.lower()):
+                return name
+    return ''
+
 def skeletonUsesLowercase(armature):
     for bone in armature.data.bones:
         if '_R' in bone.name or '_L' in bone.name:
@@ -155,6 +186,13 @@ def parentToSkeleton(context, transfer_weights=False, delete_samples=True):
         for o in imported:
             bpy.data.objects.remove(o, do_unlink=True)
         return 'No armature found inside %s' % variant
+
+    # Remember which skeleton this rig came from, and hand it the matching IWTE
+    # sample task file - the bone order in the task file has to match the
+    # skeleton or the converted .mesh is wrong.
+    armature[SKELETON_TAG] = skeleton
+    from .iwte_tasks import applySkeletonTask  # imported here: iwte_tasks imports this module
+    applySkeletonTask(armature)
 
     # The GLBs can carry a stray pose; weight transfer maps between evaluated
     # meshes, so the sample body must sit at its bind pose or nothing lines up.

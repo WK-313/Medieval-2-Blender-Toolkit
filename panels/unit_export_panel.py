@@ -9,7 +9,7 @@ from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJson
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate, bmdbEntryText
 from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
-from ..tasks import bmdb_install, modeldb
+from ..tasks import bmdb_install, modeldb, iwte_tasks
 
 script_folder = Path(__file__).parent.parent
 
@@ -17,6 +17,7 @@ script_folder = Path(__file__).parent.parent
 # strings to stay referenced, otherwise they get garbage collected.
 _material_items = []
 _material_items_none = []
+_task_sample_items = []
 
 def exportSetMaterials(context):
     armature = activeExportArmature(context)
@@ -139,6 +140,30 @@ def iwteTemplateChanged(self, context):
     if self.iwte_task_template:
         storeValue('last_iwte_task_template', self.iwte_task_template)
 
+def taskSampleItems(self, context):
+    global _task_sample_items
+    items = [('auto', 'Auto (from skeleton)',
+              "Use the bundled sample task file for the skeleton this rig is parented to. "
+              "Rigs that are not on one of the QOL skeletons fall back to the last used / Paths template"),
+             ('custom', 'Custom File',
+              "Use the task file picked with the browse button next to the Task Template above")]
+    for path in iwte_tasks.sampleTaskFiles():
+        items.append((path.name, "%s sample" % iwte_tasks.sampleTaskLabel(path.name), path.name))
+    _task_sample_items = items
+    return _task_sample_items
+
+def taskSampleChanged(self, context):
+    """Point the rig's task template at the picked sample. 'Custom File' leaves
+    the browsed path alone; 'Auto' re-resolves it from the rig's skeleton."""
+    choice = self.iwte_task_sample
+    if choice == 'custom':
+        return
+    if choice == 'auto':
+        path, _skeleton = iwte_tasks.autoSampleTask(self.id_data)
+    else:
+        path = str(iwte_tasks.sampleTasksFolder()/choice)
+    self.iwte_task_template = path if path and os.path.isfile(path) else ""
+
 def prefillCopyFields(export_data):
     """Fill a rig's untouched copy-from fields with the last used selection."""
     global _prefilling
@@ -210,6 +235,7 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     copy_unit: EnumProperty(name = "Unit", description = "Unit to copy the sprite and footer from", items = copyUnitItems, update = copyFieldChanged)
     copy_initialized: BoolProperty(default = False, options = {'HIDDEN'})
     iwte_task_template: StringProperty(name = "IWTE Task Template", description = "Task template used for this rig's GLB to .mesh conversion. Blank = the last used / Paths template, adopted on the first conversion. Use the browse button to pick it, starting in the IWTE tasks folder", update = iwteTemplateChanged)
+    iwte_task_sample: EnumProperty(name = "Sample Task File", description = "Which of the addon's bundled sample task files this rig converts with. Auto picks the one for the skeleton the rig is parented to", items = taskSampleItems, update = taskSampleChanged)
     install_on_conflict: EnumProperty(
         name = "If the entry exists",
         description = "What to do when battle_models.modeldb already has an entry with this name and different content",
@@ -260,6 +286,12 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
         # materials into main/attach
         export_data = exportSettings(context)
         results.extend(autoAssignMaterials(context))
+
+        # rigs parented to a QOL skeleton before this addon version have no task
+        # file yet, so pick theirs up here too
+        skeleton = iwte_tasks.applySkeletonTask(activeExportArmature(context))
+        if skeleton:
+            results.append(('INFO', "Rigged to the %s skeleton: using its IWTE sample task file" % skeleton))
 
         # UV tile placement, right after the main/attach textures are known
         uv_results, wrong_uv = checkUVSpace(context)
@@ -914,24 +946,44 @@ class MED_2_TOOLKIT_OT_Browse_Task_Template(bpy.types.Operator):
     def invoke(self, context, event):
         export_data = exportSettings(context)
         current = export_data.iwte_task_template.strip('"').strip("'") if export_data.iwte_task_template else ""
-        if current:
-            # already picked once: reopen where that file lives
+        if current and not iwte_tasks.isSampleTask(current):
+            # already picked one of their own: reopen where that file lives
             self.filepath = current
         else:
             reader = context.scene.med2_toolkit_reader
             iwte_root = bpy.path.abspath(reader.directory_iwte) if reader.directory_iwte else ""
-            if iwte_root:
-                tasks_dir = os.path.join(iwte_root, "iwte_tasks")
-                if os.path.isdir(tasks_dir):
-                    # trailing separator makes Blender open inside the folder
-                    self.filepath = os.path.join(tasks_dir, "")
+            tasks_dir = os.path.join(iwte_root, "iwte_tasks") if iwte_root else ""
+            if not os.path.isdir(tasks_dir):
+                # no IWTE tasks folder: start in the bundled samples instead
+                tasks_dir = str(iwte_tasks.sampleTasksFolder())
+            if os.path.isdir(tasks_dir):
+                # trailing separator makes Blender open inside the folder
+                self.filepath = os.path.join(tasks_dir, "")
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
         export_data = exportSettings(context)
         if export_data is not None and self.filepath:
+            # keep the sample dropdown in step: browsing to one of the bundled
+            # files pins that sample, anything else is a custom file
+            if iwte_tasks.isSampleTask(self.filepath):
+                export_data.iwte_task_sample = os.path.basename(self.filepath)
+            else:
+                export_data.iwte_task_sample = 'custom'
             export_data.iwte_task_template = self.filepath
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Open_Sample_Tasks(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.open_sample_tasks"
+    bl_label = "Open Sample Task Folder"
+    bl_description = ("Open the addon's iwte_tasks folder, holding the sample task file for each "
+                      "skeleton. Copy one out to edit it - the folder is replaced on addon update")
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def execute(self, context):
+        open_folder(str(iwte_tasks.sampleTasksFolder()))
         return {'FINISHED'}
 
 
@@ -1189,6 +1241,39 @@ def drawInstallSection(layout, context, export_data):
         box.label(text="Last probe: %s" % export_data.install_summary, icon='INFO')
 
 
+def drawSampleTasks(layout, context, export_data):
+    """The bundled sample task files: one per QOL skeleton, auto-picked for a
+    rig that was parented to one of them."""
+    box = layout.box()
+    box.label(text="Sample Task Files", icon='PRESET')
+    samples = iwte_tasks.sampleTaskFiles()
+    if not samples:
+        box.label(text="No sample task files in the addon's iwte_tasks folder", icon='ERROR')
+        return
+    box.prop(export_data, "iwte_task_sample", text="Sample")
+
+    choice = export_data.iwte_task_sample
+    template = export_data.iwte_task_template
+    if choice == 'auto':
+        auto_path, skeleton = iwte_tasks.autoSampleTask(activeExportArmature(context))
+        if template and not iwte_tasks.isSampleTask(template):
+            box.label(text="Own task file in use - pick a sample to replace it", icon='FILE_TEXT')
+        elif auto_path:
+            box.label(text="Rigged to %s: %s" % (skeleton, os.path.basename(auto_path)), icon='ARMATURE_DATA')
+        elif skeleton:
+            box.label(text="No sample task file for the %s skeleton" % skeleton, icon='ERROR')
+        else:
+            box.label(text="Not on a QOL skeleton - pick a sample or browse", icon='INFO')
+    elif choice == 'custom':
+        if template:
+            box.label(text="Using %s" % os.path.basename(template.strip('"').strip("'")), icon='FILE_TEXT')
+        else:
+            box.label(text="Browse to a task file above", icon='INFO')
+    else:
+        box.label(text="Using the %s sample" % iwte_tasks.sampleTaskLabel(choice), icon='FILE_TEXT')
+    box.operator("medieval2toolkit.open_sample_tasks", icon='FILE_FOLDER')
+
+
 class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
     bl_idname = "MED_2_TOOLKIT_PT_Export_Run"
     bl_parent_id = "MED_2_TOOLKIT_PT_Main_Panel"
@@ -1228,6 +1313,7 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
             if fallback:
                 file_name = os.path.basename(fallback.strip('"').strip("'"))
                 col.label(text="If blank, uses recent task file: %s" % file_name, icon='FILE_TEXT')
+        drawSampleTasks(layout, context, export_data)
         if _iwte_job is not None:
             elapsed = time.time() - _iwte_job['start']
             verb = "Converting" if _iwte_job['process'].returncode is None else "Waiting for"
@@ -1258,6 +1344,7 @@ classes = [
     MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh,
     MED_2_TOOLKIT_OT_Open_Export_Folder,
     MED_2_TOOLKIT_OT_Browse_Task_Template,
+    MED_2_TOOLKIT_OT_Open_Sample_Tasks,
     ]
 
 def register():

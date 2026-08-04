@@ -1,0 +1,44 @@
+<task_id>                                           extract_to_mesh                                                      # to read an extract file (eg .glb, .dae, .ms3d) and generate *.cas files
+<extract_file_full_path_in>                         "to_extract/model.glb"                                               # extract file to read in (eg .glb, .dae, .ms3d). Set by the toolkit on export.
+
+<directory_out>                                     "/from_extract"                                                      # Set by the toolkit on export.
+
+<mesh_file_name_out>                                "model.mesh"                                                         # *.mesh file to be created. Set by the toolkit on export.
+<mesh_type>                                         unit                                                                 # unit, siege, banner, skydome
+<mesh_double_texture>                               yes                                                                  # battle mesh models mapped to two textures
+
+<overlap_frames>                                    no                                                                   # overlap frames selection used to create the extract (not used on import)
+<cas_file_types_out_list>                           body                                                                 # types of cas files to be created (in sequence)
+
+<cas_file_name_out_default_list>                                                                                         # cas default files
+"mtw2_fast_longbowman_string.cas"                                                                                       
+
+<skeleton_scale>                                    1.0000                                                               # scaling used to reset skeleton *.cas to scale 1.0
+<cas_file_name_out_anim_split_list>                                                                                      # cas anim files start and end frames (main mesh or rider with weapons, then mount)
+"mtw2_bowman_attack_missile_ready_modified.cas"         1   91                                                          
+
+#<end_frame>                                        91                                                                   # Last animated frame (use to see full animation in blender)
+<cas_skeleton_name_list>                                                                                                 # start bone names used to retain original ordering
+bone_pelvis                                                                                                             
+bone_rthigh                                                                                                             
+bone_rlowerleg                                                                                                          
+bone_rfoot                                                                                                              
+bone_abs                                                                                                                
+bone_torso                                                                                                              
+bone_head                                                                                                               
+bone_jaw                                                                                                                
+bone_eyebrow                                                                                                            
+bone_rclavical                                                                                                          
+bone_rupperarm                                                                                                          
+bone_relbow                                                                                                             
+bone_rhand                                                                                                              
+bone_lclavical                                                                                                          
+bone_lupperarm                                                                                                          
+bone_lelbow                                                                                                             
+bone_lhand                                                                                                              
+bone_lthigh                                                                                                             
+bone_llowerleg                                                                                                          
+bone_lfoot                                                                                                              
+bone_bowoffset                                                                                                          
+bone_bowstring                                                                                                          
+bone_sling                                                                                                              
