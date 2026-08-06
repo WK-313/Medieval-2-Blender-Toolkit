@@ -13,7 +13,7 @@ bl_info = {
 import bpy
 from .directories import ensureDataFiles
 ensureDataFiles()
-from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel, unit_export_panel, unit_info_panel, qol_panel, pose_panel
+from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel, unit_export_panel, unit_info_panel, qol_panel, pose_panel, strat_panel
 from .panels import multi_panel
 from bpy.props import EnumProperty, PointerProperty
 
@@ -24,6 +24,7 @@ class MED_2_TOOLKIT_Mode_Selection(bpy.types.PropertyGroup):
     mode_selection: EnumProperty(
         items = [("unit_import", "Import", "Read a mod's units and models in - EDU and BMDB"),
                  ("unit_export", "Export", "Take a finished unit back out to the mod"),
+                 ("strat", "Strat", "Turn a battle unit into a campaign map model and convert it to .cas"),
                  ("settlements", "Settlement", "Settlement pieces"),
                  ("qol", "QOL", "Rigging, renaming, weights, poses and the other everyday tools"),
                  ("unit_info", "Unit Cards", "Build the card scene and render unit cards")],
@@ -58,6 +59,7 @@ def register():
     unit_info_panel.register()
     qol_panel.register()
     pose_panel.register()
+    strat_panel.register()
     # last: it imports the panel classes the modules above define
     multi_panel.register()
 
@@ -74,6 +76,7 @@ def unregister():
     unit_info_panel.unregister()
     qol_panel.unregister()
     pose_panel.unregister()
+    strat_panel.unregister()
 
 if __name__ == "__main__":
     register()

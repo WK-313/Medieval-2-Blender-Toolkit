@@ -33,6 +33,7 @@ from .qol_panel import (MED_2_TOOLKIT_PT_Armature, MED_2_TOOLKIT_PT_Interface,
                         MED_2_TOOLKIT_PT_QOL_Advanced, MED_2_TOOLKIT_PT_Rename_Tools,
                         MED_2_TOOLKIT_PT_Weight_Transfer)
 from .settlements_panel import MED_2_TOOLKIT_PT_Settlements_Panel
+from .strat_panel import MED_2_TOOLKIT_PT_Strat_Build, MED_2_TOOLKIT_PT_Strat_Export
 from .unit_export_panel import (MED_2_TOOLKIT_PT_Export_BMDB, MED_2_TOOLKIT_PT_Export_Materials,
                                 MED_2_TOOLKIT_PT_Export_Run, MED_2_TOOLKIT_PT_Unit_Export)
 from .unit_info_panel import (MED_2_TOOLKIT_PT_Card_Render, MED_2_TOOLKIT_PT_Card_Scene,
@@ -46,6 +47,7 @@ from .unit_info_panel import (MED_2_TOOLKIT_PT_Card_Render, MED_2_TOOLKIT_PT_Car
 SECTIONS = [
     ('unit_import', "Import",     'EVENT_I'),
     ('unit_export', "Export",     'EVENT_E'),
+    ('strat',       "Strat",      'EVENT_T'),
     ('settlements', "Settlement", 'EVENT_S'),
     ('qol',         "QOL",        'EVENT_Q'),
     ('unit_info',   "Unit Cards", 'EVENT_U'),
@@ -62,6 +64,8 @@ EMBEDDED_PANELS = [
     MED_2_TOOLKIT_PT_Export_Materials,
     MED_2_TOOLKIT_PT_Export_BMDB,
     MED_2_TOOLKIT_PT_Export_Run,
+    MED_2_TOOLKIT_PT_Strat_Build,
+    MED_2_TOOLKIT_PT_Strat_Export,
     MED_2_TOOLKIT_PT_Settlements_Panel,
     MED_2_TOOLKIT_PT_Weight_Transfer,
     MED_2_TOOLKIT_PT_Armature,

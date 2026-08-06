@@ -2,7 +2,7 @@
 
 This Blender addon is a complete asset pipeline for Medieval II: Total War modding. It imports the game's units, models and settlements straight into Blender, and exports finished models back into the game's formats — including textures, normal maps and a ready-made `battle_models.modeldb` entry — with IWTE handling the final `.mesh` conversion.
 
-The addon is organised into five **workmodes**, selected from the strip of buttons at the top left of the toolkit panel (N-panel → Medieval 2 Toolkit). Each workmode shows only the panels relevant to that stage of the pipeline. If you preferred the older look, **QOL → Interface → Panel layout** switches back to the classic grid of workmode buttons with ordinary Blender sub-panels underneath; the choice is kept in your Blender preferences, so it holds for every file.
+The addon is organised into six **workmodes**, selected from the strip of buttons at the top left of the toolkit panel (N-panel → Medieval 2 Toolkit). Each workmode shows only the panels relevant to that stage of the pipeline. If you preferred the older look, **QOL → Interface → Panel layout** switches back to the classic grid of workmode buttons with ordinary Blender sub-panels underneath; the choice is kept in your Blender preferences, so it holds for every file.
 
 > **Blender 5.0 or newer is recommended** — that is what the addon is developed and tested against.
 
@@ -95,6 +95,24 @@ Render a whole faction's unit cards and unit info images without leaving Blender
 
 ![Unit Info — cameras, lighting, rigs and the render panel](./images/Unit_Card3.png)
 
+### Strat (campaign map models)
+Turn a finished battle unit into a campaign map model, in one or two clicks instead of the nine-step manual process.
+
+The strat skeleton is the battle skeleton with the clavicals, jaw, eyebrow and weapon groups taken away and three cloak bones plus a particle node added, and a strat model carries **one mesh, one texture and one bone per vertex**. Getting there by hand means combining the two textures in another addon, stripping bones and re-rigging whatever was weighted to them, joining everything, limiting weights, and scaling both UV islands into the combined texture. **Create Strat Model** does all of it:
+
+- **Combines the main and attachment textures** into a single `.tga` and remaps the UVs to match. No Material Combiner needed — the atlas is built to a known layout, so the UV transform is exact rather than a guess. *Square* puts the two textures along the top of a square texture (the layout the community guide uses); *Half Height* wastes nothing at the same resolution per texture
+- **Folds orphaned weights into their nearest surviving bone** — a clavicle's weights onto the torso, a jaw's onto the head, a bowstring's or weapon group's onto the hand — instead of dropping them. Dropped weights are what causes IWTE's *"Some vertices have no bone weights and have been assigned to the models first bone eg pelvis"* warning and limbs trailing off the model in game
+- **Welds anything still loose** to its nearest weighted neighbour, so the model converts without that warning at all
+- Matches the rig's own bone name case, uppercase or lowercase, automatically
+- Joins every mesh, re-rigs onto the strat skeleton, and gives each vertex exactly one bone at weight 1.0
+- Builds on a **copy in its own collection** by default, so the battle unit you imported is still there afterwards
+
+Then **Convert to .cas (IWTE)** writes the `extract_to_cas` task file and runs the conversion with a progress bar — the same job as IWTE's *Model Files → Cas Models → dae/ms3d to cas_mesh*, without leaving Blender. **Build + Convert** does the whole thing in one press.
+
+Afterwards, **Check .cas Texture** reads the texture name back out of the converted `.cas` and compares it with the texture that was written — a mismatch there is what crashes the campaign map on load, and it is otherwise found by opening the binary in a text editor. **Copy to Mod** puts the `.cas` and its `.tga` into the mod. The `descr_character.txt` entry is still yours to write.
+
+> Start from a unit imported through **Unit Import**, with its main and attachment materials set (running **Check Model for Export** in the Export workmode is the easy way — the Strat workmode reads the same two materials).
+
 ### Settlements
 - Import settlement `.world` models through IWTE
 - Browse and sort the mod's settlement packs
@@ -162,3 +180,4 @@ The toolkit uses **IWTE** for the final `.mesh` and `.world` conversions. Downlo
     - Discord: `projyeet`
 - `Medik`
 - `Wilddog` and `Makanyane` — for IWTE
+- The *Quick Tutorial For Strat Models w/ Blender and IWTE* guide and its `createStratModel.py`, which the Strat workmode is built from

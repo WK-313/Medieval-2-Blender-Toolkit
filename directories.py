@@ -13,6 +13,7 @@ DEFAULT_DIRECTORIES = {
     "directory_settlements": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
     "directory_unit_export": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
     "directory_unit_cards": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
+    "directory_strat": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
     "directory_iwte_task_template": ""
 }
 
@@ -74,6 +75,7 @@ def saveFolderPaths():
         "directory_settlements": bpy.context.scene.med2_toolkit_reader.directory_settlements,
         "directory_unit_export": bpy.context.scene.med2_toolkit_reader.directory_unit_export,
         "directory_unit_cards": bpy.context.scene.med2_toolkit_reader.directory_unit_cards,
+        "directory_strat": bpy.context.scene.med2_toolkit_reader.directory_strat,
         "directory_iwte_task_template": bpy.context.scene.med2_toolkit_reader.directory_iwte_task_template
     })
     with open(script_folder/('text/directories.json'), 'w') as directories_output:
