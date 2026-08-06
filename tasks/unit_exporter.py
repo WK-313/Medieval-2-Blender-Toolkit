@@ -2,12 +2,12 @@ import os
 import shutil
 import struct
 import subprocess
-import time
 import bpy
 from pathlib import Path
 from .export_checks import deselectAll, materialImages, activeExportArmature, exportSettings
 from ..directories import loadStoredValue
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
+from .iwte_run import findIWTEExe, startIWTETask
 from .iwte_tasks import applySkeletonTask
 
 addon_folder = Path(__file__).parent.parent
@@ -432,11 +432,7 @@ def exportToMeshIWTE(context):
     if not os.path.isfile(template):
         return "Invalid IWTE task template"
 
-    iwte_exe = next(
-        (os.path.join(iwte_dir, f) for f in os.listdir(iwte_dir)
-         if f.lower().startswith("iwte") and f.lower().endswith(".exe")),
-        None
-    )
+    iwte_exe = findIWTEExe(iwte_dir)
 
     if not iwte_exe:
         return "IWTE executable not found"
@@ -467,21 +463,4 @@ def exportToMeshIWTE(context):
         f.writelines(new_lines)
 
     mesh_path = os.path.join(unit_folder, unit_name + ".mesh")
-    try:
-        previous_mtime = os.path.getmtime(mesh_path)
-    except OSError:
-        previous_mtime = None
-
-    process = subprocess.Popen(
-        [iwte_exe, "--uh", "--st", task_path],
-        cwd=iwte_dir,
-        creationflags=0x08000000
-    )
-
-    return {
-        'process': process,
-        'mesh_path': mesh_path,
-        'mesh_name': unit_name + ".mesh",
-        'previous_mtime': previous_mtime,
-        'start': time.time(),
-    }
+    return startIWTETask(iwte_exe, iwte_dir, task_path, mesh_path)

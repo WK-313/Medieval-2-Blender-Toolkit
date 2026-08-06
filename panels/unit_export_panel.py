@@ -9,6 +9,8 @@ from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJson
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate, bmdbEntryText
 from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
+from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, finishIWTEJob, iwteOutputReady,
+                              iwteProgress, redrawView3D, waitForIWTEJob)
 from ..tasks import bmdb_install, modeldb, iwte_tasks
 
 script_folder = Path(__file__).parent.parent
@@ -791,51 +793,9 @@ class MED_2_TOOLKIT_OT_Export_Unit_GLB(bpy.types.Operator):
 
 
 # The one running IWTE conversion, shared with the Export panel so it can draw
-# a progress bar. IWTE gives no percentage feedback, so the bar eases toward
-# full over time and jumps to done when the mesh lands on disk. The .mesh can
-# appear well after the IWTE process exits, so the watcher keeps polling the
-# folder until the file shows up (or updates) or the wait times out.
+# a progress bar. The watching itself lives in tasks/iwte_run.py, which the
+# strat export uses as well.
 _iwte_job = None
-
-# How long to keep watching the folder after the IWTE process has exited.
-IWTE_MESH_TIMEOUT = 300.0
-# The mesh counts as written once it has stopped growing for this long.
-IWTE_QUIET_SECONDS = 1.0
-
-def iwteProgress(elapsed):
-    return 1.0 - math.exp(-elapsed / 10.0)
-
-def redrawView3D(context):
-    for window in context.window_manager.windows:
-        for area in window.screen.areas:
-            if area.type == 'VIEW_3D':
-                area.tag_redraw()
-
-def iwteMeshReady(job):
-    """True once the .mesh exists, is newer than any pre-existing file, and
-    has stopped changing (same size as last check and quiet for a moment)."""
-    try:
-        stat = os.stat(job['mesh_path'])
-    except OSError:
-        return False
-    if job['previous_mtime'] is not None and stat.st_mtime <= job['previous_mtime']:
-        return False
-    if stat.st_size <= 0 or time.time() - stat.st_mtime < IWTE_QUIET_SECONDS:
-        return False
-    if stat.st_size != job.get('last_size'):
-        job['last_size'] = stat.st_size
-        return False
-    return True
-
-def finishIWTEJob(job, success):
-    """Compose the (level, message) report for a finished conversion."""
-    elapsed = time.time() - job['start']
-    if success:
-        size = os.stat(job['mesh_path']).st_size
-        return ('INFO', "IWTE conversion finished: %s (%d KB) in %.1fs" % (job['mesh_name'], max(1, size // 1024), elapsed))
-    returncode = job['process'].returncode
-    verb = "updated" if job['previous_mtime'] is not None else "created"
-    return ('ERROR', "IWTE exited (code %s) but %s was not %s within %ds - check the task file and IWTE window" % (returncode, job['mesh_name'], verb, int(IWTE_MESH_TIMEOUT)))
 
 
 class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
@@ -861,13 +821,7 @@ class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
         if bpy.app.background or context.window is None:
             # Headless: no event loop for timers, wait for IWTE and then poll
             # the folder for the mesh the same way the modal timer does.
-            result['process'].wait()
-            deadline = time.time() + IWTE_MESH_TIMEOUT
-            success = iwteMeshReady(result)
-            while not success and time.time() < deadline:
-                time.sleep(0.5)
-                success = iwteMeshReady(result)
-            return self.finish(context, success)
+            return self.finish(context, waitForIWTEJob(result))
         wm = context.window_manager
         wm.progress_begin(0, 100)
         self._timer = wm.event_timer_add(0.2, window=context.window)
@@ -882,14 +836,14 @@ class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
         wm = context.window_manager
         wm.progress_update(int(iwteProgress(time.time() - job['start']) * 100))
         redrawView3D(context)
-        if iwteMeshReady(job):
+        if iwteOutputReady(job):
             return self.stop(context, True)
         if job['process'].poll() is None:
             return {'RUNNING_MODAL'}
         # process gone: keep watching the folder, IWTE writes the mesh late
         if job.get('exit_time') is None:
             job['exit_time'] = time.time()
-        if time.time() - job['exit_time'] < IWTE_MESH_TIMEOUT:
+        if time.time() - job['exit_time'] < IWTE_OUTPUT_TIMEOUT:
             return {'RUNNING_MODAL'}
         return self.stop(context, False)
 
@@ -1318,7 +1272,7 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
             elapsed = time.time() - _iwte_job['start']
             verb = "Converting" if _iwte_job['process'].returncode is None else "Waiting for"
             layout.progress(factor=iwteProgress(elapsed), type='BAR',
-                            text="%s %s... %ds" % (verb, _iwte_job['mesh_name'], int(elapsed)))
+                            text="%s %s... %ds" % (verb, _iwte_job['output_name'], int(elapsed)))
         else:
             layout.operator("medieval2toolkit.export_unit_iwte_mesh", icon='MOD_ARMATURE')
         if context.mode != 'OBJECT':
