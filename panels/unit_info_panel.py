@@ -10,11 +10,12 @@ from ..directories import readJsonCached, saveFolderPaths, saveSettings
 from ..tasks import card_renderer
 from ..tasks.control_rig import CONTROL_RIG_TYPES, controlRigOf
 from ..tasks.card_renderer import (CAMERA_ORTHO_SCALE, CARD_LIGHT_TYPES, CARD_TYPE_ITEMS, FULL_SIZE_FOLDER,
-                                   HD_FOLDER, HD_PRESETS, LINE_ART_THICKNESS, MERC_FOLDER,
+                                   HD_FOLDER, HD_PRESETS, LINE_ART_THICKNESS, MERC_FOLDER_NAMES,
                                    SUN_STRENGTH, applyRenderSettings, buildRenderQueue, cardCameras, cardFolders,
                                    cardOutputParts, cardResolution, cardSuns, createCardCameras, defaultCardFolders,
                                    defaultLightStrength, deleteCardCameras, hdOrthoScale, hdResolution,
-                                   lineArtObjects, openRendersWindow, renderCard, renderedPaths,
+                                   lineArtObjects, mercFolder, normalizeMercFolders, openRendersWindow,
+                                   renderCard, renderedPaths,
                                    setCardFolders, setupCardScene, shuffleImportedVariations,
                                    unitCardIndex)
 from ..tasks.importer import hideVariations, postImport, unitChecker, unitImporter
@@ -224,9 +225,9 @@ class MED_2_TOOLKIT_Card_Folder(bpy.types.PropertyGroup):
     enabled: BoolProperty(name = "Write here", description = "Write this unit's card into this faction's folder", default = False)
 
 
-def factionFolderList():
+def factionFolderList(subfolder):
     """[(display name, codename)] for the folder checklist: every faction of the
-    mod that was last read, plus the mercenary folder."""
+    mod that was last read, plus the ONE mercenary folder this card type uses."""
     factions = readJsonCached(script_folder/('text/available_factions.json'))
     entries = []
     # alphabetical, like every other faction list; Mercs is appended afterwards
@@ -235,8 +236,11 @@ def factionFolderList():
         if 'spawning' in display_name.lower() or 'spawning' in faction_id.lower():
             continue
         entries.append((display_name, faction_id))
-    if not any(faction_id == MERC_FOLDER for _display_name, faction_id in entries):
-        entries.append(("Mercs", MERC_FOLDER))
+    # both merc spellings are checked, not just this card type's: the checklist has
+    # room for exactly one mercenary entry, and offering merc AND mercs is what made
+    # it possible to tick the folder the game does not read
+    if not any(faction_id in MERC_FOLDER_NAMES for _display_name, faction_id in entries):
+        entries.append(("Mercs", mercFolder(subfolder)))
     return entries
 
 
@@ -250,15 +254,42 @@ def currentCardFolders(context, targets):
     custom armature, every owning faction for an imported EDU unit.
     """
     settings = context.scene.med2_toolkit_cards
-    _subfolder, _pattern, dir_key = cardOutputParts(settings)
+    subfolder, _pattern, dir_key = cardOutputParts(settings)
     index = unitCardIndex()
     chosen = set()
     for unit_id, faction, model in targets:
-        folders = cardFolders(model) or defaultCardFolders(index.get(unit_id), faction, dir_key)
+        folders = (normalizeMercFolders(cardFolders(model), subfolder)
+                   or defaultCardFolders(index.get(unit_id), faction, dir_key, subfolder))
         chosen.add(tuple(folders))
     if len(chosen) != 1:
         return []
     return list(chosen.pop())
+
+
+def fillFolderChecklist(context, targets):
+    """Rebuild the Card Folders checklist for `targets`. Scratch space on the scene,
+    so the dialog can draw it as toggle operators; the dialog's own execute() is
+    what writes the result onto the rigs."""
+    subfolder, _pattern, _dir_key = cardOutputParts(context.scene.med2_toolkit_cards)
+    collection = context.scene.med2_toolkit_card_folders
+    collection.clear()
+    # already respelled for this card type by currentCardFolders, so a rig pinned
+    # under the other one ticks the single Mercs entry instead of adding a second
+    current = set(currentCardFolders(context, targets))
+    for display_name, faction_id in factionFolderList(subfolder):
+        item = collection.add()
+        item.name = display_name
+        item.faction_id = faction_id
+        item.enabled = faction_id in current
+    # folders the units are pinned to that this mod has no faction for - a
+    # hand-typed card_pic_dir - would otherwise be dropped silently
+    for folder in sorted(current):
+        if not any(item.faction_id == folder for item in collection):
+            item = collection.add()
+            item.name = folder
+            item.faction_id = folder
+            item.enabled = True
+    return collection
 
 
 # Render job in flight, shared with the panel so it can draw the progress bar.
@@ -461,7 +492,7 @@ class MED_2_TOOLKIT_OT_Set_Card_Folders(bpy.types.Operator):
             elif self.mode == 'NONE':
                 item.enabled = False
             else:
-                item.enabled = item.faction_id == MERC_FOLDER
+                item.enabled = item.faction_id in MERC_FOLDER_NAMES
         return {'FINISHED'}
 
 
@@ -499,33 +530,21 @@ class MED_2_TOOLKIT_OT_Edit_Card_Folders(bpy.types.Operator):
         if not targets:
             self.report({'ERROR'}, "Tick some units in the imported models list, or select an armature")
             return {'CANCELLED'}
-        collection = context.scene.med2_toolkit_card_folders
-        collection.clear()
-        current = set(currentCardFolders(context, targets))
-        for display_name, faction_id in factionFolderList():
-            item = collection.add()
-            item.name = display_name
-            item.faction_id = faction_id
-            item.enabled = faction_id in current
-        # folders the units are pinned to that this mod has no faction for - a
-        # hand-typed card_pic_dir - would otherwise be dropped silently
-        for folder in sorted(current):
-            if not any(item.faction_id == folder for item in collection):
-                item = collection.add()
-                item.name = folder
-                item.faction_id = folder
-                item.enabled = True
+        fillFolderChecklist(context, targets)
         return context.window_manager.invoke_props_dialog(self, width=460)
 
     def draw(self, context):
         layout = self.layout
         targets, source = cardTargets(context)
         folders = context.scene.med2_toolkit_card_folders
+        subfolder, _pattern, _dir_key = cardOutputParts(context.scene.med2_toolkit_cards)
         layout.label(text="Card folders for %d %s" % (len(targets), source), icon='FILE_FOLDER')
         row = layout.row(align=True)
         row.operator("medieval2toolkit.set_card_folders", text="All").mode = 'ALL'
         row.operator("medieval2toolkit.set_card_folders", text="None").mode = 'NONE'
-        row.operator("medieval2toolkit.set_card_folders", text="Use Merc Folder", icon='SOLO_ON').mode = 'MERC'
+        # the folder is named in the label, since it differs between the card types
+        row.operator("medieval2toolkit.set_card_folders", text="Use %s Folder" % mercFolder(subfolder).capitalize(),
+                     icon='SOLO_ON').mode = 'MERC'
         if not folders:
             layout.label(text="No factions found - run Read Mod Data first", icon='ERROR')
             return

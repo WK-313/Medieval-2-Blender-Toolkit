@@ -195,8 +195,36 @@ TARGET_TAG = "med2_card_target"
 # own card_pic_dir / info_pic_dir decides, as before.
 FOLDER_TAG = "med2_card_folders"
 # Mercenaries have no faction entry in descr_sm_factions, but they do have a card
-# folder - the same codename the BMDB uses.
-MERC_FOLDER = "merc"
+# folder - and the game spells it DIFFERENTLY for the two card types: the unit card
+# goes in ui\units\mercs, the info card in ui\unit_info\merc. Both spellings ship
+# with vanilla and mods follow them (DaC files 908 of its 910 units that way), so
+# one constant cannot serve both - it put every unit card in units\merc, a folder
+# the game never reads.
+MERC_FOLDERS = {'units': "mercs", 'unit_info': "merc"}
+# Either spelling means "the mercenary folder" when one is read back off a rig.
+MERC_FOLDER_NAMES = frozenset(MERC_FOLDERS.values())
+
+
+def mercFolder(subfolder):
+    """The mercenary folder name under a ui subfolder ('units' / 'unit_info')."""
+    return MERC_FOLDERS.get(subfolder, "mercs")
+
+
+def normalizeMercFolders(folders, subfolder):
+    """Pinned folders with the mercenary one respelled for the card type in hand.
+
+    A pin is ONE list of folder names shared by both card types, so a unit pinned
+    to 'mercs' has to write its info card into 'merc' all the same - and a pin
+    written before this rule existed can hold either spelling. Every other folder
+    is left exactly as it was pinned; only the mercenary one has two names.
+    """
+    merc = mercFolder(subfolder)
+    normalized = []
+    for name in folders:
+        name = merc if name in MERC_FOLDER_NAMES else name
+        if name not in normalized:
+            normalized.append(name)
+    return normalized
 
 
 def cardFolders(target):
@@ -232,22 +260,23 @@ def unitOwnershipFolders(unit):
     return folders
 
 
-def defaultCardFolders(unit, faction, dir_key):
+def defaultCardFolders(unit, faction, dir_key, subfolder):
     """Where a unit's card goes when nothing has been pinned by hand.
 
     Three cases, in order:
 
     - a rig that is not an EDU unit at all - a custom armature someone built
       themselves - has no ownership to read, and a hand-made unit is nearly
-      always a mercenary, so it defaults to the mercenary folder rather than to
-      whichever faction happened to be selected in the panel.
+      always a mercenary, so it defaults to the mercenary folder of the card type
+      being rendered rather than to whichever faction happened to be selected in
+      the panel.
     - a unit whose EDU names its own card_pic_dir / info_pic_dir keeps that: it
       is an explicit instruction and the game obeys it over ownership.
     - anything else goes to every faction that owns it, so a unit several
       factions can field gets its card in each of their folders.
     """
     if unit is None:
-        return [MERC_FOLDER]
+        return [mercFolder(subfolder)]
     card_directory = unit.get(dir_key, 'faction')
     if card_directory not in ('', 'faction'):
         return [card_directory]
@@ -1018,11 +1047,13 @@ def buildRenderQueue(context):
             results.append(('WARNING', "Could not tell which rig '%s' belongs to - there is nothing to "
                                        "isolate, so its card may come out empty" % unit_id))
         unit = index.get(unit_id)
-        directories = cardFolders(target)
+        # the pin is respelled for this card type: mercenaries are units\mercs but
+        # unit_info\merc, and a pin made under the other card type holds the other name
+        directories = normalizeMercFolders(cardFolders(target), subfolder)
         if directories:
             results.append(('INFO', "'%s' is pinned to %s" % (unit_id, ', '.join(directories))))
         else:
-            directories = defaultCardFolders(unit, faction, dir_key)
+            directories = defaultCardFolders(unit, faction, dir_key, subfolder)
             if unit is None:
                 # a camera made for a rig that is not an EDU unit - a custom
                 # armature, or the mod data was re-read since
