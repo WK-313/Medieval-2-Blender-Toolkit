@@ -3,6 +3,7 @@ import os
 import re
 from pathlib import Path
 from . import recurlayercollection
+from .importer import principledNode
 from .task_writer import settlementTaskAppend, settlementTaskRun, unitTaskAppend
 script_folder = Path(__file__).parent.parent
 
@@ -55,7 +56,7 @@ def settlementImporter(settlement_folder, name, world):
         new_link = material.node_tree.links.new
 
         #Defining nodes
-        shader_node = material.node_tree.nodes["Principled BSDF"]
+        shader_node = principledNode(material)
         texture_image = nodes.new("ShaderNodeTexImage")
         texture_image.location = (-506, 444)
         texture_image.image = bpy.data.images.load(texture_path+texture_name)

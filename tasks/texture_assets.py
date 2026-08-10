@@ -11,6 +11,8 @@ import os
 import bpy
 from pathlib import Path
 
+from .importer import principledNode
+
 # Matched against the file name without its extension, so the same suffixes work
 # for the game's .dds and for the .png/.tga people keep working copies in.
 NORMAL_SUFFIXES = ('_normal', '_norm', '_nrm', '_bump')
@@ -60,7 +62,7 @@ def buildMaterial(texture_folder, texture, normal_texture):
     nodes = material.node_tree.nodes
     new_link = material.node_tree.links.new
 
-    shader_node = nodes["Principled BSDF"]
+    shader_node = principledNode(material)
     shader_node.inputs['Metallic'].default_value = 0
     shader_node.inputs['Roughness'].default_value = 0.5
 

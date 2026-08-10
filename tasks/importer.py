@@ -331,6 +331,36 @@ def findFirstObject(current_material):
                 return(model)
     return("None")
 
+def principledNode(material):
+    """The material's Principled BSDF, looked up by node type, never by name.
+
+    A Blender whose interface language is not English and which has
+    Preferences > Interface > Translation > New Data switched on names every
+    newly created node in that language, so the shader the glTF importer built
+    comes back as "Принципиальный BSDF" (or whatever the language is) and
+    nodes["Principled BSDF"] raises a KeyError - the model imports, the
+    material setup dies before a single texture is loaded. Node types are not
+    translated. A material that genuinely arrived without a principled shader
+    gets one built and wired to the output here, so the caller always has a
+    shader to link its textures into."""
+    node_tree = material.node_tree
+    for node in node_tree.nodes:
+        if node.type == 'BSDF_PRINCIPLED':
+            return node
+    shader_node = node_tree.nodes.new("ShaderNodeBsdfPrincipled")
+    shader_node.location = (10, 300)
+    output_node = None
+    for node in node_tree.nodes:
+        if node.type == 'OUTPUT_MATERIAL':
+            output_node = node
+            break
+    if output_node is None:
+        output_node = node_tree.nodes.new("ShaderNodeOutputMaterial")
+        output_node.location = (300, 300)
+    #Sockets by index for the same reason: BSDF out -> Surface in
+    node_tree.links.new(output_node.inputs[0], shader_node.outputs[0])
+    return shader_node
+
 def materialWorkflow(texture_path, texture, normal_texture, material):
     #Setup material mode and keywords
     material.use_nodes = True
@@ -340,7 +370,7 @@ def materialWorkflow(texture_path, texture, normal_texture, material):
     new_link = material.node_tree.links.new
 
     #Defining nodes
-    shader_node = material.node_tree.nodes["Principled BSDF"]
+    shader_node = principledNode(material)
     shader_node.inputs['Metallic'].default_value = 0
     shader_node.inputs['Roughness'].default_value = 0.5
     

@@ -38,6 +38,7 @@ from mathutils import Matrix, Vector, kdtree
 
 from .armature_tools import caseConvertedName, mergeGroupInto, skeletonUsesLowercase
 from .export_checks import activeExportArmature, deselectAll, exportMeshes, materialImages
+from .importer import principledNode
 from .iwte_run import findIWTEExe, startIWTETask
 from .strat_data import NON_DEFORM_BONES, STRAT_BONES
 
@@ -460,13 +461,12 @@ def assignAtlasMaterial(obj, image, name):
     texture = nodes.new('ShaderNodeTexImage')
     texture.image = image
     texture.location = (-320, 280)
-    principled = nodes.get('Principled BSDF')
-    if principled is not None:
-        material.node_tree.links.new(texture.outputs['Color'], principled.inputs['Base Color'])
-        if 'Alpha' in principled.inputs:
-            material.node_tree.links.new(texture.outputs['Alpha'], principled.inputs['Alpha'])
-        if 'Roughness' in principled.inputs:
-            principled.inputs['Roughness'].default_value = 1.0
+    principled = principledNode(material)
+    material.node_tree.links.new(texture.outputs['Color'], principled.inputs['Base Color'])
+    if 'Alpha' in principled.inputs:
+        material.node_tree.links.new(texture.outputs['Alpha'], principled.inputs['Alpha'])
+    if 'Roughness' in principled.inputs:
+        principled.inputs['Roughness'].default_value = 1.0
     obj.data.materials.append(material)
     return material
 
