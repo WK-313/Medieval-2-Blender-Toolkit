@@ -2,6 +2,7 @@ import os
 import json
 import time
 import bpy
+from bpy.app.handlers import persistent
 from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProperty,
                        IntProperty, PointerProperty, StringProperty)
 from pathlib import Path
@@ -9,13 +10,13 @@ from pathlib import Path
 from ..directories import readJsonCached, saveFolderPaths, saveSettings
 from ..tasks import card_renderer
 from ..tasks.control_rig import CONTROL_RIG_TYPES, controlRigOf
-from ..tasks.card_renderer import (CAMERA_ORTHO_SCALE, CARD_LIGHT_TYPES, CARD_TYPE_ITEMS, FULL_SIZE_FOLDER,
+from ..tasks.card_renderer import (CAMERA_ORTHO_SCALE, CAMERA_TAG, CARD_LIGHT_TYPES, CARD_TYPE_ITEMS, FULL_SIZE_FOLDER,
                                    HD_FOLDER, HD_PRESETS, LINE_ART_THICKNESS, MERC_FOLDER_NAMES,
                                    SUN_STRENGTH, applyRenderSettings, buildRenderQueue, cardCameras, cardFolders,
                                    cardOutputParts, cardResolution, cardSuns, createCardCameras, defaultCardFolders,
                                    defaultLightStrength, deleteCardCameras, hdOrthoScale, hdResolution,
                                    lineArtObjects, mercFolder, normalizeMercFolders, openRendersWindow,
-                                   renderCard, renderedPaths,
+                                   renderCard, renderedPaths, selectionCamera,
                                    setCardFolders, setupCardScene, shuffleImportedVariations,
                                    unitCardIndex)
 from ..tasks.importer import hideVariations, postImport, unitChecker, unitImporter
@@ -149,7 +150,82 @@ def cardTargets(context):
     return targets, "selected armatures"
 
 
+#   ------------------------------  #
+#   Camera follows the selection     #
+#   ------------------------------  #
+
+# What the last pass looked at: the active object, the scene camera and whether
+# that camera is visible. A depsgraph update that leaves all three alone - which
+# is nearly all of them - costs one tuple comparison and stops there, and a pass
+# that found nothing to do is not retried until something actually moves. Names,
+# not object references, because the objects can go.
+_camera_state = {'seen': None}
+_camera_queued = False
+
+
+def applyQueuedCamera():
+    """Set the scene camera the deferred pass decided on.
+
+    Deferred because writing scene data from inside depsgraph_update_post
+    retriggers the handler - the same reason the imported models list syncs on a
+    timer rather than in the handler itself.
+    """
+    global _camera_queued
+    _camera_queued = False
+    context = bpy.context
+    scene = context.scene
+    settings = getattr(scene, "med2_toolkit_cards", None)
+    if settings is None or not settings.auto_card_camera:
+        return None
+    camera = selectionCamera(context)
+    if camera is None or camera == scene.camera:
+        return None
+    scene.camera = camera
+    return None
+
+
+@persistent
+def watchCardSelection(scene, depsgraph=None):
+    """Follow the selection with the scene camera.
+
+    Every card camera is the same pose slid along X onto its own unit, so
+    looking through one unit's camera leaves every other unit off to the side -
+    which is what made a multi-unit scene look like the camera was offset. The
+    fix is that selecting a unit switches to that unit's camera.
+    """
+    global _camera_queued
+    if _camera_queued or scene is None:
+        return
+    settings = getattr(scene, "med2_toolkit_cards", None)
+    if settings is None or not settings.auto_card_camera:
+        return
+    view_layer = bpy.context.view_layer
+    active = view_layer.objects.active if view_layer is not None else None
+    current = scene.camera
+    # the visibility flag is what makes hiding the camera being looked through
+    # count as a change: neither name moves when a camera is switched off
+    key = (active.name if active is not None else None,
+           current.name if current is not None else None,
+           current is not None and card_renderer.cameraIsVisible(current))
+    if key == _camera_state['seen']:
+        return
+    _camera_state['seen'] = key
+    _camera_queued = True
+    bpy.app.timers.register(applyQueuedCamera, first_interval=0)
+
+
+@persistent
+def cardCameraAfterLoad(_file_path):
+    _camera_state['seen'] = None
+
+
 class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
+    # same idiom as the import and settlements panels: the persisted toggles come
+    # from menu_settings.json, read with .get() because ensureDataFiles only
+    # writes that file when it is MISSING, so every existing install has one
+    # without the newer keys
+    with open(script_folder/('text/menu_settings.json'), 'r') as settings_input:
+            bool_settings = json.load(settings_input)
     card_type: EnumProperty(name = "Card type", description = "Which image the renderer writes, and where", items = CARD_TYPE_ITEMS)
     custom_size: BoolProperty(name = "Custom size", description = "Use a hand-picked card resolution instead of the card type's standard size", default = False)
     card_width: IntProperty(name = "Width", description = "Card width in pixels", default = 48, min = 1, soft_max = 512)
@@ -203,6 +279,13 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                 default = SUN_STRENGTH, min = 0.0, soft_max = 1000.0, update = cardLightChanged)
     add_control_rig: BoolProperty(name = "Add control rig", description = ("Also build each unit's IK control rig, so it can be posed before the card is rendered. "
                                                                            "Units that already have one are left alone"), default = False)
+    auto_card_camera: BoolProperty(name = "Camera follows selection",
+                                   description = ("Make a unit's own card camera the scene camera as soon as that unit is selected - the "
+                                                  "armature, its control rig, one of its meshes or any part of a mounted unit. Every card "
+                                                  "camera sits in front of its own unit, so without this the viewport stays on one unit's "
+                                                  "camera and every other unit looks off to the side. Cameras hidden by hand are never "
+                                                  "switched to, and a hidden one that is already the scene camera is replaced by a visible one"),
+                                   default = bool_settings.get('auto_card_camera', True))
     control_rig_type: EnumProperty(name = "Control rig", description = "Which IK layout to build for the units", items = CONTROL_RIG_TYPES, default = 'infantry')
     lift_sunken: BoolProperty(name = "Lift sunken units", description = ("Set a unit standing in the ground down on it - raised by exactly how far its "
                                                                           "lowest point is below z=0 - so the card camera frames it like every other "
@@ -391,12 +474,17 @@ class MED_2_TOOLKIT_OT_Look_Through_Card_Camera(bpy.types.Operator):
         return len(cardCameras(context.scene)) > 0
 
     def execute(self, context):
-        targets, _source = cardTargets(context)
-        camera = None
-        if targets:
-            camera = card_renderer.cardCamera(targets[0][0])
+        # what is SELECTED decides, not the first ticked entry: a scene holding a
+        # faction's worth of units was always framed on whichever unit came first,
+        # leaving every other one off to the side of the frame
+        camera = selectionCamera(context)
         if camera is None:
-            camera = cardCameras(context.scene)[0]
+            targets, _source = cardTargets(context)
+            if targets:
+                camera = card_renderer.cardCamera(targets[0][0])
+        if camera is None:
+            visible = [obj for obj in cardCameras(context.scene) if card_renderer.cameraIsVisible(obj)]
+            camera = (visible or cardCameras(context.scene))[0]
         context.scene.camera = camera
         for area in context.window.screen.areas:
             if area.type == 'VIEW_3D':
@@ -822,6 +910,7 @@ class MED_2_TOOLKIT_PT_Card_Scene(bpy.types.Panel):
         if existing:
             col = box.column(align=True)
             col.label(text="%d card camera(s) in the scene" % existing, icon='OUTLINER_OB_CAMERA')
+            col.prop(settings, "auto_card_camera", text="Camera Follows Selection", toggle=1)
             col.operator("medieval2toolkit.look_through_card_camera", icon='VIEW_CAMERA')
             col.operator("medieval2toolkit.delete_card_cameras", icon='TRASH')
 
@@ -924,8 +1013,16 @@ def register():
     # scratch space for the Card Folders dialog: the answer is written onto the
     # rigs, so nothing here needs to survive the dialog
     bpy.types.Scene.med2_toolkit_card_folders = CollectionProperty(type=MED_2_TOOLKIT_Card_Folder)
+    if watchCardSelection not in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.append(watchCardSelection)
+    if cardCameraAfterLoad not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(cardCameraAfterLoad)
 
 def unregister():
+    for handler, chain in ((watchCardSelection, bpy.app.handlers.depsgraph_update_post),
+                           (cardCameraAfterLoad, bpy.app.handlers.load_post)):
+        if handler in chain:
+            chain.remove(handler)
     for item in classes:
         bpy.utils.unregister_class(item)
     del bpy.types.Scene.med2_toolkit_cards

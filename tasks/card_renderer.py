@@ -30,7 +30,7 @@ from pathlib import Path
 from mathutils import Vector
 
 from ..directories import readJsonCached
-from .control_rig import controlRigOf, isControlRig
+from .control_rig import controlRigOf, controlledRigs, isControlRig
 from .recurlayercollection import linkBeside, recurLayerCollection
 from .unit_groups import createGroupControlRigs, groupParts, groupRoot
 
@@ -401,6 +401,110 @@ def cameraTarget(scene, camera):
     # holding several units from handing back the wrong one
     aimed_at = camera.matrix_world.translation.x - CAMERA_LOCATION[0]
     return min(deform, key=lambda obj: abs(obj.matrix_world.translation.x - aimed_at))
+
+
+def cameraIsVisible(camera):
+    """Whether a card camera is one the user can still see.
+
+    A camera switched off with the monitor icon or hidden in the view layer has
+    been put away deliberately - which is exactly what isolating one unit out of
+    fifty does - so it is not something to switch the viewport to. `visible_get`
+    needs the object to be in the view layer, hence the guard.
+    """
+    if camera.hide_viewport:
+        return False
+    try:
+        return camera.visible_get()
+    except RuntimeError:
+        return True
+
+
+def cameraUnitRoot(obj):
+    """The rig a card camera would have been made for, from anything belonging to
+    the unit: the deform rig itself, a mesh under it, the control rig driving it,
+    or one part of a mounted unit.
+
+    Cameras are per UNIT, so a rider resolves to its mount and a crew member to
+    its engine - the same rule cardTargets uses when the cameras are built.
+    """
+    if obj is None:
+        return None
+    rig = obj if obj.type == 'ARMATURE' else None
+    parent = obj
+    while rig is None and parent.parent is not None:
+        parent = parent.parent
+        if parent.type == 'ARMATURE':
+            rig = parent
+    if rig is None:
+        return None
+    if isControlRig(rig):
+        # the controller drives the rig the meshes hang off; the camera was made
+        # for that one, never for the controller
+        driven = controlledRigs(rig)
+        rig = driven[0] if driven else rig
+    return groupRoot(rig) or rig
+
+
+def cameraForObject(scene, obj):
+    """The card camera framing whatever `obj` belongs to, or None."""
+    rig = cameraUnitRoot(obj)
+    if rig is None:
+        return None
+    cameras = cardCameras(scene)
+    for camera in cameras:
+        if camera.get(TARGET_TAG, "") == rig.name:
+            return camera
+    # cameras from before TARGET_TAG existed know only their unit id, so fall
+    # back to the same collection-and-X walk the renderer uses
+    for camera in cameras:
+        if cameraTarget(scene, camera) == rig:
+            return camera
+    return None
+
+
+def selectionCamera(context):
+    """The card camera the viewport should be looking through for the current
+    selection, or None to leave the scene camera alone.
+
+    The ACTIVE object decides, with the rest of the selection behind it, so
+    clicking a unit frames that unit instead of whichever camera happens to be
+    first in the file - which is what made every unit past the first look
+    off-centre. Selecting a card camera itself means "look through this one".
+
+    Hidden cameras are never chosen: a working view is never taken away because
+    the unit's own camera happens to be switched off. A hidden camera the scene
+    is ALREADY looking through is the one exception - there is nothing to lose
+    then, so the first visible card camera takes over.
+    """
+    scene = context.scene
+    cameras = cardCameras(scene)
+    if not cameras:
+        return None
+    ordered = []
+    if context.object is not None:
+        ordered.append(context.object)
+    ordered.extend(obj for obj in context.selected_objects if obj != context.object)
+
+    for obj in ordered:
+        if obj.type == 'CAMERA':
+            if CAMERA_TAG in obj and cameraIsVisible(obj):
+                # selecting a card camera is asking to look through that one
+                return obj
+            break
+        camera = cameraForObject(scene, obj)
+        if camera is None:
+            continue
+        if cameraIsVisible(camera):
+            return camera
+        break
+
+    # nothing selected offers a visible camera. Step in only when what the scene
+    # is looking through has been hidden too, which is the case that leaves the
+    # viewport framed on something the user cannot see
+    current = scene.camera
+    if current is not None and CAMERA_TAG in current and not cameraIsVisible(current):
+        return next((camera for camera in cameras if cameraIsVisible(camera)), None)
+    return None
 
 
 def createCardCamera(context, unit_id, faction, target, add_sun=True, light_strength=SUN_STRENGTH,
