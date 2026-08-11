@@ -32,7 +32,8 @@ from .pose_panel import MED_2_TOOLKIT_PT_Poses, MED_2_TOOLKIT_PT_Texture_Assets
 from .qol_panel import (MED_2_TOOLKIT_PT_Armature, MED_2_TOOLKIT_PT_Interface,
                         MED_2_TOOLKIT_PT_QOL_Advanced, MED_2_TOOLKIT_PT_Rename_Tools,
                         MED_2_TOOLKIT_PT_Weight_Transfer)
-from .settlements_panel import MED_2_TOOLKIT_PT_Settlements_Panel
+from .settlements_panel import (MED_2_TOOLKIT_PT_Settlement_Buildings,
+                                MED_2_TOOLKIT_PT_Settlements_Panel)
 from .strat_panel import MED_2_TOOLKIT_PT_Strat_Build, MED_2_TOOLKIT_PT_Strat_Export
 from .unit_export_panel import (MED_2_TOOLKIT_PT_Export_BMDB, MED_2_TOOLKIT_PT_Export_Materials,
                                 MED_2_TOOLKIT_PT_Export_Run, MED_2_TOOLKIT_PT_Unit_Export)
@@ -67,6 +68,7 @@ EMBEDDED_PANELS = [
     MED_2_TOOLKIT_PT_Strat_Build,
     MED_2_TOOLKIT_PT_Strat_Export,
     MED_2_TOOLKIT_PT_Settlements_Panel,
+    MED_2_TOOLKIT_PT_Settlement_Buildings,
     MED_2_TOOLKIT_PT_Weight_Transfer,
     MED_2_TOOLKIT_PT_Armature,
     MED_2_TOOLKIT_PT_Rename_Tools,

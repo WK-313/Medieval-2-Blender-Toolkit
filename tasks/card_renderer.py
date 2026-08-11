@@ -44,12 +44,16 @@ COMPOSITOR_NAME = "Medieval 2 Unit Cards"
 COMPOSITOR_VERSION_TAG = "med2_compositor_version"
 COMPOSITOR_VERSION = 3
 # 480x660 - the game's own card UI chrome (experience chevrons, the numbers, the
-# weapon and shield icons) over a 10x card frame, so the framing can be checked
-# against what the interface leaves visible.
+# weapon and shield icons), so the framing can be checked against what the
+# interface leaves visible. It is a 10x 48x66 image over a 48x64 card, i.e. two
+# card pixels taller than the card, and those two rows belong BELOW the card -
+# see guideOffset.
 CAMERA_GUIDE = "Camera Preview.png"
-# The guide that shipped before the 48x66 correction. 480x640, so it is the wrong
-# shape now, but it is what an older install still has on disk.
+GUIDE_SIZE = (48, 66)
+# The guide that shipped before the camera preview. 480x640, the card's own
+# shape, and it is what an older install still has on disk.
 LEGACY_CAMERA_GUIDE = "unit card guide.png"
+LEGACY_GUIDE_SIZE = (48, 64)
 # The rescale Transform, by name, so the render settings can retune it without
 # rebuilding the whole graph and the full-size and HD passes can switch it off.
 RESCALE_NODE = "Card Rescale"
@@ -77,13 +81,13 @@ MAX_SUNK_SHARE = 0.75
 
 # card type -> (width, height, ui subfolder, file name pattern, EDU directory key)
 CARD_TYPES = {
-    'unit_card':       (48, 66, 'units', '#%s.tga', 'Unit Card'),
+    'unit_card':       (48, 64, 'units', '#%s.tga', 'Unit Card'),
     'unit_card_large': (68, 90, 'units', '#%s.tga', 'Unit Card'),
     'info_card':       (180, 230, 'unit_info', '%s_info.tga', 'Info Card'),
 }
 
 CARD_TYPE_ITEMS = [
-    ('unit_card', "Unit Card (48x66)", "Battle UI unit card, written to units/<dir>/#<unit>.tga"),
+    ('unit_card', "Unit Card (48x64)", "Battle UI unit card, written to units/<dir>/#<unit>.tga"),
     ('unit_card_large', "Unit Card (68x90)", "Larger unit card some mods use, written to units/<dir>/#<unit>.tga"),
     ('info_card', "Info Card (180x230)", "Unit info panel image, written to unit_info/<dir>/<unit>_info.tga"),
 ]
@@ -104,15 +108,15 @@ def cardResolution(settings):
     return CARD_TYPES[settings.card_type][:2]
 
 
-# The HD pass is a whole multiple of the 48x66 unit card rather than a 16:9
+# The HD pass is a whole multiple of the 48x64 unit card rather than a 16:9
 # screen size, so it frames exactly what the card frames - see hdOrthoScale, which
-# on a 48x66 card then leaves the camera alone entirely.
-HD_BASE = (48, 66)
+# on a 48x64 card then leaves the camera alone entirely.
+HD_BASE = (48, 64)
 HD_PRESETS = [
-    ('10', "10x", "480 x 660"),
-    ('20', "20x", "960 x 1320"),
-    ('30', "30x", "1440 x 1980"),
-    ('40', "40x", "1920 x 2640"),
+    ('10', "10x", "480 x 640"),
+    ('20', "20x", "960 x 1280"),
+    ('30', "30x", "1440 x 1920"),
+    ('40', "40x", "1920 x 2560"),
 ]
 HD_DEFAULT_MULTIPLE = 20
 
@@ -125,7 +129,7 @@ def hdMultiple(settings):
 
 
 def hdResolution(settings):
-    """Pixel size of the HD pass: 48x66 times the chosen multiple."""
+    """Pixel size of the HD pass: 48x64 times the chosen multiple."""
     multiple = hdMultiple(settings)
     return HD_BASE[0]*multiple, HD_BASE[1]*multiple
 
@@ -165,20 +169,65 @@ def cardOutputParts(settings):
 #   -----------------  #
 
 def guideImage():
-    """The 480x660 framing overlay shown through the camera. Optional - the setup
-    still works without it, the user just loses the on-screen guide.
+    """(image, its nominal card size) for the framing overlay shown through the
+    camera, or (None, None). Optional - the setup still works without it, the
+    user just loses the on-screen guide.
 
-    The pre-48x66 guide in cards/ is the fallback, so an install that has not
-    picked up the new asset still gets an overlay rather than none at all.
+    The older guide in cards/ is the fallback, so an install that has not picked
+    up the camera preview asset still gets an overlay rather than none at all.
     """
-    for folder, name in ((ASSET_FOLDER, CAMERA_GUIDE), (CARD_FOLDER, LEGACY_CAMERA_GUIDE)):
+    for folder, name, size in ((ASSET_FOLDER, CAMERA_GUIDE, GUIDE_SIZE),
+                               (CARD_FOLDER, LEGACY_CAMERA_GUIDE, LEGACY_GUIDE_SIZE)):
         image = bpy.data.images.get(name)
         if image is not None:
-            return image
+            return image, size
         guide_path = folder/name
         if guide_path.exists():
-            return bpy.data.images.load(str(guide_path))
-    return None
+            return bpy.data.images.load(str(guide_path)), size
+    return None, None
+
+
+def guideOffset(guide_size, card_size):
+    """How far down the guide has to slide, as a fraction of the camera frame.
+
+    The camera preview is 48x66 and the unit card is 48x64, so the guide is two
+    card pixels taller than what is rendered. 'CROP' matches their widths and
+    leaves the overshoot split evenly above and below, which puts the game's
+    chrome one pixel low; the card is the TOP of the guide and the spare two
+    rows hang off the bottom. So the guide is nudged down by half the overshoot,
+    which is what closes that gap.
+
+    Everything is derived from the two sizes rather than hardcoded, so a guide
+    the same shape as its card (the legacy one, or a custom 48x66 card) comes
+    out at zero and nothing moves.
+    """
+    guide_width, guide_height = guide_size
+    card_width, card_height = card_size
+    if not all((guide_width, guide_height, card_width, card_height)):
+        return 0.0
+    # 'CROP' scales the guide up until it covers the frame on both axes
+    cover = max(card_width/float(guide_width), card_height/float(guide_height))
+    overshoot = guide_height*cover - card_height
+    # in camera view an offset of 1.0 is a whole frame, so half the overshoot in
+    # card pixels is (overshoot/2)/card_height of one
+    return -(overshoot/2.0)/card_height
+
+
+def applyCameraGuide(camera_data, card_size):
+    """Put the framing overlay on a card camera, aligned to the card frame."""
+    guide, guide_size = guideImage()
+    if guide is None:
+        return False
+    background = camera_data.background_images[0] if camera_data.background_images \
+        else camera_data.background_images.new()
+    background.image = guide
+    background.display_depth = 'FRONT'
+    background.alpha = 1
+    # not 'STRETCH' (the default): that squashes a 48x66 guide onto a 48x64 card
+    # and the chrome no longer lines up with anything
+    background.frame_method = 'CROP'
+    background.offset = (0.0, guideOffset(guide_size, card_size))
+    return True
 
 
 # Marker properties: a card camera and its sun carry the unit they belong to, so
@@ -386,16 +435,10 @@ def createCardCamera(context, unit_id, faction, target, add_sun=True, light_stre
     )
     camera.data.type = 'ORTHO'
     camera.data.ortho_scale = ortho_scale
-    guide = guideImage()
-    if guide is not None:
-        # assigned on a refresh too, not just on a new camera: one built before
-        # the 48x66 correction is still showing the 480x640 guide, which is the
-        # wrong shape for the card it now renders
-        background = camera.data.background_images[0] if camera.data.background_images \
-            else camera.data.background_images.new()
-        background.image = guide
-        background.display_depth = 'FRONT'
-        background.alpha = 1
+    # applied on a refresh too, not just on a new camera: one built under an
+    # earlier card size is still carrying that size's guide alignment, and a
+    # Refresh is how the user is expected to repair it
+    applyCameraGuide(camera.data, cardResolution(context.scene.med2_toolkit_cards))
     camera.data.show_background_images = True
 
     sun = next((child for child in camera.children if child.type == 'LIGHT' and SUN_TAG in child), None)
@@ -573,7 +616,7 @@ def lineArtRadius(thickness, ortho_scale, card_size):
       so the width comes back out as `radius`. There is no 0.5 to apply.
     - `ortho_scale` frames the LONGER side of the render, so a card pixel is
       ortho_scale/max(width, height) world units - not ortho_scale/width. On a
-      48x66 card the old divisor was out by 66/48.
+      48x64 card the old divisor was out by 64/48.
     """
     if card_size <= 0:
         return LINE_ART_THICKNESS
@@ -1581,7 +1624,7 @@ def copyCard(source_path, paths):
 def saveHDRender(context, camera, hd_path, width, height, ortho_scale):
     """Render the same camera again at HD size and save it as a PNG.
 
-    A second pass rather than a scale-up of the card render: the card is 48x66
+    A second pass rather than a scale-up of the card render: the card is 48x64
     and no amount of resampling puts detail back. The camera's ortho scale is
     widened for the pass and put back afterwards, for the HD sizes that frame a
     different shape than the card does - see hdOrthoScale. The compositor's
@@ -1682,7 +1725,7 @@ def renderedPaths(entry):
 def fitImageToArea(area):
     """Zoom an image editor so the card fills it.
 
-    A 48x66 card opens at 1:1 - a postage stamp in the middle of a whole window.
+    A 48x64 card opens at 1:1 - a postage stamp in the middle of a whole window.
     `image.view_all(fit_view=True)` is the View > Frame All item, and it needs a
     WINDOW region of that area overridden in, not just the area. It is run off a
     timer because a freshly retyped (or brand new) area has no usable region size
