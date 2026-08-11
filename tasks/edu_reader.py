@@ -44,6 +44,7 @@ def eduReader(mod_folder):
     except FileNotFoundError as error:
         return('No export_units.txt found in the specified directory.\n%s' % error)
 
+    unit_type = ''
     unit_id = ''
     unit_attachment = 'unused'
     unit_officers = []
@@ -53,13 +54,22 @@ def eduReader(mod_folder):
     unit_info_dir = 'faction'
     unit_card_dir = 'faction'
     attachments = ['mount', 'engine']
-    unit_data = {'ID': unit_id, 'Model': unit_models, 'Officers': unit_officers, 'Formation': unit_formation, 'Attachment': unit_attachment, 'Owners': unit_ownership, 'Info Card': unit_info_dir, 'Unit Card': unit_card_dir}
+
+    # The EDU `type` is the one thing that is unique per unit - the `dictionary`
+    # key is not (two units may share one) and neither is the name it looks up
+    # in export_units.txt - so it is kept and used to tell units apart below.
+    def unitEntry():
+        return {'Type': unit_type, 'ID': unit_id, 'Model': unit_models, 'Officers': unit_officers, 'Formation': unit_formation, 'Attachment': unit_attachment, 'Owners': unit_ownership, 'Info Card': unit_info_dir, 'Unit Card': unit_card_dir}
+
     temp_database = []
     for line in edu_cleaned:
         identifier = line[0]
         if identifier == 'type':
-            unit_data = {'ID': unit_id, 'Model': unit_models, 'Officers': unit_officers, 'Formation': unit_formation, 'Attachment': unit_attachment, 'Owners': unit_ownership, 'Info Card': unit_info_dir, 'Unit Card': unit_card_dir}
-            temp_database.append(unit_data)
+            # nothing has been read yet before the first type line, so there is
+            # no unit to close off - the old code banked an empty one here
+            if unit_type:
+                temp_database.append(unitEntry())
+            unit_type = ' '.join(line[1:])
             unit_id = ''
             unit_attachment = 'unused'
             unit_officers = []
@@ -86,16 +96,52 @@ def eduReader(mod_folder):
             unit_info_dir = line[1]
         elif identifier == 'card_pic_dir':
             unit_card_dir = line[1]
-    unit_data = {'ID': unit_id, 'Model': unit_models, 'Officers': unit_officers, 'Formation': unit_formation, 'Attachment': unit_attachment, 'Owners': unit_ownership, 'Info Card': unit_info_dir, 'Unit Card': unit_card_dir}
-    temp_database.append(unit_data)
+    if unit_type:
+        temp_database.append(unitEntry())
+
+    # {dictionary key: display name} from export_units.txt, built once instead
+    # of rescanning the file per unit. A key that appears twice keeps the last
+    # spelling, which is what the old per-unit scan did - it never broke out of
+    # the loop on a match.
+    eu_names = {}
+    for name in eu_lines:
+        key = name.split('}')[0].lstrip('{')
+        if not key:
+            continue
+        unit_name = ' '.join(x.title().strip() for x in name.split('}')[1:])
+        eu_names[key] = unicodedata.normalize('NFKD', unit_name).encode('ascii', 'ignore').decode('ascii')
+
+    # Two EDU units can share one export_units.txt name: a dismounted version
+    # reusing the mounted unit's text ("Knights of the Blazing Sun" for both
+    # `knights_blazing_sun` and `knights_blazing_sun_foot`), or DaC's five
+    # catapults all reading "Catapult". Keying the dictionary on that name alone
+    # made the later unit overwrite the earlier one, so only the last of them
+    # could ever be picked in any dropdown - 19 of DaC's 931 units were
+    # unreachable. Every unit sharing a name is labelled with its EDU type,
+    # which is unique, and the units export_units.txt has nothing for are listed
+    # under their type rather than dropped.
+    shared_names = {}
+    for unit in temp_database:
+        shared_names.setdefault(eu_names.get(unit['ID'], ''), []).append(unit)
 
     unit_database = {}
     for unit in temp_database:
-        for name in eu_lines:
-            if ('{%s' % unit['ID']) in name.lower().split('}'):
-                unit_name = ' '.join(x.title().strip() for x in name.split('}')[1:])
-                normalized_unit_name = unicodedata.normalize('NFKD', unit_name).encode('ascii', 'ignore')
-                unit_database[normalized_unit_name.decode('ascii')] = unit
+        display = eu_names.get(unit['ID'], '')
+        if not display:
+            label = unit['Type'].title()
+        elif len(shared_names[display]) > 1:
+            label = '%s (%s)' % (display, unit['Type'])
+        else:
+            label = display
+        if not label:
+            continue
+        # a name two units still agree on (the same type twice, which a valid
+        # EDU cannot have) must not lose one of them either
+        base, suffix = label, 2
+        while label in unit_database:
+            label = '%s %d' % (base, suffix)
+            suffix += 1
+        unit_database[label] = unit
 
     try:
         m_lines = readModLines(os.path.join(mod_folder, 'descr_mount.txt'), 'utf-8')

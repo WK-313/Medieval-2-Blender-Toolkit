@@ -16,8 +16,9 @@ from ..directories import saveFolderPaths
 from ..tasks.export_checks import activeExportArmature
 from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, finishIWTEJob, iwteOutputReady,
                               iwteProgress, redrawView3D, waitForIWTEJob)
-from ..tasks.strat_model import (activeStratArmature, buildStratModel, checkCASTexture,
-                                 exportStratCAS, exportStratGLB, installStratModel)
+from ..tasks.strat_model import (STRAT_TRIANGLE_LIMIT, activeStratArmature, buildStratModel,
+                                 checkCASTexture, exportStratCAS, exportStratGLB,
+                                 installStratModel, modelTriangles, triangleLevel)
 from ..tasks.unit_exporter import open_folder, selectedModFolder
 from .unit_export_panel import showResultsPopup
 
@@ -143,11 +144,15 @@ class MED_2_TOOLKIT_OT_Strat_Build(bpy.types.Operator):
         if armature is None:
             self.report({'ERROR'}, report[0][1] if report else "Could not build the strat model")
             return {'CANCELLED'}
-        warnings = [message for level, message in report if level == 'WARNING']
-        if warnings:
-            self.report({'WARNING'}, "Strat model built, but: " + "; ".join(warnings))
-        else:
-            self.report({'INFO'}, "Strat model built")
+        # the model is built either way - an over-budget triangle count is
+        # reported in red rather than refused, so the status line carries the
+        # worst level the report holds without cancelling anything
+        for level in ('ERROR', 'WARNING'):
+            found = [message for entry_level, message in report if entry_level == level]
+            if found:
+                self.report({level}, "Strat model built, but: " + "; ".join(found))
+                return {'FINISHED'}
+        self.report({'INFO'}, "Strat model built")
         return {'FINISHED'}
 
 
@@ -379,6 +384,24 @@ class MED_2_TOOLKIT_PT_Strat_Build(bpy.types.Panel):
             meshes = [obj for obj in armature.children_recursive
                       if obj.type == 'MESH' and (not settings.visible_only or obj.visible_get())]
             layout.label(text="%s - %d mesh(es)" % (armature.name, len(meshes)), icon='ARMATURE_DATA')
+            # the count the build will report, shown before it is pressed -
+            # untangling a built model is more work than ticking Visible Only.
+            # alert paints the row red, and the yellow warning triangle is the
+            # ERROR icon, so the two levels read the same as the build's popup
+            triangles = modelTriangles(meshes)
+            level = triangleLevel(triangles)
+            row = layout.row()
+            if level == 'ERROR':
+                row.alert = True
+                row.label(text="%s triangles - over %s, the campaign map will crash"
+                               % ("{:,}".format(triangles), "{:,}".format(STRAT_TRIANGLE_LIMIT)),
+                          icon='CANCEL')
+            elif level == 'WARNING':
+                row.label(text="%s triangles - close to the %s limit"
+                               % ("{:,}".format(triangles), "{:,}".format(STRAT_TRIANGLE_LIMIT)),
+                          icon='ERROR')
+            else:
+                row.label(text="%s triangles" % "{:,}".format(triangles), icon='MESH_DATA')
 
         col = layout.column(align=True)
         row = col.row(align=True)

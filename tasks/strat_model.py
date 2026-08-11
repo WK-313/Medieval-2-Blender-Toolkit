@@ -49,9 +49,51 @@ JOINED_UV = 'joined_uv'
 
 STRAT_TAG = 'med2_strat_model'
 
+# The campaign map crashes on load on a strat model past 10,000 triangles, so
+# this is the game's own ceiling rather than a style guide. Nothing here refuses
+# to build or export on it - an over-budget model is still the modder's to
+# decimate - but the build says so in red and the panel does too, and the 7,000
+# mark is called out in yellow while there is still room to do something about
+# it.
+STRAT_TRIANGLE_LIMIT = 10000
+STRAT_TRIANGLE_CAUTION = 7000
+
 
 def cleanPath(path):
     return os.path.normpath(path.strip('"').strip("'")) if path else ''
+
+
+def triangleCount(obj):
+    """Triangles the mesh exports as: a quad is two, an n-gon is n - 2, which is
+    how the GLB - and so the .cas IWTE writes from it - counts them.
+
+    foreach_get rather than a walk over polygons because the panel asks for this
+    on every redraw, and a battle unit is tens of thousands of faces.
+    """
+    mesh = obj.data
+    faces = len(mesh.polygons)
+    if not faces:
+        return 0
+    loop_totals = np.empty(faces, dtype=np.int32)
+    mesh.polygons.foreach_get('loop_total', loop_totals)
+    return int(loop_totals.sum()) - 2 * faces
+
+
+def modelTriangles(meshes):
+    """Triangles the strat model will have. The join never merges geometry, so
+    the sum over the source meshes is what comes out of it."""
+    return sum(triangleCount(obj) for obj in meshes)
+
+
+def triangleLevel(triangles):
+    """How bad a triangle count is: 'ERROR' past the game's limit, 'WARNING'
+    approaching it, 'INFO' below. The one place the two thresholds are read, so
+    the build report and the panel always agree."""
+    if triangles > STRAT_TRIANGLE_LIMIT:
+        return 'ERROR'
+    if triangles > STRAT_TRIANGLE_CAUTION:
+        return 'WARNING'
+    return 'INFO'
 
 
 def freeName(collection, name):
@@ -554,6 +596,17 @@ def buildStratModel(context):
 
     # 4. one mesh
     mesh = joinMeshes(context, meshes, name)
+    triangles = triangleCount(mesh)
+    level = triangleLevel(triangles)
+    advice = ("Decimate the mesh, or leave the armour upgrades and hidden variants out with Visible Only")
+    if level == 'ERROR':
+        report.append(('ERROR', "%s triangles - over the %s limit, the campaign map will CRASH on load. %s"
+                       % ("{:,}".format(triangles), "{:,}".format(STRAT_TRIANGLE_LIMIT), advice)))
+    elif level == 'WARNING':
+        report.append(('WARNING', "%s triangles - close to the %s the campaign map crashes past. %s"
+                       % ("{:,}".format(triangles), "{:,}".format(STRAT_TRIANGLE_LIMIT), advice)))
+    else:
+        report.append(('INFO', "%s triangles" % "{:,}".format(triangles)))
 
     # 5. the strat skeleton, at the old rig's transform, and the mesh onto it
     strat_armature = buildStratArmature(context, collection, "Armature_" + name,
