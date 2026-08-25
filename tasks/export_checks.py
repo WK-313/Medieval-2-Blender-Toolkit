@@ -170,6 +170,84 @@ def materialFingerprint(material):
                 images.add(bpy.path.abspath(node.image.filepath) or node.image.name)
     return (baseName(material.name), frozenset(images))
 
+# Blender's own name for a mesh's first UV map. A mesh that carries several
+# (a SimpleBake layer, a lightmap, an import leftover) exports every one of
+# them into the GLB, and IWTE reads whichever came first, so a unit can go
+# into the game textured off a UV map nobody was looking at in Blender.
+DEFAULT_UV_NAME = "UVMap"
+
+def retargetUVNodes(obj, uv_name):
+    """Point this mesh's material UV Map nodes at uv_name when the layer they
+    named is no longer on the mesh. Returns "material: old -> new" strings."""
+    changed = []
+    layer_names = {layer.name for layer in obj.data.uv_layers}
+    for slot in obj.material_slots:
+        material = slot.material
+        if material is None or not material.use_nodes:
+            continue
+        for node in material.node_tree.nodes:
+            if node.type != 'UVMAP' or not node.uv_map or node.uv_map in layer_names:
+                continue
+            changed.append("%s: %s -> %s" % (material.name, node.uv_map, uv_name))
+            node.uv_map = uv_name
+    return changed
+
+def cleanUVLayers(meshes):
+    """Reduce every mesh to its active UV map, renamed to Blender's default.
+
+    The ACTIVE layer is the one kept, because that is the layer the rest of
+    the export reads - checkUVSpace and autoAssignUV both work on
+    uv_layers.active - so what the tile checks measured is what survives.
+    Returns a list of (level, message) in the usual report shape."""
+    report = []
+    stripped = []
+    renamed = []
+    retargeted = []
+    no_uvs = []
+    for obj in meshes:
+        if obj.type != 'MESH':
+            continue
+        uv_layers = obj.data.uv_layers
+        active = uv_layers.active
+        if active is None:
+            no_uvs.append(obj.name)
+            continue
+        # UV map names are unique per mesh, so the keeper is safe to identify
+        # by name across the removals - the collection reorders as it shrinks
+        keep = active.name
+        removed = []
+        while len(uv_layers) > 1:
+            doomed = next((layer for layer in uv_layers if layer.name != keep), None)
+            if doomed is None:
+                break
+            removed.append(doomed.name)
+            uv_layers.remove(doomed)
+        layer = uv_layers[0]
+        if removed:
+            stripped.append("%s (%s)" % (obj.name, ", ".join(removed)))
+        if layer.name != DEFAULT_UV_NAME:
+            renamed.append("%s: %s -> %s" % (obj.name, layer.name, DEFAULT_UV_NAME))
+            layer.name = DEFAULT_UV_NAME
+        # removing layers can move the active/render flags onto the survivor
+        # implicitly, but never trust it - the export reads both
+        uv_layers.active = layer
+        layer.active_render = True
+        # a UV Map node naming a layer that has just gone (or been renamed)
+        # silently falls back to the active one, so point it at the survivor
+        # instead - the material keeps showing what it showed before
+        retargeted.extend(retargetUVNodes(obj, DEFAULT_UV_NAME))
+    if stripped:
+        report.append(('INFO', "Removed inactive UV maps from %d object(s): %s" % (len(stripped), ", ".join(stripped))))
+    if renamed:
+        report.append(('INFO', "Renamed UV maps to %s on %d object(s): %s" % (DEFAULT_UV_NAME, len(renamed), ", ".join(renamed))))
+    if retargeted:
+        report.append(('INFO', "Repointed %d material UV Map node(s) at %s: %s" % (len(retargeted), DEFAULT_UV_NAME, ", ".join(retargeted))))
+    if no_uvs:
+        report.append(('WARNING', "Objects with no UV map at all: %s" % ", ".join(no_uvs)))
+    if not (stripped or renamed or retargeted or no_uvs):
+        report.append(('INFO', "UV maps already tidy: one %s per object" % DEFAULT_UV_NAME))
+    return report
+
 def dedupeMaterialSlots(obj):
     """Collapse repeated material slots on one mesh: remap its faces to the
     first slot holding each material, then drop the now-duplicate slots.
@@ -387,6 +465,13 @@ def runSelectCleanup(context):
             weightless.append(obj.name)
     if weightless:
         report.append(('ERROR', "Objects with no vertex weights: %s" % ", ".join(weightless)))
+
+    # 8b. optional UV map tidy-up: keep the active UV map only, under the
+    # default name. Off by default - it deletes UV data, so it stays a
+    # deliberate tick rather than something a routine check does behind you.
+    # Runs before the tile checks so they measure the map that will export.
+    if armature.med2_toolkit_unit_export.clean_uv_layers:
+        report.extend(cleanUVLayers(meshes))
 
     # 9. per-texture UV tile placement runs separately (checkUVSpace), after
     # the operator has auto-detected the main/attach textures, so it can tell

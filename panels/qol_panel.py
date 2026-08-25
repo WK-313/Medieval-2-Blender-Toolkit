@@ -1,11 +1,12 @@
 import bpy
-from bpy.props import BoolProperty, EnumProperty, PointerProperty
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty
 from ..tasks.armature_tools import skeletonItems, parentToSkeleton
 from ..tasks.control_rig import (CONTROL_RIG_TYPES, controlRigOf, controlledRigs, createControlRig,
                                  deleteControlRig, isControlRig)
 from ..tasks.unit_groups import createGroupControlRigs, groupParts, groupRoot
 from ..tasks.export_checks import (
-    OPT_SUFFIX, splitNumberSuffix, hasOptSuffix, addOptSuffix, removeOptSuffix, splitOptSuffix,
+    OPT_SUFFIX, DEFAULT_UV_NAME, cleanUVLayers, splitNumberSuffix, hasOptSuffix, addOptSuffix,
+    removeOptSuffix, splitOptSuffix,
 )
 
 # Enum identifiers cannot safely carry spaces, so map them to the actual
@@ -45,6 +46,9 @@ class MED_2_TOOLKIT_QOL_Data(bpy.types.PropertyGroup):
         default='POLYINTERP_NEAREST'
     )
     clear_groups: BoolProperty(name = "Clear Existing Groups", default = True)
+    smooth_weights: BoolProperty(name = "Smooth Weights", description = "After the transfer, run Blender's vertex group smooth over every target mesh. The mapping leaves hard edges where it jumps from one source vertex to the next, and the smoothing softens them. Untick to keep the transferred weights exactly as they came across", default = True)
+    smooth_repeat: IntProperty(name = "Smoothing", description = "How many smoothing passes to run on each target mesh. More passes spread the weights further; 5 is what the transfer used to do unconditionally", default = 5, min = 1, max = 100)
+    smooth_factor: FloatProperty(name = "Strength", description = "How far each smoothing pass moves a weight towards its neighbours' average. 0.5 is Blender's own default", default = 0.5, min = 0.0, max = 1.0)
     skeleton: EnumProperty(name = "Skeleton", description = "Skeleton from the addon's armatures folder to parent selected meshes to", items = skeletonItems)
     rename_prefix: EnumProperty(name = "Part Prefix", description = "Prefix applied by Apply Prefix to Selected", items = [(i, label, '') for i, label, _ in PART_PREFIXES], default = 'PRIMARYACTIVE0')
 
@@ -92,15 +96,18 @@ class MED_2_TOOLKIT_OT_Weight_Transfer(bpy.types.Operator):
         )
 
         # soften the hard edges the mapping leaves behind
-        for obj in selected_objs:
-            for o in context.selected_objects:
-                o.select_set(False)
-            obj.select_set(True)
-            context.view_layer.objects.active = obj
-            bpy.ops.object.mode_set(mode='EDIT')
-            bpy.ops.mesh.select_all(action='SELECT')
-            bpy.ops.object.vertex_group_smooth(group_select_mode='ALL', repeat=5)
-            bpy.ops.object.mode_set(mode='OBJECT')
+        if settings.smooth_weights:
+            for obj in selected_objs:
+                for o in context.selected_objects:
+                    o.select_set(False)
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.object.vertex_group_smooth(group_select_mode='ALL',
+                                                   factor=settings.smooth_factor,
+                                                   repeat=settings.smooth_repeat)
+                bpy.ops.object.mode_set(mode='OBJECT')
 
         for o in context.selected_objects:
             o.select_set(False)
@@ -108,7 +115,12 @@ class MED_2_TOOLKIT_OT_Weight_Transfer(bpy.types.Operator):
             o.select_set(True)
         context.view_layer.objects.active = orig_active
 
-        self.report({'INFO'}, f"Transferred weights to {len(selected_objs)} object(s) and smoothed 5x")
+        if settings.smooth_weights:
+            smoothed = "smoothed %dx at strength %.2f" % (settings.smooth_repeat, settings.smooth_factor)
+        else:
+            smoothed = "no smoothing"
+        self.report({'INFO'}, "Transferred weights to %d object(s) (%s): %s"
+                    % (len(selected_objs), smoothed, ", ".join(obj.name for obj in selected_objs)))
         return {'FINISHED'}
 
 
@@ -279,6 +291,33 @@ class MED_2_TOOLKIT_OT_Toggle_Opt_Suffix(bpy.types.Operator):
             self.report({'INFO'}, "Toggled __opt on %d object(s): %s" % (len(renamed), ", ".join(renamed)))
         else:
             self.report({'INFO'}, "No objects needed changing")
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Clean_UV_Layers(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.clean_uv_layers"
+    bl_label = "Clean UV Maps"
+    bl_description = ("Delete every UV map except the active one on each selected mesh and rename it "
+                      "to " + DEFAULT_UV_NAME + ", Blender's default. A mesh carrying several UV maps exports all of "
+                      "them into the GLB and IWTE reads whichever came first, so the unit can end up "
+                      "textured off a map you were not looking at. Material UV Map nodes naming a layer "
+                      "that goes are repointed at the survivor. The same tick box is on the export check")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return any(obj.type == 'MESH' for obj in context.selected_objects)
+
+    def execute(self, context):
+        # late import: unit_export_panel is a sibling panel module, and only the
+        # results popup is wanted from it
+        from .unit_export_panel import SEVERITY_ORDER, showResultsPopup
+        meshes = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        results = cleanUVLayers(meshes)
+        results = sorted(results, key=lambda r: SEVERITY_ORDER.get(r[0], 2))
+        for level, message in results:
+            self.report({level}, message)
+        showResultsPopup(context, "Clean UV Maps: %d mesh(es)" % len(meshes), results)
         return {'FINISHED'}
 
 
@@ -520,6 +559,11 @@ class MED_2_TOOLKIT_PT_Weight_Transfer(bpy.types.Panel):
         layout.operator("medieval2toolkit.weight_transfer", icon='MOD_DATA_TRANSFER')
         layout.prop(settings, "vert_mapping")
         layout.prop(settings, "clear_groups")
+        layout.prop(settings, "smooth_weights")
+        col = layout.column(align=True)
+        col.enabled = settings.smooth_weights
+        col.prop(settings, "smooth_repeat", text="Smoothing Passes")
+        col.prop(settings, "smooth_factor", text="Strength")
 
 
 class MED_2_TOOLKIT_PT_Armature(bpy.types.Panel):
@@ -606,6 +650,7 @@ class MED_2_TOOLKIT_PT_QOL_Advanced(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         col = layout.column(align=True)
+        col.operator("medieval2toolkit.clean_uv_layers", icon='GROUP_UVS')
         col.operator("medieval2toolkit.recreate_simplebake_uv", icon='UV')
         col.operator("medieval2toolkit.remove_baked_suffix", icon='X')
 
@@ -649,6 +694,7 @@ classes = [
     MED_2_TOOLKIT_OT_Rename_Bones_Lower_To_Upper,
     MED_2_TOOLKIT_OT_Rename_To_Prefix,
     MED_2_TOOLKIT_OT_Toggle_Opt_Suffix,
+    MED_2_TOOLKIT_OT_Clean_UV_Layers,
     MED_2_TOOLKIT_OT_Recreate_Simplebake_UV,
     MED_2_TOOLKIT_OT_Remove_Baked_Suffix,
     MED_2_TOOLKIT_OT_Parent_To_Skeleton,

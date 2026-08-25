@@ -210,6 +210,7 @@ class MED_2_TOOLKIT_Export_Faction(bpy.types.PropertyGroup):
 class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     export_visible_only: BoolProperty(name = "Visible Only", description = "Only export visible mesh children of the armature", default = True)
     export_animations: BoolProperty(name = "Export Animations", description = "Bake actions into the GLB. Slow and unnecessary for .mesh conversion, and reimports with the rig posed", default = False)
+    clean_uv_layers: BoolProperty(name = "Clean UV Maps", description = "During the check, delete every UV map except the active one on each mesh and rename it to UVMap, Blender's default. A mesh that carries several UV maps (a SimpleBake layer, an import leftover) exports all of them into the GLB and IWTE reads whichever came first, so the unit can end up textured off a map you were not looking at. Off by default: it deletes UV data. Material UV Map nodes naming a layer that goes are repointed at the survivor", default = False)
     select_wrong_uv: BoolProperty(name = "Select objects with wrong UV", description = "After the check, select the objects whose UVs are in the wrong tile and enter UV/edit mode on them", default = False)
     bmdb_entry_name: StringProperty(name = "BMDB Entry Name", description = "Model name at the top of the generated BMDB entry. Leave blank to use the mesh name")
     export_glb_name: StringProperty(name = "Mesh Name", description = "Name of the exported GLB/mesh file and its output subfolder", default = "export")
@@ -973,6 +974,7 @@ class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
         col.prop(export_data, "export_glb_name")
 
         layout.operator("medieval2toolkit.select_cleanup", icon='CHECKMARK')
+        layout.prop(export_data, "clean_uv_layers")
         layout.prop(export_data, "select_wrong_uv")
         layout.operator("medieval2toolkit.auto_assign_uv", icon='UV')
 

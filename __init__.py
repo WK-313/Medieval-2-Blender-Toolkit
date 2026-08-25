@@ -20,7 +20,10 @@ from bpy.props import EnumProperty, PointerProperty
 
 class MED_2_TOOLKIT_Mode_Selection(bpy.types.PropertyGroup):
     # The values are what every panel's poll() tests, so they are kept as they
-    # were; only the order and the labels follow the strip.
+    # were. The order here is NOT the strip's - multi_panel.SECTIONS carries
+    # that, and only the classic layout's button grid draws in this order.
+    # Reordering these items would re-point every saved .blend, since an enum
+    # is stored as the item's position, not its identifier.
     mode_selection: EnumProperty(
         items = [("unit_import", "Import", "Read a mod's units and models in - EDU and BMDB"),
                  ("unit_export", "Export", "Take a finished unit back out to the mod"),

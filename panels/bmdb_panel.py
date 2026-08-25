@@ -57,7 +57,41 @@ def sortModels(self, context):
             item.name = model
             item.folder = bmdb_dictionary[model]['Folder']
             item.bmdb_info = json.dumps(bmdb_dictionary[model])
+    snapToSearch(self, context)
     return{'FINISHED'}
+
+
+def searchTerms(text):
+    """The search box split into terms. Every term has to appear somewhere in
+    the name, so "eng knight" finds ug_english_knight."""
+    return [term for term in text.lower().split() if term]
+
+
+def modelMatches(name, terms):
+    lowered = name.lower()
+    return all(term in lowered for term in terms)
+
+
+def snapToSearch(self, context):
+    """Move the selection onto the first model the search matches.
+
+    The search filters the UIList rather than rebuilding the collection - with
+    a few thousand models, rebuilding on every keystroke is not something the
+    panel can keep up with - so the list index has to be walked onto a visible
+    row itself, or the details and Import button below the list would go on
+    describing a model the filter has hidden. Called on every keystroke and
+    again after a rebuild, which parks the index on row 0 regardless."""
+    terms = searchTerms(context.scene.med2_toolkit_bmdb_data.search)
+    if not terms:
+        return
+    models = context.scene.med2_toolkit_bmdb_list
+    index = context.scene.med2_toolkit_bmdb_list_index
+    if 0 <= index < len(models) and modelMatches(models[index].name, terms):
+        return
+    for position, model in enumerate(models):
+        if modelMatches(model.name, terms):
+            context.scene.med2_toolkit_bmdb_list_index = position
+            return
 
 
 # Same GC guard as above, plus a cache keyed by the selected model: this
@@ -129,6 +163,9 @@ class MED_2_TOOLKIT_OT_Model_Importer(bpy.types.Operator):
 
 class MED_2_TOOLKIT_BMDB_data(bpy.types.PropertyGroup):
     filter_faction: EnumProperty(name = "Faction list", description = "Factions found in descr_sm_factions", items = sortFactions)
+    # TEXTEDIT_UPDATE applies the value on every keystroke instead of waiting
+    # for Return, which is what makes the list narrow as you type
+    search: StringProperty(name = "Search", description = "Show only models whose name contains what you type. Several words all have to match, in any order, so \"eng knight\" finds ug_english_knight", default = "", options = {'TEXTEDIT_UPDATE'}, update = snapToSearch)
 
 
 class MED_2_TOOLKIT_PT_BMDB_Import(bpy.types.Panel):
@@ -153,6 +190,15 @@ class MED_2_TOOLKIT_PT_BMDB_Import(bpy.types.Panel):
         row = box.row(align=True)
         row.prop (context.scene.med2_toolkit_bmdb_data, "filter_faction", text="Filter by faction")
         row.operator("medieval2toolkit.bmdb_filter", icon = "FILE_REFRESH", text = "")
+        search = context.scene.med2_toolkit_bmdb_data.search
+        row = layout.row(align=True)
+        row.prop (context.scene.med2_toolkit_bmdb_data, "search", text="", icon="VIEWZOOM")
+        if search:
+            row.operator("medieval2toolkit.bmdb_clear_search", icon = "X", text = "")
+            terms = searchTerms(search)
+            shown = sum(1 for model in context.scene.med2_toolkit_bmdb_list if modelMatches(model.name, terms))
+            layout.label(text="%d of %d models match" % (shown, len(context.scene.med2_toolkit_bmdb_list)),
+                         icon='CHECKMARK' if shown else 'ERROR')
         row = layout.row(align=True)
         row.template_list("MED_2_TOOLKIT_UL_BMDB_List", "BMDB_list", context.scene, "med2_toolkit_bmdb_list", context.scene, "med2_toolkit_bmdb_list_index")
         if context.scene.med2_toolkit_bmdb_list_index >= 0 and context.scene.med2_toolkit_bmdb_list:
@@ -173,6 +219,17 @@ class MED2_TOOLKIT_OT_BMDB_Filter(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
     def execute(self, context):
         sortModels(self, context)
+        return{"FINISHED"}
+
+
+class MED2_TOOLKIT_OT_BMDB_Clear_Search(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.bmdb_clear_search"
+    bl_label = "Clear Search"
+    bl_description = "Empty the search box and show every model again"
+    bl_options = {'INTERNAL'}
+
+    def execute(self, context):
+        context.scene.med2_toolkit_bmdb_data.search = ""
         return{"FINISHED"}
 
 
@@ -199,6 +256,16 @@ class MED_2_TOOLKIT_BMDB_List_Items(bpy.types.PropertyGroup):
 
 
 class MED_2_TOOLKIT_UL_BMDB_List(bpy.types.UIList):
+    def filter_items(self, context, data, property):
+        """Hide the rows the search box does not match. Returning empty lists
+        means "no filtering, no reordering", which is the untouched list."""
+        terms = searchTerms(context.scene.med2_toolkit_bmdb_data.search)
+        if not terms:
+            return [], []
+        models = getattr(data, property)
+        return [self.bitflag_filter_item if modelMatches(model.name, terms) else 0
+                for model in models], []
+
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             layout.label(text=item.name)
@@ -211,6 +278,7 @@ classes = [
     MED_2_TOOLKIT_OT_Model_Importer,
     MED_2_TOOLKIT_BMDB_data,
     MED2_TOOLKIT_OT_BMDB_Filter,
+    MED2_TOOLKIT_OT_BMDB_Clear_Search,
     MED2_TOOLKIT_OT_Model_Folder,
     MED_2_TOOLKIT_BMDB_List_Items,
     MED_2_TOOLKIT_UL_BMDB_List,

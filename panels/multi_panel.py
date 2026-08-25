@@ -48,10 +48,10 @@ from .unit_info_panel import (MED_2_TOOLKIT_PT_Card_Render, MED_2_TOOLKIT_PT_Car
 SECTIONS = [
     ('unit_import', "Import",     'EVENT_I'),
     ('unit_export', "Export",     'EVENT_E'),
+    ('unit_info',   "Unit Cards", 'EVENT_U'),
     ('strat',       "Strat",      'EVENT_T'),
     ('settlements', "Settlement", 'EVENT_S'),
     ('qol',         "QOL",        'EVENT_Q'),
-    ('unit_info',   "Unit Cards", 'EVENT_U'),
 ]
 
 # Draw order within a section. Which section a panel belongs to is still its own

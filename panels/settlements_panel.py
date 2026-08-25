@@ -69,7 +69,41 @@ def sortSettlements(self, context):
         item.translation = settlement_entry["name"]
         item.folder = settlement_entry["folder"]
         item.world = settlement_entry["world"]
+    snapToSearch(self, context)
     return{'FINISHED'}
+
+
+def searchTerms(text):
+    """The search box split into terms. Every term has to appear somewhere in
+    the entry, so "fort north" finds both words in either field."""
+    return [term for term in text.lower().split() if term]
+
+
+def settlementMatches(item, terms):
+    """Search the list name and the in-game name together - a settlement is
+    known by either, and the list only shows the first."""
+    haystack = ("%s %s" % (item.name, item.translation)).lower()
+    return all(term in haystack for term in terms)
+
+
+def snapToSearch(self, context):
+    """Move the selection onto the first entry the search matches, so the
+    fields and the Import button below the list never describe an entry the
+    filter has hidden. The search filters the UIList rather than rebuilding
+    the collection, so the index does not follow along by itself. Called on
+    every keystroke and again after a rebuild, which parks the index on row 0
+    regardless."""
+    terms = searchTerms(context.scene.med2_toolkit_settlements.search)
+    if not terms:
+        return
+    settlements = context.scene.med2_toolkit_settlements_list
+    index = context.scene.med2_toolkit_settlements_list_index
+    if 0 <= index < len(settlements) and settlementMatches(settlements[index], terms):
+        return
+    for position, settlement in enumerate(settlements):
+        if settlementMatches(settlement, terms):
+            context.scene.med2_toolkit_settlements_list_index = position
+            return
 
 
 #   ---------------  #
@@ -126,6 +160,9 @@ class MED_2_TOOLKIT_Settlement_Data(bpy.types.PropertyGroup):
     # install from before this setting existed still has a file without the key
     hide_complexes: BoolProperty(name = "Hide Complexes", description = "If on, hide the settlement's complex objects after importing it", default = bool_settings.get('hide_complexes', True))
     settlement_folders: EnumProperty(name = "Settlements", description = "List of settlement .worldpkgdesc files in the mod directory", items = sortFolders)
+    # TEXTEDIT_UPDATE applies the value on every keystroke instead of waiting
+    # for Return, which is what makes the list narrow as you type
+    search: StringProperty(name = "Search", description = "Show only settlements whose name or in-game name contains what you type. Several words all have to match, in any order", default = "", options = {'TEXTEDIT_UPDATE'}, update = snapToSearch)
     pkg_types: EnumProperty(name = "Pkg Types", description = "PKG groups", items = [("settlement", "Settlement", ""), ("ambient", "Ambient", ""), ("ambientmisc", "Ambient Misc", ""), ("techtree", "Tech Tree", ""), ("rivercrossing", "River Crossing", ""), ("fieldfortification", "Field Fortification", ""), ("all", "All", "")])
 
 
@@ -155,6 +192,16 @@ class MED_2_TOOLKIT_PT_Settlements_Panel(bpy.types.Panel):
         row.prop(context.scene.med2_toolkit_settlements, "settlement_folders", text="Folder")
         row.prop(context.scene.med2_toolkit_settlements, "pkg_types", text="Type")
         row.operator("medieval2toolkit.sort_settlements", icon = "FILE_REFRESH", text = "")
+        search = context.scene.med2_toolkit_settlements.search
+        row = layout.row(align=True)
+        row.prop(context.scene.med2_toolkit_settlements, "search", text="", icon="VIEWZOOM")
+        if search:
+            row.operator("medieval2toolkit.settlement_clear_search", icon = "X", text = "")
+            terms = searchTerms(search)
+            settlements = context.scene.med2_toolkit_settlements_list
+            shown = sum(1 for settlement in settlements if settlementMatches(settlement, terms))
+            layout.label(text="%d of %d settlements match" % (shown, len(settlements)),
+                         icon='CHECKMARK' if shown else 'ERROR')
         col = layout.column()
         col.template_list("MED_2_TOOLKIT_UL_Settlement_List", "Settlements_list", context.scene, "med2_toolkit_settlements_list", context.scene, "med2_toolkit_settlements_list_index")
         settlement = selectedSettlement(context)
@@ -423,7 +470,28 @@ class MED_2_TOOLKIT_Settlement_List_Items(bpy.types.PropertyGroup):
     folder: StringProperty(name="Folder", description="Location of the settlement")
 
 
+class MED_2_TOOLKIT_OT_Settlement_Clear_Search(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.settlement_clear_search"
+    bl_label = "Clear Search"
+    bl_description = "Empty the search box and show every settlement again"
+    bl_options = {'INTERNAL'}
+
+    def execute(self, context):
+        context.scene.med2_toolkit_settlements.search = ""
+        return{"FINISHED"}
+
+
 class MED_2_TOOLKIT_UL_Settlement_List(bpy.types.UIList):
+    def filter_items(self, context, data, property):
+        """Hide the rows the search box does not match. Returning empty lists
+        means "no filtering, no reordering", which is the untouched list."""
+        terms = searchTerms(context.scene.med2_toolkit_settlements.search)
+        if not terms:
+            return [], []
+        settlements = getattr(data, property)
+        return [self.bitflag_filter_item if settlementMatches(settlement, terms) else 0
+                for settlement in settlements], []
+
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             layout.label(text=item.name)
@@ -437,6 +505,7 @@ classes = [
     MED_2_TOOLKIT_OT_Sort_Settlements,
     MED_2_TOOLKIT_OT_Import_Settlement,
     MED_2_TOOLKIT_Settlement_List_Items,
+    MED_2_TOOLKIT_OT_Settlement_Clear_Search,
     MED_2_TOOLKIT_UL_Settlement_List,
     MED_2_TOOLKIT_OT_Find_Copied_Buildings,
     MED_2_TOOLKIT_OT_Find_Unique_Buildings,
