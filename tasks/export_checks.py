@@ -193,11 +193,15 @@ def retargetUVNodes(obj, uv_name):
     return changed
 
 def cleanUVLayers(meshes):
-    """Reduce every mesh to its active UV map, renamed to Blender's default.
+    """Reduce every mesh to its render UV map, renamed to Blender's default.
 
-    The ACTIVE layer is the one kept, because that is the layer the rest of
-    the export reads - checkUVSpace and autoAssignUV both work on
-    uv_layers.active - so what the tile checks measured is what survives.
+    The keeper is the layer flagged ACTIVE FOR RENDER - the camera icon in the
+    UV Maps list, which is the layer a render or an export reads - not the one
+    merely selected in that list. The two are the same layer on almost every
+    mesh; where they are not, the camera icon is the one that decides what the
+    unit is actually textured by. The survivor is made the selected layer too,
+    and this runs before the UV tile checks, so checkUVSpace and autoAssignUV
+    (which both work on uv_layers.active) still measure the layer that exports.
     Returns a list of (level, message) in the usual report shape."""
     report = []
     stripped = []
@@ -208,13 +212,17 @@ def cleanUVLayers(meshes):
         if obj.type != 'MESH':
             continue
         uv_layers = obj.data.uv_layers
-        active = uv_layers.active
-        if active is None:
+        if not uv_layers:
             no_uvs.append(obj.name)
             continue
+        # Blender always flags one layer for render, but a mesh built by an
+        # importer or a script can arrive without it - fall back to the list
+        # selection, then to the first layer, rather than keeping nothing
+        keeper = next((layer for layer in uv_layers if layer.active_render), None)
+        keeper = keeper or uv_layers.active or uv_layers[0]
         # UV map names are unique per mesh, so the keeper is safe to identify
         # by name across the removals - the collection reorders as it shrinks
-        keep = active.name
+        keep = keeper.name
         removed = []
         while len(uv_layers) > 1:
             doomed = next((layer for layer in uv_layers if layer.name != keep), None)
@@ -228,7 +236,7 @@ def cleanUVLayers(meshes):
         if layer.name != DEFAULT_UV_NAME:
             renamed.append("%s: %s -> %s" % (obj.name, layer.name, DEFAULT_UV_NAME))
             layer.name = DEFAULT_UV_NAME
-        # removing layers can move the active/render flags onto the survivor
+        # removing layers can move the selection/render flags onto the survivor
         # implicitly, but never trust it - the export reads both
         uv_layers.active = layer
         layer.active_render = True
@@ -237,7 +245,7 @@ def cleanUVLayers(meshes):
         # instead - the material keeps showing what it showed before
         retargeted.extend(retargetUVNodes(obj, DEFAULT_UV_NAME))
     if stripped:
-        report.append(('INFO', "Removed inactive UV maps from %d object(s): %s" % (len(stripped), ", ".join(stripped))))
+        report.append(('INFO', "Removed non-render UV maps from %d object(s): %s" % (len(stripped), ", ".join(stripped))))
     if renamed:
         report.append(('INFO', "Renamed UV maps to %s on %d object(s): %s" % (DEFAULT_UV_NAME, len(renamed), ", ".join(renamed))))
     if retargeted:

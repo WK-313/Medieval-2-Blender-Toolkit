@@ -297,8 +297,9 @@ class MED_2_TOOLKIT_OT_Toggle_Opt_Suffix(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Clean_UV_Layers(bpy.types.Operator):
     bl_idname = "medieval2toolkit.clean_uv_layers"
     bl_label = "Clean UV Maps"
-    bl_description = ("Delete every UV map except the active one on each selected mesh and rename it "
-                      "to " + DEFAULT_UV_NAME + ", Blender's default. A mesh carrying several UV maps exports all of "
+    bl_description = ("Delete every UV map except the render one on each selected mesh - the layer with "
+                      "the camera icon in the UV Maps list - and rename it to " + DEFAULT_UV_NAME + ", Blender's "
+                      "default. A mesh carrying several UV maps exports all of "
                       "them into the GLB and IWTE reads whichever came first, so the unit can end up "
                       "textured off a map you were not looking at. Material UV Map nodes naming a layer "
                       "that goes are repointed at the survivor. The same tick box is on the export check")
