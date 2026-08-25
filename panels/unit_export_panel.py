@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
 from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJsonCached
-from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate, bmdbEntryText
+from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate, bmdbEntryText, normalFileName
 from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, finishIWTEJob, iwteOutputReady,
@@ -69,11 +69,13 @@ def genBlankNormalsToggled(self, context):
         root, ext = os.path.splitext(name)
         return root + "_norm" + ext
 
-    if main_norm is None:
+    # a slot pointed at a normal map file keeps that file's name unless the
+    # user typed one, so it is not renamed here
+    if main_norm is None and not self.norm_main_file:
         name = base_name(main_diff, self.out_main)
         if name:
             self.out_main_norm = norm_name(name)
-    if attach_mat and attach_norm is None:
+    if attach_mat and attach_norm is None and not self.norm_attach_file:
         name = base_name(attach_diff, self.out_attach)
         if name:
             self.out_attach_norm = norm_name(name)
@@ -219,6 +221,9 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     out_main_norm: StringProperty(name = "Main Normal", description = "Output name for the main normal map (no extension)")
     out_attach: StringProperty(name = "Attach", description = "Output name for the attachment texture (no extension)")
     out_attach_norm: StringProperty(name = "Attach Normal", description = "Output name for the attachment normal map (no extension)")
+    ignore_diffuse_alpha: BoolProperty(name = "Ignore Diffuse Alpha", description = "Write the main and attachment textures with a fully opaque alpha channel. The game reads the diffuse alpha as transparency, so a texture painted with an unused or half-empty alpha channel makes those parts of the unit see-through in game - this throws that alpha away. Leave it off when the alpha is a deliberate cutout (hair, chainmail gaps, banners). Normal maps are never touched: their alpha is the specular map, not a cutout", default = False)
+    norm_main_file: StringProperty(name = "Main Normal File", description = "Normal map image on disk to use for the main texture when the material has no normal map wired in. It is converted to .dds and .texture with the rest of the export and named in the BMDB entry, so a normal map painted in an image editor needs no separate IWTE run. Leave the output name blank to keep the file's own name", subtype = 'FILE_PATH')
+    norm_attach_file: StringProperty(name = "Attach Normal File", description = "Normal map image on disk to use for the attachment texture when the material has no normal map wired in. It is converted to .dds and .texture with the rest of the export and named in the BMDB entry, so a normal map painted in an image editor needs no separate IWTE run. Leave the output name blank to keep the file's own name", subtype = 'FILE_PATH')
     gen_blank_normals: BoolProperty(name = "Generate Blank Normal Maps", description = "Copy a blank normal map of matching size from the addon's normals folder for materials without one. Auto-fills the normal output names as <main>_norm / <attach>_norm", default = False, update = genBlankNormalsToggled)
     generate_bmdb: BoolProperty(name = "Generate BMDB Entry", description = "Build a battle_models.modeldb entry for this rig. Prefills the mesh path and copy-from unit with the last used values", default = False, update = generateBmdbToggled)
     bmdb_mode: EnumProperty(
@@ -1038,19 +1043,37 @@ class MED_2_TOOLKIT_PT_Export_Materials(bpy.types.Panel):
         header_split.label(text="Current output names")
         header_split.label(text="New output names (blank = current)")
 
-        def image_row(label, image, prop_name):
+        def image_row(label, image, prop_name, current=None, icon=None):
             row = grid.row(align=True)
             split = row.split(factor=0.45, align=True)
-            split.label(text="%s: %s" % (label, image.name if image else "missing"), icon='IMAGE_DATA' if image else 'X')
+            current = current or (image.name if image else "missing")
+            split.label(text="%s: %s" % (label, current),
+                        icon=icon or ('IMAGE_DATA' if image else 'X'))
             split.prop(export_data, prop_name, text="")
 
+        def normal_row(label, material, image, prop_name, file_prop):
+            """The normal map row, plus a file picker when the material has no
+            normal map of its own - pointing at one made in an image editor is
+            the alternative to the blank normal map below."""
+            picked = "" if image else normalFileName(getattr(export_data, file_prop))
+            image_row(label, image, prop_name,
+                      current=picked or None,
+                      icon='FILE_IMAGE' if picked else None)
+            if material and image is None:
+                grid.prop(export_data, file_prop, text="%s File" % label)
+
         image_row("Main", main_diff, "out_main")
-        image_row("Main Normal", main_norm, "out_main_norm")
+        normal_row("Main Normal", main_mat, main_norm, "out_main_norm", "norm_main_file")
         if attach_mat:
             image_row("Attach", attach_diff, "out_attach")
-            image_row("Attach Normal", attach_norm, "out_attach_norm")
+            normal_row("Attach Normal", attach_mat, attach_norm, "out_attach_norm", "norm_attach_file")
 
-        if (main_mat and not main_norm) or (attach_mat and not attach_norm):
+        layout.prop(export_data, "ignore_diffuse_alpha")
+
+        # only offered for a slot with neither a normal map in the material nor
+        # a file pointed at - a browsed file is used instead of a blank one
+        if ((main_mat and not main_norm and not export_data.norm_main_file)
+                or (attach_mat and not attach_norm and not export_data.norm_attach_file)):
             layout.prop(export_data, "gen_blank_normals")
 
 

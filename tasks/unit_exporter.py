@@ -80,27 +80,29 @@ def ddsMipCount(path):
         return 1
     return max(1, struct.unpack("<I", header[28:32])[0])
 
-def runTexconv(texconv, source, tex_dir, out_base):
+def runTexconv(texconv, source, tex_dir, out_base, opaque_alpha=False):
     """Convert an image to DXT5 with a full mipmap chain at tex_dir/out_base.dds
     and return that path, or None when texconv fails. The output is staged in a
     temp folder first so this also works when source IS the destination (a .dds
-    being recompressed in place), which texconv itself refuses to do."""
+    being recompressed in place), which texconv itself refuses to do.
+
+    opaque_alpha writes alpha 1 everywhere and keeps the colour - the fix for a
+    diffuse whose alpha channel is not meant as a cutout."""
     staging = os.path.join(tex_dir, "_texconv")
     shutil.rmtree(staging, ignore_errors=True)
     os.makedirs(staging, exist_ok=True)
+    command = [
+        str(texconv),
+        "-f", "DXT5",
+        "-m", "0",
+        "-nologo",
+        "-y",
+    ]
+    if opaque_alpha:
+        command += ["-swizzle", "rgb1"]
+    command += ["-o", staging, source]
     try:
-        subprocess.run(
-            [
-                str(texconv),
-                "-f", "DXT5",
-                "-m", "0",
-                "-nologo",
-                "-y",
-                "-o", staging,
-                source
-            ],
-            check=True
-        )
+        subprocess.run(command, check=True)
         produced = os.path.join(staging, os.path.splitext(os.path.basename(source))[0] + ".dds")
         if not os.path.exists(produced):
             return None
@@ -154,6 +156,134 @@ def writeTexture(savefiletexture, ddsdata):
         f.write(ddsdata)
     return None
 
+# a DXT5 alpha block whose 16 three-bit indices all select palette entry 6,
+# the fixed 0 of the a0 <= a1 mode - the only way a block with two non-zero
+# endpoints can still be fully transparent
+ALL_SIX_INDICES = sum(6 << (3 * i) for i in range(16)).to_bytes(6, "little")
+
+def alphaBlockIsTransparent(block, dxt3):
+    """True when every texel of one 8-byte DXT3/DXT5 alpha block is alpha 0.
+
+    DXT5 stores two endpoints and 16 three-bit indices into a palette built
+    from them, and texconv writes a flat transparent block as endpoints
+    (255, 0) with every index on the second one - so the endpoints alone are
+    not enough to tell, the indices have to be read."""
+    if dxt3:
+        return block == b"\x00" * 8
+    a0, a1 = block[0], block[1]
+    if a0 > a1:
+        if a1 > 0:
+            return False
+        palette = [a0, a1] + [((7 - i) * a0 + i * a1 + 3) // 7 for i in range(1, 7)]
+    else:
+        if a0 > 0:
+            return block[2:8] == ALL_SIX_INDICES
+        palette = [a0, a1] + [((5 - i) * a0 + i * a1 + 2) // 5 for i in range(1, 5)] + [0, 255]
+    indices = int.from_bytes(block[2:8], "little")
+    return all(palette[(indices >> (3 * i)) & 7] == 0 for i in range(16))
+
+def ddsHasTransparentAreas(path):
+    """True when the top mip of a DXT3/DXT5 .dds holds fully transparent blocks.
+    The game draws nothing where the diffuse alpha is zero, so a texture painted
+    with an empty or half-empty alpha channel comes out see-through in game. A
+    soft alpha gradient never trips it, and DXT1 has no real alpha channel."""
+    try:
+        with open(path, "rb") as dds_input:
+            header = dds_input.read(128)
+            if len(header) < 128 or header[0:4] != b'DDS ':
+                return False
+            fourcc = header[84:88].decode('ascii', errors='ignore').strip('\x00')
+            if fourcc not in ('DXT3', 'DXT5'):
+                return False
+            height, = struct.unpack("<I", header[12:16])
+            width, = struct.unpack("<I", header[16:20])
+            blocks = max(1, (width + 3) // 4) * max(1, (height + 3) // 4)
+            top_mip = dds_input.read(blocks * 16)
+    except OSError:
+        return False
+    dxt3 = fourcc == 'DXT3'
+    return any(alphaBlockIsTransparent(top_mip[i:i + 8], dxt3)
+               for i in range(0, len(top_mip) - 15, 16))
+
+SUPPORTED_TEXTURE_EXTS = ('.png', '.jpg', '.jpeg', '.tga', '.dds')
+
+def textureFromFile(texconv, source, tex_dir, out_base, diffuse=False, opaque_alpha=False):
+    """Copy an image into tex_dir under out_base, convert it to mipped DXT5 and
+    wrap that .dds as out_base.texture.
+
+    `diffuse` marks a main/attachment texture, whose alpha the game reads as
+    transparency; `opaque_alpha` throws that alpha away. Both are ignored for
+    anything else - a normal map's alpha is its specular map, not a cutout.
+
+    Returns (error, warning) - error is the reason no .texture was written,
+    warning is something worth saying about one that was. Both None on a clean
+    conversion."""
+    ext = os.path.splitext(source)[1].lower()
+    if ext not in SUPPORTED_TEXTURE_EXTS:
+        return "%s is not a format the export can convert" % (ext or "no extension"), None
+
+    dst = os.path.join(tex_dir, out_base + ext)
+    if not (os.path.exists(dst) and os.path.samefile(source, dst)):
+        shutil.copy2(source, dst)
+
+    force_opaque = diffuse and opaque_alpha
+    if force_opaque:
+        # even a game-ready .dds is reconverted here: passing it through would
+        # keep exactly the alpha channel this is meant to drop
+        dds = runTexconv(texconv, dst, tex_dir, out_base, opaque_alpha=True)
+    elif ext == ".dds":
+        dds = dst
+        # a .dds is not automatically game-ready: uncompressed, BC7 and
+        # DX10-header files all load fine in Blender but the game only
+        # reads DXT1/DXT3/DXT5, so recompress those the same way a png.
+        # A flat DXT file is recompressed too - the game picks a mip level
+        # by distance, so one without a chain shimmers and stays at full
+        # resolution at every range. Everything texconv writes is mipped.
+        if ddsFourcc(dst) not in DXT_FOURCCS or ddsMipCount(dst) <= 1:
+            dds = runTexconv(texconv, dst, tex_dir, out_base)
+    else:
+        dds = runTexconv(texconv, dst, tex_dir, out_base)
+
+    if dds is None or not os.path.exists(dds):
+        return "texconv could not convert it", None
+
+    with open(dds, "rb") as f:
+        error = writeTexture(os.path.join(tex_dir, out_base + ".texture"), f.read())
+    if error:
+        return error, None
+
+    # every branch above either ran texconv (-m 0, a full chain) or passed
+    # through a .dds that already had one, so a flat result means the conversion
+    # did not do what it was asked. Say so rather than shipping a texture that
+    # shimmers and stays full-resolution at every range.
+    if ddsMipCount(dds) <= 1:
+        return None, "%s.texture was written without mipmaps" % out_base
+    if diffuse and not force_opaque and ddsHasTransparentAreas(dds):
+        return None, ("%s.texture has fully transparent areas in its alpha channel - the game "
+                      "draws nothing there, so those parts of the unit are see-through. Tick "
+                      "Ignore Diffuse Alpha if that alpha is not a deliberate cutout" % out_base)
+    return None, None
+
+def normalFromFile(prop_value, requested):
+    """A normal map browsed from disk for a material that carries none.
+    Returns (absolute path, output name), or (None, "") when nothing usable is
+    set - a path that no longer exists counts as nothing, same as a blank one."""
+    if not prop_value:
+        return None, ""
+    path = clean_path(bpy.path.abspath(prop_value))
+    if not os.path.isfile(path):
+        return None, ""
+    return path, (requested or os.path.splitext(os.path.basename(path))[0])
+
+def normalFileName(prop_value):
+    """What to show for a browsed normal map: its file name, or "" when nothing
+    is set or the path no longer points at a file."""
+    return os.path.basename(normalFromFile(prop_value, "")[0] or "")
+
+# the slots of a texture plan holding a Blender image; the *_norm_file ones hold
+# a path on disk instead and must not be walked with them
+IMAGE_SLOTS = ('main', 'main_norm', 'attach', 'attach_norm')
+
 def texturePlan(context):
     """Resolve the main/attach materials into (image, out_name) pairs and the
     effective texture names used for conversion and the BMDB entry."""
@@ -175,6 +305,13 @@ def texturePlan(context):
         'main_norm': (main_norm, out_name(main_norm, export_data.out_main_norm)),
         'attach': (attach_diff, out_name(attach_diff, export_data.out_attach)),
         'attach_norm': (attach_norm, out_name(attach_norm, export_data.out_attach_norm)),
+        # a normal map the user pointed at on disk, for a material that carries
+        # none of its own. The material's own normal map always wins, and with
+        # no material picked for the slot there is nothing to be the normal of.
+        'main_norm_file': normalFromFile(export_data.norm_main_file, export_data.out_main_norm)
+            if (main_mat and main_norm is None) else (None, ""),
+        'attach_norm_file': normalFromFile(export_data.norm_attach_file, export_data.out_attach_norm)
+            if (attach_mat and attach_norm is None) else (None, ""),
     }
     return plan
 
@@ -182,16 +319,13 @@ def generateBlankNormal(texconv, tex_dir, out_name, size):
     blank = addon_folder/'normals'/('%d.dds' % size)
     if not blank.exists():
         return "No blank normal available for %dx%d (only 512/1024/2048)" % (size, size)
-    dds_path = os.path.join(tex_dir, out_name + ".dds")
-    shutil.copy2(blank, dds_path)
-    # the bundled blanks ship mipped, but a hand-replaced one may not be
-    if ddsFourcc(dds_path) not in DXT_FOURCCS or ddsMipCount(dds_path) <= 1:
-        if runTexconv(texconv, dds_path, tex_dir, out_name) is None:
-            return "Blank normal %s not converted: texconv could not convert it" % out_name
-    with open(dds_path, "rb") as f:
-        error = writeTexture(os.path.join(tex_dir, out_name + ".texture"), f.read())
+    # the bundled blanks ship mipped, but a hand-replaced one may not be -
+    # textureFromFile rebuilds the chain either way
+    error, warning = textureFromFile(texconv, str(blank), tex_dir, out_name)
     if error:
         return "Blank normal %s not converted: %s" % (out_name, error)
+    if warning:
+        return "Blank normal %s: %s" % (out_name, warning)
     return None
 
 def bmdbEntryText(context, plan=None):
@@ -213,9 +347,12 @@ def bmdbEntryText(context, plan=None):
         plan = texturePlan(context)
     relative = parseRelativeUnitPath(export_data.bmdb_unit_path)
     main_name = plan['main'][1]
-    main_norm_name = plan['main_norm'][1] or (export_data.out_main_norm if export_data.gen_blank_normals else "")
+    main_norm_name = (plan['main_norm'][1] or plan['main_norm_file'][1]
+                      or (export_data.out_main_norm if export_data.gen_blank_normals else ""))
     attach_name = plan['attach'][1] or main_name
-    attach_norm_name = plan['attach_norm'][1] or (export_data.out_attach_norm if export_data.gen_blank_normals else "") or main_norm_name
+    attach_norm_name = (plan['attach_norm'][1] or plan['attach_norm_file'][1]
+                        or (export_data.out_attach_norm if export_data.gen_blank_normals else "")
+                        or main_norm_name)
     entry_name = export_data.bmdb_entry_name or export_data.export_glb_name
     entry = buildEntry(
         model_name=entry_name,
@@ -282,7 +419,7 @@ def exportArmatureGLB(context):
     # empty selection writes an empty GLB. Unhide for the export, restore after.
     plan = texturePlan(context)
     rename_map = {}
-    for image, name in plan.values():
+    for image, name in (plan[slot] for slot in IMAGE_SLOTS):
         if image is not None and name:
             rename_map[bpy.path.abspath(image.filepath)] = name
 
@@ -311,7 +448,7 @@ def exportArmatureGLB(context):
                 modifier.show_viewport = False
                 modifier.show_render = False
 
-        for image, name in plan.values():
+        for image, name in (plan[slot] for slot in IMAGE_SLOTS):
             if image is not None and name and image.name != name:
                 image_name_backup.append((image, image.name))
                 image.name = name
@@ -345,49 +482,48 @@ def exportArmatureGLB(context):
     os.makedirs(tex_dir, exist_ok=True)
 
     texture_errors = []
+    texture_warnings = []
+
+    # the main and attachment textures are the ones the game alpha-tests
+    diffuse_names = {plan['main'][1], plan['attach'][1]} - {""}
+
+    def convert(source, out_base, label, diffuse=False):
+        error, warning = textureFromFile(texconv, source, tex_dir, out_base,
+                                         diffuse=diffuse,
+                                         opaque_alpha=export_data.ignore_diffuse_alpha)
+        if error:
+            texture_errors.append("%s (%s)" % (label, error))
+        if warning:
+            texture_warnings.append(warning)
+
     for tex in collect_textures(meshes):
         if not os.path.exists(tex):
             continue
-
-        ext = os.path.splitext(tex)[1].lower()
+        if os.path.splitext(tex)[1].lower() not in SUPPORTED_TEXTURE_EXTS:
+            continue
         out_base = rename_map.get(bpy.path.abspath(tex)) or os.path.splitext(os.path.basename(tex))[0]
-        dst = os.path.join(tex_dir, out_base + ext)
-        shutil.copy2(tex, dst)
+        convert(tex, out_base, os.path.basename(tex), diffuse=out_base in diffuse_names)
 
-        name = os.path.join(tex_dir, out_base)
-
-        if ext in [".png", ".jpg", ".jpeg", ".tga"]:
-            dds = runTexconv(texconv, dst, tex_dir, out_base)
-        elif ext == ".dds":
-            dds = dst
-            # a .dds is not automatically game-ready: uncompressed, BC7 and
-            # DX10-header files all load fine in Blender but the game only
-            # reads DXT1/DXT3/DXT5, so recompress those the same way a png.
-            # A flat DXT file is recompressed too - the game picks a mip level
-            # by distance, so one without a chain shimmers and stays at full
-            # resolution at every range. Everything texconv writes is mipped.
-            if ddsFourcc(dst) not in DXT_FOURCCS or ddsMipCount(dst) <= 1:
-                dds = runTexconv(texconv, dst, tex_dir, out_base)
-        else:
-            continue
-
-        if dds is None or not os.path.exists(dds):
-            texture_errors.append("%s (texconv could not convert it)" % os.path.basename(tex))
-            continue
-        with open(dds, "rb") as f:
-            error = writeTexture(name + ".texture", f.read())
-        if error:
-            texture_errors.append("%s (%s)" % (os.path.basename(tex), error))
+    # normal maps pointed at a file on disk instead of being wired into the
+    # material go through the same conversion, so a normal map painted in an
+    # image editor becomes a .texture here rather than in a separate IWTE run
+    for slot in ('main_norm_file', 'attach_norm_file'):
+        source, out_base = plan[slot]
+        if source and out_base:
+            convert(source, out_base, os.path.basename(source))
 
     notes = []
     if texture_errors:
         notes.append("no .texture written for %s" % "; ".join(texture_errors))
+    notes.extend(texture_warnings)
     if export_data.gen_blank_normals:
         for slot, norm_out_prop in (('main', 'out_main_norm'), ('attach', 'out_attach_norm')):
             diffuse, _ = plan[slot]
             norm_image, _ = plan[slot + '_norm']
+            norm_file, _ = plan[slot + '_norm_file']
             requested = getattr(export_data, norm_out_prop)
-            if diffuse is None or norm_image is not None or not requested:
+            # a browsed normal map has already been converted for this slot
+            if diffuse is None or norm_image is not None or norm_file or not requested:
                 continue
             size = diffuse.size[0]
             error = generateBlankNormal(texconv, tex_dir, requested, size)
