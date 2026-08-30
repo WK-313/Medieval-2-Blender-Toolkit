@@ -20,7 +20,7 @@ fdbd1e25-0d55-4f97-b81b-af4f3c2576ee:Poses/IK Bodyparts/IK Posture:Poses-IK Body
 1b8bf767-9f28-4b2c-b00e-b8e9f7fbe25f:Poses/IK Dwarves Full/2H:Poses-IK Dwarves Full-2H
 a08ffd54-56f7-44cf-9a3c-001ea9836ebe:Poses/IK Dwarves Full/Archer:Poses-IK Dwarves Full-Archer
 d2ebc1d8-7ad4-4971-b264-3430df71af08:Poses/IK Dwarves Full/Crossbow:Poses-IK Dwarves Full-Crossbow
-2258d40a-f3b3-49d7-bdee-c8e1e364500f:Poses/IK Dwarves Full/Javeling:Poses-IK Dwarves Full-Javeling
+2258d40a-f3b3-49d7-bdee-c8e1e364500f:Poses/IK Dwarves Full/Javelin:Poses-IK Dwarves Full-Javelin
 9ba1a196-98eb-4c8b-854d-0c42c02324de:Poses/IK Dwarves Full/Mounted:Poses-IK Dwarves Full-Mounted
 522e999a-2c54-4342-87e1-adc1acdc03ad:Poses/IK Dwarves Full/Polearm:Poses-IK Dwarves Full-Polearm
 dadc76e3-663c-41d6-b5a1-86dff7c1e6fb:Poses/IK Dwarves Full/Spears:Poses-IK Dwarves Full-Spears
@@ -29,7 +29,7 @@ dadc76e3-663c-41d6-b5a1-86dff7c1e6fb:Poses/IK Dwarves Full/Spears:Poses-IK Dwarv
 aaae8141-b120-440d-9a70-0484f089fe22:Poses/IK Full/2H:Poses-IK Full-2H
 f10b4cc6-1114-480e-90e8-bfa81a96453b:Poses/IK Full/Archer:Poses-IK Full-Archer
 9a8204b4-54dd-4e26-8fb2-1042ca52f928:Poses/IK Full/Crossbow:Poses-IK Full-Crossbow
-8e327d93-dcab-4246-ad5f-17ffa5b62432:Poses/IK Full/Javeling:Poses-IK Full-Javeling
+8e327d93-dcab-4246-ad5f-17ffa5b62432:Poses/IK Full/Javelin:Poses-IK Full-Javelin
 044c83f9-1356-4609-9236-30b66b6d1734:Poses/IK Full/Mounted:Poses-IK Full-Mounted
 0fc6b8f3-a75d-4585-bdfc-762d0fdf9a9b:Poses/IK Full/Polearm:Poses-IK Full-Polearm
 8a025104-c2ea-42da-b90a-42926ea4b6f6:Poses/IK Full/Spears:Poses-IK Full-Spears
@@ -38,7 +38,7 @@ f10b4cc6-1114-480e-90e8-bfa81a96453b:Poses/IK Full/Archer:Poses-IK Full-Archer
 4cc029ce-4389-4f73-9dc7-cf4401044c4b:Poses/IK Orcs Full/2H:Poses-IK Orcs Full-2H
 3bcf8f43-9407-4dd7-ba3a-bf3eb93950f3:Poses/IK Orcs Full/Archer:Poses-IK Orcs Full-Archer
 621ad716-8d7f-429f-bddd-b6a20a27083b:Poses/IK Orcs Full/Crossbow:Poses-IK Orcs Full-Crossbow
-86deab78-d490-4ac5-8968-92299806d29a:Poses/IK Orcs Full/Javeling:Poses-IK Orcs Full-Javeling
+86deab78-d490-4ac5-8968-92299806d29a:Poses/IK Orcs Full/Javelin:Poses-IK Orcs Full-Javelin
 2dc0a7b0-33f9-42a0-a9f2-11f5724125a0:Poses/IK Orcs Full/Mounted:Poses-IK Orcs Full-Mounted
 2d023cef-d8c4-46ce-95a0-c990ac2c3395:Poses/IK Orcs Full/Polearm:Poses-IK Orcs Full-Polearm
 f843a39e-ff5a-42fd-a318-d3c065491619:Poses/IK Orcs Full/Spears:Poses-IK Orcs Full-Spears
