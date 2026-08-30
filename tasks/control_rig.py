@@ -46,6 +46,20 @@ CONTROLLER_SUFFIX = " Controller"
 WEAPON_BONE_MARKERS = ("weapon", "Weapon")
 
 
+def setRigHidden(armature, hidden):
+    """Show or hide a Med2 skeleton in the viewport. Its meshes are children of
+    the object, not of its data, so hiding the armature leaves the unit itself
+    on screen. Returns True when the eye was actually toggled - an object that
+    is not in the current view layer has none, and that is not an error."""
+    if armature is None:
+        return False
+    try:
+        armature.hide_set(hidden)
+    except RuntimeError:
+        return False
+    return True
+
+
 def rigTypeLabel(rig_type):
     for identifier, label, _description in CONTROL_RIG_TYPES:
         if identifier == rig_type:
@@ -325,6 +339,11 @@ def createControlRig(context, armature, rig_type):
     armature.parent = controller
     armature.matrix_parent_inverse = controller.matrix_world.inverted()
 
+    # The Med2 skeleton is only driven from here on - every bone of it that the
+    # controller models is constrained to the controller's - so it is in the way
+    # of clicking the controller bones. Hide it; deleteControlRig brings it back.
+    setRigHidden(armature, True)
+
     results.append(('INFO', "Built '%s' (%s) and linked %d bone(s)" % (controller.name, rigTypeLabel(rig_type), linked)))
     if weapons:
         results.append(('INFO', "Left %d weapon bone(s) free so props can still be posed by hand" % weapons))
@@ -350,5 +369,7 @@ def deleteControlRig(controller):
         rig.parent = None
         rig.matrix_parent_inverse = Matrix.Identity(4)
         rig.matrix_world = world_matrix
+        # nothing drives it any more, so it is the thing to pose again
+        setRigHidden(rig, False)
     bpy.data.objects.remove(controller, do_unlink=True)
     return len(rigs)
