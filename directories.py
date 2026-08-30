@@ -122,8 +122,13 @@ def saveFolderPaths():
     mod_list = bpy.context.scene.med2_toolkit_reader.list_holder
     if bpy.context.scene.med2_toolkit_reader.mods_filtered != "custom":
         mod_data = bpy.context.scene.med2_toolkit_reader.mods_filtered
-        temp_list = mod_list.split(',')
-        temp_list.remove(mod_data)
+        temp_list = [mod for mod in mod_list.split(',') if mod]
+        # the selected mod is moved to the front so it is the one restored next
+        # session. It is not always in the list: an enum whose items callback
+        # came back empty hands back a stale value, and list.remove raised
+        # ValueError on it, which took the whole Read Mod Data down
+        if mod_data in temp_list:
+            temp_list.remove(mod_data)
         temp_list.insert(0, mod_data)
         mod_list = ','.join(temp_list)
     else:

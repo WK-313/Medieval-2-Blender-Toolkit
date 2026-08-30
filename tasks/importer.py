@@ -3,6 +3,7 @@ import json
 import random
 from pathlib import Path
 from . import recurlayercollection
+from ..directories import withTrailingSep
 from .task_writer import unitTaskAppend, unitTaskRun, engineTaskAppend, engineTaskRun
 from .unit_groups import tagGroup
 script_folder = Path(__file__).parent.parent
@@ -41,6 +42,10 @@ def selectionBoundingBox():
     return(width, z_offset)
 
 def unitChecker(model_folder, unit_list, upgrade):
+    # the Unit Output path is joined onto bare file names below, and the
+    # Paths field holds it with a trailing separator only when it was
+    # browsed to rather than typed
+    model_folder = withTrailingSep(model_folder)
     with open(script_folder/('text/attachment_dictionary.json'), 'r') as attachment_input:
         attachment_dictionary = json.load(attachment_input)
     files_to_check = []
@@ -62,6 +67,10 @@ def unitChecker(model_folder, unit_list, upgrade):
 
 
 def fileChecker(model_folder, model_list):
+    # the Unit Output path is joined onto bare file names below, and the
+    # Paths field holds it with a trailing separator only when it was
+    # browsed to rather than typed
+    model_folder = withTrailingSep(model_folder)
     with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
         bmdb_dictionary = json.load(bmdb_input)
     missing_count = 0
@@ -77,6 +86,10 @@ def fileChecker(model_folder, model_list):
 
 
 def engineChecker(model_folder, model_list):
+    # the Unit Output path is joined onto bare file names below, and the
+    # Paths field holds it with a trailing separator only when it was
+    # browsed to rather than typed
+    model_folder = withTrailingSep(model_folder)
     missing_count = 0
     for model_id in model_list:
         engine_mesh = model_id+'.glb'
@@ -93,6 +106,10 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
     # apply_offset=False lets a caller place this exact `coordinates` (e.g.
     # stacking a unit's armour upgrades on Z) without the auto x-spacing below,
     # which otherwise fires on any non-origin `coordinates` regardless of axis.
+    # the Unit Output path is joined onto bare file names below, and the
+    # Paths field holds it with a trailing separator only when it was
+    # browsed to rather than typed
+    model_folder = withTrailingSep(model_folder)
     with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
         bmdb_dictionary = json.load(bmdb_input)
     with open(script_folder/('text/attachment_dictionary.json'), 'r') as attachment_input:
@@ -226,6 +243,10 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
 
 
 def engineImporter(model_folder, unit_name, faction_id, engine_model):
+    # the Unit Output path is joined onto bare file names below, and the
+    # Paths field holds it with a trailing separator only when it was
+    # browsed to rather than typed
+    model_folder = withTrailingSep(model_folder)
     if not Path(str(model_folder)+engine_model).exists():
         print("Model '%s' not found in folder %s." % (engine_model, str(model_folder)))
         return(0, 0, 0)
@@ -252,6 +273,10 @@ def engineImporter(model_folder, unit_name, faction_id, engine_model):
     return(2, width, z_offset)
 
 def modelImporter(model_folder, unit_name, faction_id, model_info, model_id):
+    # the Unit Output path is joined onto bare file names below, and the
+    # Paths field holds it with a trailing separator only when it was
+    # browsed to rather than typed
+    model_folder = withTrailingSep(model_folder)
     model_mesh = model_info['Mesh']
     if not Path(str(model_folder)+model_mesh).exists():
         print("Model '%s' for %s not found in folder %s." % (model_mesh, model_id, str(model_folder)))
