@@ -2,6 +2,7 @@ import re
 import math
 import bpy
 from .armature_tools import skeletonUsesLowercase
+from .control_rig import controlRigOf
 
 RECOMMENDED_SIZES = (512, 1024, 2048)
 
@@ -343,24 +344,10 @@ def stripTrailingNumbers(meshes):
 
     return renamed, errors
 
-def runSelectCleanup(context):
-    """Select the armature's export set and run all validation/cleanup checks.
-    Returns a list of (level, message) where level is INFO/WARNING/ERROR."""
+def cleanNames(meshes):
+    """Steps 1 + 2: strip trailing .001 suffixes and force the x__y export
+    naming. Returns the usual (level, message) pairs."""
     report = []
-    armature = activeExportArmature(context)
-    if not armature:
-        return [('ERROR', "Select an Armature first")]
-
-    deselectAll(context)
-    meshes = exportMeshes(context, armature)
-    if not meshes:
-        return [('ERROR', "No mesh objects found under the armature (check the Visible Only toggle)")]
-
-    armature.hide_set(False)
-    armature.select_set(True)
-    for obj in meshes:
-        obj.select_set(True)
-    context.view_layer.objects.active = armature
 
     # 1. trailing .001 suffix cleanup, with conflict detection inside the set.
     # Runs again after step 2, whose renames can collide and pick up fresh
@@ -408,8 +395,11 @@ def runSelectCleanup(context):
         report.append(('INFO', "Converted name to name__name on %d object(s): %s" % (len(doubled), ", ".join(doubled))))
     if bad_format:
         report.append(('WARNING', "Not in x__y naming format: %s" % ", ".join(bad_format)))
+    return report
 
-    # 3/4. primaryactive0/secondaryactive0 presence by skeleton type
+def checkWeaponMeshes(armature, meshes):
+    """Steps 3/4: primaryactive0/secondaryactive0 presence by skeleton type."""
+    report = []
     names_lower = [o.name.lower() for o in meshes]
     has_primary = any(n.startswith("primaryactive0__") for n in names_lower)
     has_secondary = any(n.startswith("secondaryactive0__") for n in names_lower)
@@ -423,27 +413,33 @@ def runSelectCleanup(context):
             report.append(('INFO', "Melee skeleton: no primaryactive0__ object found"))
         if not has_secondary:
             report.append(('INFO', "Melee skeleton: no secondaryactive0__ object, check if needed"))
+    return report
 
-    # 5. collapse repeated material slots on a single object (same material
-    # assigned to two slots), so the count check below sees real materials
+def dedupeSlots(meshes):
+    """Step 5: collapse repeated material slots on a single object (the same
+    material assigned to two slots), so the count check sees real materials."""
     slot_deduped = []
     for obj in meshes:
         removed = dedupeMaterialSlots(obj)
         if removed:
             slot_deduped.append("%s (%d)" % (obj.name, removed))
     if slot_deduped:
-        report.append(('INFO', "Removed duplicate material slots from %d object(s): %s" % (len(slot_deduped), ", ".join(slot_deduped))))
+        return [('INFO', "Removed duplicate material slots from %d object(s): %s" % (len(slot_deduped), ", ".join(slot_deduped)))]
+    return []
 
-    # 6. material count per object
+def checkMaterialCounts(meshes):
+    """Step 6: material count per object - the game allows one or two."""
     bad_counts = []
     for obj in meshes:
         count = sum(1 for slot in obj.material_slots if slot.material)
         if count > 2 or count == 0:
             bad_counts.append("%s (%d)" % (obj.name, count))
     if bad_counts:
-        report.append(('ERROR', "Objects need 1-2 materials: %s" % ", ".join(bad_counts)))
+        return [('ERROR', "Objects need 1-2 materials: %s" % ", ".join(bad_counts))]
+    return []
 
-    # 7. de-duplicate identical materials (material1 vs material1.001)
+def mergeDuplicateMaterials(meshes):
+    """Step 7: de-duplicate identical materials (material1 vs material1.001)."""
     fingerprints = {}
     remapped = []
     for material in uniqueMaterials(meshes):
@@ -458,9 +454,11 @@ def runSelectCleanup(context):
                     slot.material = original
         remapped.append("%s -> %s" % (material.name, original.name))
     if remapped:
-        report.append(('INFO', "Merged duplicate materials: %s" % ", ".join(remapped)))
+        return [('INFO', "Merged duplicate materials: %s" % ", ".join(remapped))]
+    return []
 
-    # 8. objects with no weights at all
+def checkWeights(meshes):
+    """Step 8: objects with no vertex weights at all."""
     weightless = []
     for obj in meshes:
         has_weight = False
@@ -472,20 +470,12 @@ def runSelectCleanup(context):
         if not has_weight:
             weightless.append(obj.name)
     if weightless:
-        report.append(('ERROR', "Objects with no vertex weights: %s" % ", ".join(weightless)))
+        return [('ERROR', "Objects with no vertex weights: %s" % ", ".join(weightless))]
+    return []
 
-    # 8b. optional UV map tidy-up: keep the active UV map only, under the
-    # default name. Off by default - it deletes UV data, so it stays a
-    # deliberate tick rather than something a routine check does behind you.
-    # Runs before the tile checks so they measure the map that will export.
-    if armature.med2_toolkit_unit_export.clean_uv_layers:
-        report.extend(cleanUVLayers(meshes))
-
-    # 9. per-texture UV tile placement runs separately (checkUVSpace), after
-    # the operator has auto-detected the main/attach textures, so it can tell
-    # main objects (first tile) from attach objects (tile to the right).
-
-    # 10. texture dimensions
+def checkTextureSizes(meshes):
+    """Step 10: texture dimensions - square, a power of two, 512/1024/2048."""
+    report = []
     seen_images = set()
     for material in uniqueMaterials(meshes):
         if not material.use_nodes:
@@ -503,6 +493,61 @@ def runSelectCleanup(context):
             elif w not in RECOMMENDED_SIZES:
                 hint = "too low" if w < RECOMMENDED_SIZES[0] else "too high"
                 report.append(('WARNING', "%s: %dx%d is %s, 512/1024/2048 recommended" % (node.image.name, w, h, hint)))
+    return report
+
+# Every pass runSelectCleanup runs, in the order it runs them: (settings
+# property, function taking (armature, meshes)). The panel draws its tick boxes
+# off the same list, so a pass added here needs no separate UI edit. The order
+# matters - the slot dedupe has to run before the count check looks at the
+# slots, and the UV tidy-up before anything measures a UV map.
+CLEANUP_PASSES = [
+    ('check_fix_names', lambda armature, meshes: cleanNames(meshes)),
+    ('check_weapon_meshes', checkWeaponMeshes),
+    ('check_material_slots', lambda armature, meshes: dedupeSlots(meshes)),
+    ('check_material_count', lambda armature, meshes: checkMaterialCounts(meshes)),
+    ('check_merge_materials', lambda armature, meshes: mergeDuplicateMaterials(meshes)),
+    ('check_weights', lambda armature, meshes: checkWeights(meshes)),
+    # optional UV map tidy-up: keep the active UV map only, under the default
+    # name. Off by default - it deletes UV data, so it stays a deliberate tick
+    # rather than something a routine check does behind you. Runs before the
+    # tile checks so they measure the map that will export.
+    ('clean_uv_layers', lambda armature, meshes: cleanUVLayers(meshes)),
+    # 9. per-texture UV tile placement runs separately (checkUVSpace), after
+    # the operator has auto-detected the main/attach textures, so it can tell
+    # main objects (first tile) from attach objects (tile to the right).
+    ('check_texture_sizes', lambda armature, meshes: checkTextureSizes(meshes)),
+]
+
+def runSelectCleanup(context):
+    """Select the armature's export set and run the passes that are ticked.
+    Returns a list of (level, message) where level is INFO/WARNING/ERROR."""
+    report = []
+    armature = activeExportArmature(context)
+    if not armature:
+        return [('ERROR', "Select an Armature first")]
+
+    deselectAll(context)
+    meshes = exportMeshes(context, armature)
+    if not meshes:
+        return [('ERROR', "No mesh objects found under the armature (check the Visible Only toggle)")]
+
+    # a hidden object silently refuses select_set(), so the armature has to be
+    # visible to be part of the checked set. One that a control rig drives was
+    # hidden by the toolkit on purpose, so that one goes back down afterwards.
+    rehide = armature.hide_get() and controlRigOf(armature) is not None
+    armature.hide_set(False)
+    armature.select_set(True)
+    for obj in meshes:
+        obj.select_set(True)
+    context.view_layer.objects.active = armature
+
+    settings = armature.med2_toolkit_unit_export
+    for prop, run in CLEANUP_PASSES:
+        if getattr(settings, prop):
+            report.extend(run(armature, meshes))
+
+    if rehide:
+        armature.hide_set(True)
 
     if not report:
         report.append(('INFO', "All checks passed"))

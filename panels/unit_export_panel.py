@@ -7,7 +7,7 @@ from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty
 from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJsonCached
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate, bmdbEntryText, normalFileName
-from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV
+from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV, CLEANUP_PASSES
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, finishIWTEJob, iwteOutputReady,
                               iwteProgress, redrawView3D, waitForIWTEJob)
@@ -212,6 +212,21 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     export_animations: BoolProperty(name = "Export Animations", description = "Bake actions into the GLB. Slow and unnecessary for .mesh conversion, and reimports with the rig posed", default = False)
     clean_uv_layers: BoolProperty(name = "Clean UV Maps", description = "During the check, delete every UV map except the render one on each mesh - the layer with the camera icon in the UV Maps list - and rename it to UVMap, Blender's default. A mesh that carries several UV maps (a SimpleBake layer, an import leftover) exports all of them into the GLB and IWTE reads whichever came first, so the unit can end up textured off a map you were not looking at. Off by default: it deletes UV data. Material UV Map nodes naming a layer that goes are repointed at the survivor", default = False)
     select_wrong_uv: BoolProperty(name = "Select objects with wrong UV", description = "After the check, select the objects whose UVs are in the wrong tile and enter UV/edit mode on them", default = False)
+    # One tick per pass "Check Model for Export" runs, so a fix that fights
+    # what you are doing can be turned off without giving up the whole check.
+    # All default on except the two that were already opt-in below, so a rig
+    # from an older file behaves exactly as it did.
+    show_check_options: BoolProperty(name = "Check options", description = "Show the individual passes the check runs, so any of them can be turned off", default = False)
+    check_fix_names: BoolProperty(name = "Fix mesh names", description = "Rename the meshes to the x__y export format: strip Blender's trailing .001 numbers, double the first underscore, and turn a name ending in a number into name__name_number. The __opt marker is kept. Off leaves every name exactly as it is - including names the game will not read", default = True)
+    check_weapon_meshes: BoolProperty(name = "Check weapon meshes", description = "Report a missing primaryactive0__ or secondaryactive0__ object. A warning on a ranged skeleton, which needs both, and a note on a melee one", default = True)
+    check_material_slots: BoolProperty(name = "Remove duplicate material slots", description = "Collapse slots on the same object that hold the same material, keeping the faces on the surviving slot. Off means the material count check below sees those extra slots and can call a two-material object a three-material one", default = True)
+    check_material_count: BoolProperty(name = "Check material count", description = "Report objects that carry no material or more than two. A unit mesh is one material (main) or two (main + attachment)", default = True)
+    check_merge_materials: BoolProperty(name = "Merge duplicate materials", description = "Point every slot using a byte-identical copy of a material (material1.001 next to material1) at the original and drop the copy. Materials are matched on their textures and settings, not their names", default = True)
+    check_assign_materials: BoolProperty(name = "Auto-assign main and attach", description = "Fill the Main and Attach material slots below by reading the material names (_main, _attach, _at), fall back to the lone remaining material for main, and fold any extra material into whichever of the two it looks like. Off leaves the slots as you set them - the UV tile check needs them, so it reports nothing while both are empty", default = True)
+    check_weights: BoolProperty(name = "Check vertex weights", description = "Report objects with no vertex weight at all. Those meshes stay at the origin in game instead of following the skeleton", default = True)
+    check_uv_tiles: BoolProperty(name = "Check UV tile placement", description = "Report meshes whose UVs sit in the wrong tile: main-texture objects belong in the first tile, attachment objects in the tile to its right. Needs the main and attach materials to be known", default = True)
+    check_texture_sizes: BoolProperty(name = "Check texture sizes", description = "Report textures that are not square, not a power of two, or outside the recommended 512/1024/2048", default = True)
+    check_task_file: BoolProperty(name = "Pick up the IWTE task file", description = "Set the rig's IWTE task template from the skeleton it is parented to, for rigs made before the sample task files existed. Only fills a template in, never replaces one you picked", default = True)
     bmdb_entry_name: StringProperty(name = "BMDB Entry Name", description = "Model name at the top of the generated BMDB entry. Leave blank to use the mesh name")
     export_glb_name: StringProperty(name = "Mesh Name", description = "Name of the exported GLB/mesh file and its output subfolder", default = "export")
     last_export_dir: StringProperty(default = "", options = {'HIDDEN'})
@@ -262,6 +277,38 @@ class MED_2_TOOLKIT_Unit_Export_Data(bpy.types.PropertyGroup):
     install_summary: StringProperty(default = "", options = {'HIDDEN'})
 
 
+# The tick boxes under "Check Model for Export", in the order the check runs
+# them. The cleanup passes come from export_checks so the two lists cannot drift
+# apart; the rest are the steps the operator itself runs around them, slotted in
+# where they happen. Adding a pass to CLEANUP_PASSES is enough to draw it here.
+CHECK_OPTION_PROPS = [prop for prop, _run in CLEANUP_PASSES]
+CHECK_OPTION_PROPS.insert(CHECK_OPTION_PROPS.index('check_weights'), 'check_assign_materials')
+CHECK_OPTION_PROPS.insert(CHECK_OPTION_PROPS.index('check_texture_sizes'), 'check_uv_tiles')
+CHECK_OPTION_PROPS.append('check_task_file')
+
+
+class MED_2_TOOLKIT_OT_Check_Options_All(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.check_options_all"
+    bl_label = "Set every check option"
+    bl_description = ("Tick or untick every pass of the check at once. All includes Clean UV Maps, "
+                      "which deletes the UV maps a mesh is not rendering with")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    enable: BoolProperty(name = "Enable", description = "Tick every pass rather than untick them", default = True)
+
+    @classmethod
+    def poll(cls, context):
+        return activeExportArmature(context) is not None
+
+    def execute(self, context):
+        export_data = exportSettings(context)
+        for prop in CHECK_OPTION_PROPS:
+            setattr(export_data, prop, self.enable)
+        self.report({'INFO'}, "%s %d check option(s)"
+                    % ("Enabled" if self.enable else "Disabled", len(CHECK_OPTION_PROPS)))
+        return {'FINISHED'}
+
+
 SEVERITY_ORDER = {'ERROR': 0, 'WARNING': 1, 'INFO': 2}
 SEVERITY_ICONS = {'ERROR': 'CANCEL', 'WARNING': 'ERROR', 'INFO': 'INFO'}
 
@@ -293,17 +340,21 @@ class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
         # remaining material once attach is known, and fold any extra
         # materials into main/attach
         export_data = exportSettings(context)
-        results.extend(autoAssignMaterials(context))
+        if export_data.check_assign_materials:
+            results.extend(autoAssignMaterials(context))
 
         # rigs parented to a QOL skeleton before this addon version have no task
         # file yet, so pick theirs up here too
-        skeleton = iwte_tasks.applySkeletonTask(activeExportArmature(context))
-        if skeleton:
-            results.append(('INFO', "Rigged to the %s skeleton: using its IWTE sample task file" % skeleton))
+        if export_data.check_task_file:
+            skeleton = iwte_tasks.applySkeletonTask(activeExportArmature(context))
+            if skeleton:
+                results.append(('INFO', "Rigged to the %s skeleton: using its IWTE sample task file" % skeleton))
 
         # UV tile placement, right after the main/attach textures are known
-        uv_results, wrong_uv = checkUVSpace(context)
-        results.extend(uv_results)
+        wrong_uv = []
+        if export_data.check_uv_tiles:
+            uv_results, wrong_uv = checkUVSpace(context)
+            results.extend(uv_results)
 
         # errors first so the most severe findings are instantly visible
         results = sorted(results, key=lambda r: SEVERITY_ORDER.get(r[0], 2))
@@ -974,7 +1025,23 @@ class MED_2_TOOLKIT_PT_Unit_Export(bpy.types.Panel):
         col.prop(export_data, "export_glb_name")
 
         layout.operator("medieval2toolkit.select_cleanup", icon='CHECKMARK')
-        layout.prop(export_data, "clean_uv_layers")
+
+        # what the check does, one tick each, folded away by default so the
+        # button stays the whole of it for anyone not tuning the passes
+        box = layout.box()
+        header = box.row(align=True)
+        header.alignment = 'LEFT'
+        header.prop(export_data, "show_check_options", text="Check options",
+                    icon='TRIA_DOWN' if export_data.show_check_options else 'TRIA_RIGHT',
+                    emboss=False)
+        if export_data.show_check_options:
+            row = box.row(align=True)
+            row.operator("medieval2toolkit.check_options_all", text="All").enable = True
+            row.operator("medieval2toolkit.check_options_all", text="None").enable = False
+            col = box.column(align=True)
+            for prop in CHECK_OPTION_PROPS:
+                col.prop(export_data, prop)
+
         layout.prop(export_data, "select_wrong_uv")
         layout.operator("medieval2toolkit.auto_assign_uv", icon='UV')
 
@@ -1307,6 +1374,7 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
 classes = [
     MED_2_TOOLKIT_Export_Faction,
     MED_2_TOOLKIT_Unit_Export_Data,
+    MED_2_TOOLKIT_OT_Check_Options_All,
     MED_2_TOOLKIT_OT_Select_Cleanup,
     MED_2_TOOLKIT_OT_Force_Textures,
     MED_2_TOOLKIT_OT_Auto_Assign_UV,
