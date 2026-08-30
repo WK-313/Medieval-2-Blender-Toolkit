@@ -20,6 +20,21 @@ import time
 IWTE_OUTPUT_TIMEOUT = 300.0
 # The output counts as written once it has stopped growing for this long.
 IWTE_QUIET_SECONDS = 1.0
+# How long a conversion may run before the toolkit asks whether to keep waiting.
+# There is no upper bound on how long IWTE can legitimately take - a whole
+# faction's meshes is minutes of work - so this is a prompt, never a kill: the
+# answer defaults to carrying on. Each prompt doubles the next interval so a
+# genuinely long job backs off instead of nagging.
+IWTE_STALL_SECONDS = 180.0
+# The longest a BLOCKING task run (the import side, which has no event loop to
+# drive a prompt from) freezes Blender before it gives up waiting. IWTE is left
+# running - whatever it has written by then is used, and anything still missing
+# is reported - because killing it mid-conversion is how you get a half-written
+# .glb that then has to be found and deleted by hand.
+IWTE_TASK_TIMEOUT = 900.0
+# How often a blocking wait prints that it is still going, so the system console
+# the stall message points at actually has something in it.
+IWTE_HEARTBEAT_SECONDS = 15.0
 
 # Windows CREATE_NO_WINDOW: IWTE brings up its own window, the console behind it
 # is just noise. Off Windows the flag does not exist and subprocess rejects any
@@ -140,12 +155,15 @@ def startIWTETask(iwte_exe, iwte_dir, task_path, output_path):
         creationflags=NO_CONSOLE_WINDOW
     )
 
+    now = time.time()
     return {
         'process': process,
         'output_path': output_path,
         'output_name': os.path.basename(output_path),
         'previous_mtime': previous_mtime,
-        'start': time.time(),
+        'start': now,
+        'stall_interval': IWTE_STALL_SECONDS,
+        'stall_deadline': now + IWTE_STALL_SECONDS,
     }
 
 
@@ -153,6 +171,56 @@ def iwteProgress(elapsed):
     """IWTE gives no percentage feedback, so the bar eases toward full over
     time and jumps to done when the file lands on disk."""
     return 1.0 - math.exp(-elapsed / 10.0)
+
+
+def iwteStalled(job):
+    """Whether this job has run long enough that the user should be asked what
+    to do with it. Nothing here decides to stop - the caller prompts, and the
+    default answer is to carry on."""
+    deadline = job.get('stall_deadline')
+    return deadline is not None and time.time() >= deadline
+
+
+def rearmStall(job):
+    """Give the job another - longer - stretch before it asks again. Doubling
+    means a conversion that is simply big is asked about once or twice rather
+    than every three minutes for the rest of the afternoon."""
+    interval = job.get('stall_interval', IWTE_STALL_SECONDS) * 2
+    job['stall_interval'] = interval
+    job['stall_deadline'] = time.time() + interval
+
+
+def abortIWTEJob(job):
+    """Stop the conversion at the user's request. The process is killed rather
+    than asked to close: IWTE has no console to send a break to, and the window
+    it puts up is waiting on the conversion, not on input."""
+    job['aborted'] = True
+    job['stall_deadline'] = None
+    process = job.get('process')
+    if process is not None and process.poll() is None:
+        try:
+            process.kill()
+        except OSError:
+            pass
+
+
+def openSystemConsole():
+    """Show Blender's system console, so the toolkit's own output is visible
+    while a conversion runs. Only Windows builds have one to toggle; everywhere
+    else Blender was started from a terminal that is already showing it."""
+    import bpy
+    if not hasattr(bpy.ops.wm, 'console_toggle'):
+        return False
+    try:
+        bpy.ops.wm.console_toggle()
+    except RuntimeError:
+        return False
+    return True
+
+
+def hasSystemConsole():
+    import bpy
+    return hasattr(bpy.ops.wm, 'console_toggle')
 
 
 def redrawView3D(context):
@@ -185,6 +253,9 @@ def finishIWTEJob(job, success):
     if success:
         size = os.stat(job['output_path']).st_size
         return ('INFO', "IWTE conversion finished: %s (%d KB) in %.1fs" % (job['output_name'], max(1, size // 1024), elapsed))
+    if job.get('aborted'):
+        return ('WARNING', "IWTE conversion aborted after %.0fs - %s was not written"
+                           % (elapsed, job['output_name']))
     returncode = job['process'].returncode
     verb = "updated" if job['previous_mtime'] is not None else "created"
     return ('ERROR', "IWTE exited (code %s) but %s was not %s within %ds - check the task file and IWTE window" % (returncode, job['output_name'], verb, int(IWTE_OUTPUT_TIMEOUT)))
@@ -200,3 +271,33 @@ def waitForIWTEJob(job):
         time.sleep(0.5)
         success = iwteOutputReady(job)
     return success
+
+
+def waitForTaskProcess(process, label):
+    """Block on a task-file run, printing a heartbeat and giving up eventually.
+
+    This is the import side, where there is no modal operator and so no way to
+    put a question on screen while the wait is happening - Blender's UI is held
+    by the operator that started it. So the two things that CAN be done are done
+    instead: the console gets a line every few seconds, which is what the stall
+    message tells people to go and look at, and the wait is bounded so a hung
+    IWTE cannot freeze Blender for the rest of the session.
+
+    Returns True if IWTE finished on its own. On False it is still running - it
+    is deliberately not killed, since a half-written .glb is worse than a slow
+    one, and the caller reports which models did not appear."""
+    start = time.time()
+    next_beat = start + IWTE_HEARTBEAT_SECONDS
+    while True:
+        if process.poll() is not None:
+            return True
+        now = time.time()
+        if now - start >= IWTE_TASK_TIMEOUT:
+            print("Medieval 2 Toolkit: %s has been running for %.0fs - no longer waiting. "
+                  "IWTE has been left running; re-run the import once it has finished."
+                  % (label, now - start))
+            return False
+        if now >= next_beat:
+            print("Medieval 2 Toolkit: %s still running (%.0fs)..." % (label, now - start))
+            next_beat = now + IWTE_HEARTBEAT_SECONDS
+        time.sleep(0.25)

@@ -3,7 +3,7 @@ import bpy
 import subprocess
 
 from ..directories import modRoot, withTrailingSep
-from .iwte_run import NO_WINE, findIWTEExe, winePath, wineWrap
+from .iwte_run import NO_WINE, findIWTEExe, waitForTaskProcess, winePath, wineWrap
 
 # Task files the toolkit writes for IWTE, all of them in IWTE's own iwte_tasks
 # folder. Built with os.path.join rather than by adding strings: the Paths
@@ -34,12 +34,17 @@ def modDirectory():
     return modRoot(reader.directory_mod_data)
 
 
-def runTask(iwte_path, task_name):
-    """Hand one task file to IWTE. The executable carries its version in its
-    name, so it is matched by prefix rather than globbed onto the folder path.
+def startTask(iwte_path, task_name):
+    """Hand one task file to IWTE and return the running process.
 
-    Off Windows this goes through Wine, and the task file has to be named by its
-    Windows path - IWTE reads a POSIX one as relative to its own folder."""
+    The executable carries its version in its name, so it is matched by prefix
+    rather than globbed onto the folder path. Off Windows this goes through
+    Wine, and the task file has to be named by its Windows path - IWTE reads a
+    POSIX one as relative to its own folder.
+
+    Split out of runTask so a modal operator can watch the conversion from its
+    own timer and keep Blender responsive, rather than holding the UI for as
+    long as IWTE takes."""
     iwte_dir = bpy.path.abspath(iwte_path)
     iwte_exe = findIWTEExe(iwte_dir)
     if not iwte_exe:
@@ -47,7 +52,13 @@ def runTask(iwte_path, task_name):
     command = wineWrap([iwte_exe, "--uh", "--st", winePath(taskPath(iwte_path, task_name))])
     if not command:
         raise FileNotFoundError(NO_WINE % "IWTE")
-    subprocess.run(command, cwd = iwte_dir)
+    return subprocess.Popen(command, cwd = iwte_dir)
+
+
+def runTask(iwte_path, task_name):
+    """startTask, waited on. Returns True if IWTE finished by itself; on False
+    it is still going and the caller should say which models did not appear."""
+    return waitForTaskProcess(startTask(iwte_path, task_name), task_name)
 
 
 def appendToTask(iwte_path, task_name, entry):
@@ -84,7 +95,7 @@ def unitTaskAppend(unit):
     appendToTask(bpy.context.scene.med2_toolkit_reader.directory_iwte, 'toolkit_bmdb_task.txt', unit)
 
 def unitTaskRun():
-    runTask(bpy.context.scene.med2_toolkit_reader.directory_iwte, 'toolkit_bmdb_task.txt')
+    return runTask(bpy.context.scene.med2_toolkit_reader.directory_iwte, 'toolkit_bmdb_task.txt')
 
 #########################
 ######## Engines ########
@@ -110,7 +121,7 @@ def engineTaskAppend(engine):
     appendToTask(bpy.context.scene.med2_toolkit_reader.directory_iwte, 'toolkit_engine_task.txt', engine)
 
 def engineTaskRun():
-    runTask(bpy.context.scene.med2_toolkit_reader.directory_iwte, 'toolkit_engine_task.txt')
+    return runTask(bpy.context.scene.med2_toolkit_reader.directory_iwte, 'toolkit_engine_task.txt')
 
 #########################
 ###### Settlements ######
@@ -136,4 +147,4 @@ def settlementTaskAppend(settlement):
     appendToTask(bpy.context.scene.med2_toolkit_reader.directory_iwte, 'toolkit_settlement_task.txt', settlement)
 
 def settlementTaskRun():
-    runTask(bpy.context.scene.med2_toolkit_reader.directory_iwte, 'toolkit_settlement_task.txt')
+    return runTask(bpy.context.scene.med2_toolkit_reader.directory_iwte, 'toolkit_settlement_task.txt')

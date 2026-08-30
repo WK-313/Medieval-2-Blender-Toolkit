@@ -14,13 +14,13 @@ from bpy.props import (BoolProperty, EnumProperty, FloatProperty, PointerPropert
 
 from ..directories import saveFolderPaths
 from ..tasks.export_checks import activeExportArmature
-from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, finishIWTEJob, iwteOutputReady,
+from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, finishIWTEJob, iwteOutputReady, iwteStalled,
                               iwteProgress, redrawView3D, waitForIWTEJob)
 from ..tasks.strat_model import (STRAT_TRIANGLE_LIMIT, activeStratArmature, buildStratModel,
                                  checkCASTexture, exportStratCAS, exportStratGLB,
                                  installStratModel, modelTriangles, triangleLevel)
 from ..tasks.unit_exporter import open_folder, selectedModFolder
-from .unit_export_panel import showResultsPopup
+from .unit_export_panel import askAboutStall, showResultsPopup
 
 
 def suggestedNames(context):
@@ -222,7 +222,11 @@ class MED_2_TOOLKIT_OT_Strat_Convert_CAS(bpy.types.Operator):
         redrawView3D(context)
         if iwteOutputReady(job):
             return self.stop(context, True)
+        if job.get('aborted'):
+            return self.stop(context, False)
         if job['process'].poll() is None:
+            if iwteStalled(job):
+                askAboutStall(context, job, "The .cas conversion")
             return {'RUNNING_MODAL'}
         # process gone: IWTE writes the .cas late, so keep watching the folder
         if job.get('exit_time') is None:

@@ -9,8 +9,10 @@ from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJson
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate, bmdbEntryText, normalFileName
 from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV, CLEANUP_PASSES
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
-from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, finishIWTEJob, iwteOutputReady,
-                              iwteProgress, redrawView3D, waitForIWTEJob)
+from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, abortIWTEJob, finishIWTEJob,
+                              hasSystemConsole, iwteOutputReady, iwteProgress,
+                              iwteStalled, openSystemConsole, rearmStall,
+                              redrawView3D, waitForIWTEJob)
 from ..tasks import bmdb_install, modeldb, iwte_tasks
 
 script_folder = Path(__file__).parent.parent
@@ -321,6 +323,95 @@ def showResultsPopup(context, title, results):
     worst = min((SEVERITY_ORDER.get(level, 2) for level, _ in results), default=2)
     icon = ('CANCEL', 'ERROR', 'CHECKMARK')[worst]
     context.window_manager.popup_menu(draw, title=title, icon=icon)
+
+
+# The job a stall dialog is currently asking about. IWTE conversions are started
+# from three different places (unit export, strat export, batch import) and each
+# keeps its own job dict, so the dialog is pointed at one rather than importing
+# from all three - which would be a circular import in two of the three cases.
+_stall_job = None
+
+
+def askAboutStall(context, job, what):
+    """Put the stall dialog up for `job`. Called from a modal operator's timer,
+    which is the only place in Blender where a dialog can be raised while
+    something is still running: the modal keeps ticking underneath it and reads
+    back whatever the dialog wrote onto the job."""
+    global _stall_job
+    if bpy.app.background or context.window is None:
+        rearmStall(job)
+        return
+    _stall_job = job
+    job['stall_what'] = what
+    job['stall_asked'] = time.time() - job['start']
+    # disarmed before the dialog goes up: the modal timer keeps ticking while it
+    # is open, and an armed job would raise a fresh dialog five times a second.
+    # The dialog re-arms on any answer but Abort.
+    job['stall_deadline'] = None
+    bpy.ops.medieval2toolkit.iwte_stalled('INVOKE_DEFAULT')
+
+
+class MED_2_TOOLKIT_OT_IWTE_Stalled(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.iwte_stalled"
+    bl_label = "IWTE is taking a while"
+    bl_description = "Decide what to do about a conversion that has been running for a long time"
+    bl_options = {"REGISTER", "INTERNAL"}
+
+    action: EnumProperty(
+        name = "",
+        description = "What to do about the running conversion",
+        items = [('WAIT', "Keep Waiting", "Let IWTE carry on. Nothing is stopped - this is the right answer for a big model or a whole faction"),
+                 ('CONSOLE', "Open Console", "Show Blender's system console, which the toolkit prints its progress to, and carry on waiting"),
+                 ('ABORT', "Abort", "Stop IWTE. Whatever it has already written is kept, and the conversion is reported as aborted")],
+        default = 'WAIT')
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=460)
+
+    def draw(self, context):
+        job = _stall_job
+        col = self.layout.column()
+        if job is None:
+            col.label(text="The conversion has already finished.", icon='CHECKMARK')
+            return
+        col.label(text="%s has been running for %d seconds."
+                       % (job.get('stall_what', "The IWTE conversion"), int(job.get('stall_asked', 0))),
+                  icon='TIME')
+        col.label(text="Nothing has gone wrong yet - a big model, or a whole faction's meshes,")
+        col.label(text="genuinely takes this long. Ignore this and press OK to let it run.")
+        col.separator()
+        col.label(text="IWTE runs in its own window - check it for a prompt or an error.", icon='WINDOW')
+        if hasSystemConsole():
+            col.label(text="Open Console shows the toolkit's own output as it goes.", icon='CONSOLE')
+        else:
+            col.label(text="The toolkit's output goes to the terminal Blender was started from.", icon='CONSOLE')
+        col.separator()
+        row = col.row(align=True)
+        row.prop(self, "action", expand=True)
+
+    def execute(self, context):
+        global _stall_job
+        job = _stall_job
+        _stall_job = None
+        if job is None:
+            return {'CANCELLED'}
+        if self.action == 'ABORT':
+            abortIWTEJob(job)
+            self.report({'WARNING'}, "Aborting the IWTE conversion")
+            return {'FINISHED'}
+        if self.action == 'CONSOLE' and not openSystemConsole():
+            self.report({'INFO'}, "No system console on this build - check the terminal Blender was started from")
+        rearmStall(job)
+        return {'FINISHED'}
+
+    def cancel(self, context):
+        # Dismissed with Esc or by clicking away. Treated as Keep Waiting, so
+        # walking away from the dialog is the same as answering its default.
+        global _stall_job
+        job = _stall_job
+        _stall_job = None
+        if job is not None:
+            rearmStall(job)
 
 
 class MED_2_TOOLKIT_OT_Select_Cleanup(bpy.types.Operator):
@@ -895,7 +986,11 @@ class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
         redrawView3D(context)
         if iwteOutputReady(job):
             return self.stop(context, True)
+        if job.get('aborted'):
+            return self.stop(context, False)
         if job['process'].poll() is None:
+            if iwteStalled(job):
+                askAboutStall(context, job, "The .mesh conversion")
             return {'RUNNING_MODAL'}
         # process gone: keep watching the folder, IWTE writes the mesh late
         if job.get('exit_time') is None:
@@ -1375,6 +1470,7 @@ classes = [
     MED_2_TOOLKIT_Export_Faction,
     MED_2_TOOLKIT_Unit_Export_Data,
     MED_2_TOOLKIT_OT_Check_Options_All,
+    MED_2_TOOLKIT_OT_IWTE_Stalled,
     MED_2_TOOLKIT_OT_Select_Cleanup,
     MED_2_TOOLKIT_OT_Force_Textures,
     MED_2_TOOLKIT_OT_Auto_Assign_UV,
