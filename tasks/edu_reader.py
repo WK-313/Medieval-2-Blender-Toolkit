@@ -5,45 +5,71 @@ import unicodedata
 from pathlib import Path
 from .text_io import readModLines
 
-def eduReader(mod_folder):
-    try:
-        lines = readModLines(os.path.join(mod_folder, 'descr_sm_factions.txt'), 'utf-8')
-        available_factions_list = [re.sub(";.*", " ", line).lower().rstrip().split()[1] for line in lines if line[:7].lower() == 'faction']
-    except FileNotFoundError as error:
-        return('No descr_sm_factions.txt found in the specified directory.\n%s' % error)
-    try:
-        lines = readModLines(os.path.join(mod_folder, 'text', 'expanded.txt'), 'utf-16')
-        skips = ['_descr}', '_descr_short}']
-        expanded_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
-    except FileNotFoundError as error:
-        return('No expanded.txt found in the specified directory.\n%s' % error)
+# Lines of an EDU entry the toolkit cares about. Everything else - the stats,
+# the costs, the attributes - is left to the game and to a text editor.
+EDU_KEYWORDS = ['type', 'dictionary', 'officer', 'formation', 'mount', 'engine',
+                'armour_ug_models', 'ownership', 'era', 'info_pic_dir', 'card_pic_dir']
 
-    faction_database = {}
-    for faction in available_factions_list:
-        for name in expanded_lines:
-            if ('{%s' % faction) in name.split('}'):
-                faction_name = ' '.join(x.title() for x in name.split('}')[1:])
-                normalized_faction_name = unicodedata.normalize('NFKD', faction_name).encode('ascii', 'ignore')
-                faction_database[normalized_faction_name.decode('ascii')] = faction
-    try:
-        lines = readModLines(os.path.join(mod_folder, 'export_descr_unit.txt'), 'utf-8')
-        edu_keywords = ['type', 'dictionary', 'officer', 'formation', 'mount', 'engine', 'armour_ug_models', 'ownership', 'era', 'info_pic_dir', 'card_pic_dir']
-        edu_lines = [re.sub(",|;.*", " ", line).lower().strip().split() for line in lines if not line.strip().startswith(';') and len(line.split()) > 1]
-        edu_cleaned = []
-        for line in edu_lines:
-            if line[0] not in edu_keywords:
-                continue
-            edu_cleaned.append(line)
-    except FileNotFoundError as error:
-        return('No export_descr_unit.txt found in the specified directory.\n%s' % error)
+# M2TWEOP lets a mod spell the type line "eopOnlyType" so the mod refuses to
+# launch without EOP. It is the same field, so it is read as one.
+TYPE_KEYWORDS = ('type', 'eoponlytype')
 
-    try:
-        lines = readModLines(os.path.join(mod_folder, 'text', 'export_units.txt'), 'utf-16')
-        skips = ['_descr}', '_descr_short}']
-        eu_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
-    except FileNotFoundError as error:
-        return('No export_units.txt found in the specified directory.\n%s' % error)
+# Where M2TWEOP's own documentation puts unit files, relative to the mod folder:
+#   M2TWEOPDU.addEopEduEntryFromFile(M2TWEOP.getModPath().."/eopData/unitTypes/myTestType.txt", 1000)
+# Each file holds one unit described exactly as it would be in
+# export_descr_unit.txt, so the same parser reads both.
+EOP_SUBFOLDER = os.path.join('eopData', 'unitTypes')
 
+
+def eopFolder(mod_folder, configured=''):
+    """Folder of M2TWEOP unit files to read, or '' when there is none.
+
+    A folder set in the Paths panel wins; blank means look for the mod's own
+    eopData\\unitTypes, which is the layout M2TWEOP documents. A mod that does
+    not use EOP simply has no such folder and nothing is read."""
+    configured = (configured or '').strip().strip('"').strip("'")
+    if configured:
+        return configured if os.path.isdir(configured) else ''
+    # mod_folder is the mod's data folder, so eopData sits beside it
+    default = os.path.join(os.path.dirname(os.path.normpath(mod_folder)), EOP_SUBFOLDER)
+    return default if os.path.isdir(default) else ''
+
+
+def eopFiles(folder):
+    """Every .txt under an EOP folder, searched recursively and in a stable
+    order. Recursive because mods group their unit files into subfolders."""
+    if not folder:
+        return []
+    found = []
+    for root, _dirs, files in os.walk(folder):
+        for file_name in files:
+            if file_name.lower().endswith('.txt'):
+                found.append(os.path.join(root, file_name))
+    return sorted(found)
+
+
+def eduKeywordLines(lines):
+    """The keyword lines of an EDU file, lowercased and split into tokens.
+    Comments and anything the toolkit does not read are dropped."""
+    cleaned = []
+    for line in lines:
+        if line.strip().startswith(';') or len(line.split()) < 2:
+            continue
+        tokens = re.sub(",|;.*", " ", line).lower().strip().split()
+        if not tokens:
+            continue
+        if tokens[0] in TYPE_KEYWORDS:
+            tokens[0] = 'type'
+        if tokens[0] not in EDU_KEYWORDS:
+            continue
+        cleaned.append(tokens)
+    return cleaned
+
+
+def eduEntries(cleaned, eop_file=''):
+    """[unit dict] for a set of cleaned EDU lines. One export_descr_unit.txt or
+    one EOP unit file goes through here the same way - `eop_file` only records
+    which file an entry came from, so the panels can tell the two apart."""
     unit_type = ''
     unit_id = ''
     unit_attachment = 'unused'
@@ -59,16 +85,18 @@ def eduReader(mod_folder):
     # key is not (two units may share one) and neither is the name it looks up
     # in export_units.txt - so it is kept and used to tell units apart below.
     def unitEntry():
-        return {'Type': unit_type, 'ID': unit_id, 'Model': unit_models, 'Officers': unit_officers, 'Formation': unit_formation, 'Attachment': unit_attachment, 'Owners': unit_ownership, 'Info Card': unit_info_dir, 'Unit Card': unit_card_dir}
+        return {'Type': unit_type, 'ID': unit_id, 'Model': unit_models, 'Officers': unit_officers,
+                'Formation': unit_formation, 'Attachment': unit_attachment, 'Owners': unit_ownership,
+                'Info Card': unit_info_dir, 'Unit Card': unit_card_dir, 'EOP': eop_file}
 
-    temp_database = []
-    for line in edu_cleaned:
+    entries = []
+    for line in cleaned:
         identifier = line[0]
         if identifier == 'type':
             # nothing has been read yet before the first type line, so there is
             # no unit to close off - the old code banked an empty one here
             if unit_type:
-                temp_database.append(unitEntry())
+                entries.append(unitEntry())
             unit_type = ' '.join(line[1:])
             unit_id = ''
             unit_attachment = 'unused'
@@ -97,7 +125,57 @@ def eduReader(mod_folder):
         elif identifier == 'card_pic_dir':
             unit_card_dir = line[1]
     if unit_type:
-        temp_database.append(unitEntry())
+        entries.append(unitEntry())
+    return entries
+
+
+def eduReader(mod_folder, eop_directory=''):
+    try:
+        lines = readModLines(os.path.join(mod_folder, 'descr_sm_factions.txt'), 'utf-8')
+        available_factions_list = [re.sub(";.*", " ", line).lower().rstrip().split()[1] for line in lines if line[:7].lower() == 'faction']
+    except FileNotFoundError as error:
+        return('No descr_sm_factions.txt found in the specified directory.\n%s' % error)
+    try:
+        lines = readModLines(os.path.join(mod_folder, 'text', 'expanded.txt'), 'utf-16')
+        skips = ['_descr}', '_descr_short}']
+        expanded_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
+    except FileNotFoundError as error:
+        return('No expanded.txt found in the specified directory.\n%s' % error)
+
+    faction_database = {}
+    for faction in available_factions_list:
+        for name in expanded_lines:
+            if ('{%s' % faction) in name.split('}'):
+                faction_name = ' '.join(x.title() for x in name.split('}')[1:])
+                normalized_faction_name = unicodedata.normalize('NFKD', faction_name).encode('ascii', 'ignore')
+                faction_database[normalized_faction_name.decode('ascii')] = faction
+    try:
+        lines = readModLines(os.path.join(mod_folder, 'export_descr_unit.txt'), 'utf-8')
+        edu_cleaned = eduKeywordLines(lines)
+    except FileNotFoundError as error:
+        return('No export_descr_unit.txt found in the specified directory.\n%s' % error)
+
+    try:
+        lines = readModLines(os.path.join(mod_folder, 'text', 'export_units.txt'), 'utf-16')
+        skips = ['_descr}', '_descr_short}']
+        eu_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
+    except FileNotFoundError as error:
+        return('No export_units.txt found in the specified directory.\n%s' % error)
+
+    temp_database = eduEntries(edu_cleaned)
+
+    # EOP unit files sit outside export_descr_unit.txt, so a mod using them has
+    # units the toolkit could not see at all until now. Each file is one entry
+    # in the same format, read with the same parser and appended to the same
+    # database, so an EOP unit imports, exports and cards exactly like any other.
+    # A file that cannot be read is skipped rather than failing the whole read -
+    # an EOP folder is a loose pile of text files and not all of them are units.
+    for eop_path in eopFiles(eopFolder(mod_folder, eop_directory)):
+        try:
+            eop_lines = readModLines(eop_path, 'utf-8')
+        except OSError:
+            continue
+        temp_database.extend(eduEntries(eduKeywordLines(eop_lines), eop_path))
 
     # {dictionary key: display name} from export_units.txt, built once instead
     # of rescanning the file per unit. A key that appears twice keeps the last

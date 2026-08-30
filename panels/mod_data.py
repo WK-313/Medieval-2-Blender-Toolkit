@@ -6,7 +6,7 @@ from pathlib import Path
 from .bmdb_panel import sortModels
 from .settlements_panel import sortSettlements
 from ..tasks import edu_reader, bmdb_reader, settlements_reader
-from ..directories import modFolderName, saveFolderPaths, saveSettings
+from ..directories import modFolderName, readJsonCached, saveFolderPaths, saveSettings
 
 script_folder = Path(__file__).parent.parent
 
@@ -18,7 +18,9 @@ def readMod(self, context):
     settlements_result = settlements_reader.findPKGs()
     if settlements_result != 'Finished':
         self.report({'ERROR'}, settlements_result)
-    edu_result = edu_reader.eduReader(bpy.path.abspath(mod_directory))
+    eop_directory = context.scene.med2_toolkit_reader.directory_eop
+    edu_result = edu_reader.eduReader(bpy.path.abspath(mod_directory),
+                                      bpy.path.abspath(eop_directory) if eop_directory else '')
     if edu_result != 'Finished':
         self.report({'ERROR'}, edu_result)
     bmdb_result = bmdb_reader.bmdbReader(bpy.path.abspath(mod_directory))
@@ -119,6 +121,8 @@ class MED2_TOOLKIT_OT_Properties(bpy.types.PropertyGroup):
     directory_unit_cards: StringProperty(name = "Unit card output path", description = "Directory the rendered unit cards are written under, normally the mod's data\\ui folder", default = file_paths.get("directory_unit_cards", file_paths["directory_unit_export"]), subtype = "DIR_PATH")
     directory_strat: StringProperty(name = "Strat model output path", description = "Directory the built strat models, their combined textures and the converted .cas files are written under", default = file_paths.get("directory_strat", file_paths["directory_unit_export"]), subtype = "DIR_PATH")
     directory_iwte_task_template: StringProperty(name = "IWTE task template", description = "IWTE task template file used for GLB to .mesh conversion", default = file_paths["directory_iwte_task_template"], subtype = "FILE_PATH")
+    # .get: directories.json files written by an older toolkit have no EOP path
+    directory_eop: StringProperty(name = "EOP unit folder", description = "Folder of M2TWEOP unit files to read alongside export_descr_unit.txt, searched recursively. Leave blank to use the mod's own eopData\\unitTypes folder", default = file_paths.get("directory_eop", ""), subtype = "DIR_PATH")
 
 
 class MED2_TOOLKIT_OT_Refresh_Mods(bpy.types.Operator):
@@ -143,7 +147,15 @@ class MED2_TOOLKIT_OT_Reader(bpy.types.Operator):
         saveFolderPaths()
         saveSettings()
         readMod(self, context)
-        self.report({'INFO'}, "Finished reading mod data.")
+        # EOP units are counted back out of the dictionary that was just
+        # written, so the report says whether the EOP folder was actually found
+        eop_units = sum(1 for unit in readJsonCached(script_folder/'text'/'unit_dictionary.json').values()
+                        if unit.get('EOP'))
+        if eop_units:
+            self.report({'INFO'}, "Finished reading mod data. %d EOP unit%s included."
+                        % (eop_units, "" if eop_units == 1 else "s"))
+        else:
+            self.report({'INFO'}, "Finished reading mod data.")
         return{"FINISHED"}
 
 
@@ -181,6 +193,10 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
         row.operator("medieval2toolkit.refresh_mods", icon = "FILE_REFRESH", text = "")
         if context.scene.med2_toolkit_reader.mods_filtered == "custom":
             col.prop (context.scene.med2_toolkit_reader, "directory_mod_data", text="Manual Path")
+        # the EOP folder only carries units, so it is drawn in the modes that
+        # read them and left out of the settlement ones
+        if mode in ('unit_import', 'unit_export', 'unit_info'):
+            col.prop (context.scene.med2_toolkit_reader, "directory_eop", text="EOP Units")
         col = layout.column(align=True)
         col.operator ("medieval2toolkit.reader", text="Read Mod Data")
         if(context.mode != 'OBJECT'):

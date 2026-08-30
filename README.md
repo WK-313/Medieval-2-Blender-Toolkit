@@ -25,6 +25,7 @@ Read any mod's data folder and pull its content into Blender:
 - Single unit import has tick boxes for the armour upgrade levels the unit actually has, each labelled with its model ID
 - Import models directly from the battle_models.modeldb (BMDB) with faction filtering, and texture variants labelled "(Same as X)" so the genuinely unique ones stand out
 - EDU-based unit browser with mount / officer / upgrade handling
+- **M2TWEOP units** are read alongside `export_descr_unit.txt`: a mod's own `eopData/unitTypes` folder is found on its own, and the Paths panel's `EOP Units` field points at them if the mod keeps them somewhere else. An EOP unit imports, exports and cards exactly like an EDU one
 - Imported Models list with a "Delete objects with the entry" toggle, so removing an entry also deletes the rig and everything parented to it
 - Unit variation randomizer
 - Batch import strategy `.cas` models

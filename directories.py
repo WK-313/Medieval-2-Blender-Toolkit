@@ -81,7 +81,9 @@ DEFAULT_DIRECTORIES = {
     "directory_unit_export": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
     "directory_unit_cards": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
     "directory_strat": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
-    "directory_iwte_task_template": ""
+    "directory_iwte_task_template": "",
+    # blank means "look in the mod's own eopData\unitTypes folder"
+    "directory_eop": ""
 }
 
 DEFAULT_MENU_SETTINGS = {
@@ -150,7 +152,8 @@ def saveFolderPaths():
         "directory_unit_export": bpy.context.scene.med2_toolkit_reader.directory_unit_export,
         "directory_unit_cards": bpy.context.scene.med2_toolkit_reader.directory_unit_cards,
         "directory_strat": bpy.context.scene.med2_toolkit_reader.directory_strat,
-        "directory_iwte_task_template": bpy.context.scene.med2_toolkit_reader.directory_iwte_task_template
+        "directory_iwte_task_template": bpy.context.scene.med2_toolkit_reader.directory_iwte_task_template,
+        "directory_eop": bpy.context.scene.med2_toolkit_reader.directory_eop
     })
     with open(script_folder/('text/directories.json'), 'w') as directories_output:
         json.dump(directories, directories_output, indent=2)
