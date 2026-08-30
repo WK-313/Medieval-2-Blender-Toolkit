@@ -1,5 +1,7 @@
 import bpy
 import json
+import time
+import traceback
 import uuid
 from bpy.app.handlers import persistent
 from bpy.props import StringProperty, BoolProperty, BoolVectorProperty, PointerProperty, CollectionProperty, IntProperty, EnumProperty
@@ -8,9 +10,11 @@ from pathlib import Path
 from..directories import saveFolderPaths, saveSettings, readJsonCached
 from ..tasks.card_renderer import TARGET_TAG
 from ..tasks.control_rig import controlRigOf, controlledRigs, isControlRig
-from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport
-from ..tasks.task_writer import unitTaskWriter, engineTaskWriter
+from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport, missingModelPaths
+from ..tasks.iwte_run import IWTE_STALL_SECONDS, abortIWTEJob, iwteStalled, redrawView3D
+from ..tasks.task_writer import unitTaskWriter, engineTaskWriter, startTask
 from ..tasks.unit_groups import adoptGroup, deriveRole, groupId, groupParts, groupRoot, unitRole
+from .unit_export_panel import SEVERITY_ORDER, askAboutStall, showResultsPopup
 
 
 script_folder = Path(__file__).parent.parent
@@ -313,6 +317,11 @@ class MED_2_TOOLKIT_OT_Unit_Importer(bpy.types.Operator):
     bl_label = "Import unit"
     bl_description = "Import the ticked armour upgrades of the selected unit."
     bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return _import_job is None
+
     def execute(self, context):
         model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
         faction = context.scene.med2_toolkit_units.import_faction
@@ -341,6 +350,11 @@ class MED_2_TOOLKIT_OT_Officer_Importer(bpy.types.Operator):
     bl_label = "Import officer"
     bl_description = "Import the officers of the selected unit."
     bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return _import_job is None
+
     def execute(self, context):
         with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
             bmdb_dictionary = json.load(bmdb_input)
@@ -368,101 +382,404 @@ class MED_2_TOOLKIT_OT_Officer_Importer(bpy.types.Operator):
         postImport(self, context)
         return{"FINISHED"}
 
-class MED_2_TOOLKIT_OT_Import_Full_Unit(bpy.types.Operator):
+# ---------------------------------------------------------------------------
+# Batch importing
+#
+# Import Full Unit and Import faction are minutes of work, not seconds: a
+# faction is every unit, every armour upgrade and optionally every officer, and
+# the first import of any of them waits on IWTE converting .mesh files as well.
+# Run straight through, that is Blender sitting frozen with nothing on screen,
+# and no way to tell a slow import from a crashed one. So both go through the
+# modal operator below instead: one model per timer tick, a progress bar naming
+# the model it is on, and Esc to stop.
+#
+# The IWTE conversion is hoisted out of the per-unit loop and run ONCE for the
+# whole batch, watched from the same timer rather than blocking. That is a fix
+# in its own right - the task file is only truncated by unitTaskWriter at the
+# start, so a faction import used to hand IWTE a task that grew by one unit each
+# time round and re-converted everything already in it.
+_import_job = None
+
+
+def convertedCount(job):
+    return sum(1 for path in job['convert_expected'] if path.exists())
+
+
+def importProgress(job):
+    """0-1 across both phases. The conversion is counted as the first fifth of
+    the job whenever there is one to do - it has no common unit with "models
+    imported", so any split is a guess, and this one at least keeps the bar
+    moving through the part that takes longest."""
+    if job['phase'] == 'convert':
+        total = job['convert_total']
+        return 0.2 * (job['convert_done'] / total if total else 1.0)
+    share = 0.2 if job['convert_total'] else 0.0
+    total = len(job['queue'])
+    return share + (1.0 - share) * (job['index'] / total if total else 1.0)
+
+
+def buildImportQueue(unit_info_list, import_officers):
+    """One entry per model the batch will import, in the order it imports them.
+
+    A unit's officers follow its armour upgrades so the whole unit lands
+    together, and each entry carries both the file name the progress bar shows
+    and the longer description under it."""
+    queue = []
+    for index, unit_info in enumerate(unit_info_list):
+        unit_id = unit_info.get('ID', 'unit')
+        models = unit_info['Model']
+        for level in range(len(models)):
+            queue.append({'kind': 'upgrade', 'unit': index, 'unit_info': unit_info,
+                          'level': level, 'unit_id': unit_id, 'label': models[level],
+                          'detail': "%s - upgrade %d" % (unit_id, level)})
+        if import_officers:
+            officers = unit_info['Officers']
+            for position, officer in enumerate(officers):
+                queue.append({'kind': 'officer', 'unit': index, 'unit_info': unit_info,
+                              'officer': officer, 'unit_id': unit_id, 'label': officer,
+                              'first': position == 0,
+                              'detail': "%s - officer %d of %d" % (unit_id, position + 1, len(officers))})
+    return queue
+
+
+def prepareConversions(model_folder, unit_info_list, import_officers):
+    """Everything the batch needs and has not got, appended to the IWTE task
+    files but NOT handed to IWTE - the caller runs one conversion for the lot
+    and watches it. Returns the list of conversions to run."""
+    unitTaskWriter()
+    engineTaskWriter()
+    missing_units, missing_engines = [], []
+    for unit_info in unit_info_list:
+        for level in range(len(unit_info['Model'])):
+            units, engines = unitChecker(model_folder, [unit_info], level, defer=True)
+            missing_units += units
+            missing_engines += engines
+        if import_officers:
+            missing_units += fileChecker(model_folder, unit_info['Officers'], defer=True)
+    # a model shared by several units is in the task file once, so count it once
+    missing_units = list(dict.fromkeys(missing_units))
+    missing_engines = list(dict.fromkeys(missing_engines))
+    conversions = []
+    if missing_units:
+        conversions.append({'task': 'toolkit_bmdb_task.txt',
+                            'expected': missingModelPaths(model_folder, missing_units, []),
+                            'what': "Converting %d unit mesh%s with IWTE"
+                                    % (len(missing_units), "" if len(missing_units) == 1 else "es")})
+    if missing_engines:
+        conversions.append({'task': 'toolkit_engine_task.txt',
+                            'expected': missingModelPaths(model_folder, [], missing_engines),
+                            'what': "Converting %d siege engine%s with IWTE"
+                                    % (len(missing_engines), "" if len(missing_engines) == 1 else "s")})
+    return conversions
+
+
+def importStep(context, job):
+    """Import one model. Anything that goes wrong is recorded and the batch
+    carries on - one bad officer should not cost you the other thirty-nine
+    units, and the results popup lists everything at the end."""
+    entry = job['queue'][job['index']]
+    job['index'] += 1
+    try:
+        runImportEntry(job, entry)
+    except Exception as error:
+        traceback.print_exc()
+        job['results'].append(('ERROR', "%s: %s" % (entry['detail'], error)))
+
+
+def runImportEntry(job, entry):
+    unit_info = entry['unit_info']
+    model_folder = job['model_folder']
+    faction = job['faction']
+
+    if entry['unit'] != job['current_unit']:
+        if job['current_unit'] is not None:
+            # the unit just finished decides where the next one starts
+            job['coordinates'][0] = job['unit_x'] + round(job['unit_width']*0.5, 1) + 0.25
+        job['unit_x'] = job['coordinates'][0]
+        job['unit_width'] = 0
+        job['current_unit'] = entry['unit']
+
+    if entry['kind'] == 'upgrade':
+        level = entry['level']
+        # defer: the whole batch was converted up front, so anything still
+        # missing here is something IWTE did not write. Say so rather than
+        # starting another blocking conversion for every unit in the faction.
+        missing_units, missing_engines = unitChecker(model_folder, [unit_info], level, defer=True)
+        for model_id in missing_units + missing_engines:
+            job['results'].append(('WARNING', "%s was not converted - %s will be missing a model"
+                                              % (model_id, entry['unit_id'])))
+        if job['mode'] == 'faction':
+            # apply_offset=False: every upgrade of this unit shares unit_x and
+            # only stacks upward on Z, so the auto x-spacing must stay off
+            offset = unitImporter(model_folder, unit_info, faction,
+                                  [job['unit_x'], 0, level * UPGRADE_Z_STEP], level,
+                                  apply_offset=False)
+            job['unit_width'] = max(job['unit_width'], offset)
+        else:
+            offset = unitImporter(model_folder, unit_info, faction, job['coordinates'], level)
+            job['coordinates'][0] += round(offset*0.5, 1) + 0.25
+        job['last_offset'] = offset
+        job['imported'] += 1
+        return
+
+    if entry.get('first'):
+        for model_id in fileChecker(model_folder, unit_info['Officers'], defer=True):
+            job['results'].append(('WARNING', "%s was not converted - an officer of %s will be missing"
+                                              % (model_id, entry['unit_id'])))
+        if job['mode'] == 'faction':
+            job['officer_at'] = [job['unit_x'], 0, 0]
+            job['officer_step'] = 2
+        else:
+            # Import Full Unit lines the officers up behind the unit, spaced by
+            # the width the last upgrade reported
+            step = round(job['last_offset']*0.5, 1)*2
+            job['officer_at'] = [0, -step, 0]
+            job['officer_step'] = step
+
+    officer = entry['officer']
+    model_info = job['bmdb'].get(officer) if job['bmdb'] else None
+    if model_info is None:
+        job['results'].append(('WARNING', "%s is not in the model dictionary - officer skipped" % officer))
+        return
+    existing = set(bpy.data.objects)
+    result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
+    if result != 0:
+        imported = importedArmature(existing)
+        if imported:
+            imported.location = list(job['officer_at'])
+            imported.location[2] += z_offset
+        job['imported'] += 1
+    job['officer_at'][1] -= job['officer_step']
+
+
+def postImportInView(context):
+    """postImport frames the scene and reads the 3D view's shading mode, so it
+    needs a VIEW_3D to run in. Called straight out of execute() it had one; from
+    a modal timer the context can be any area, and view3d.view_all then raises
+    "context is incorrect". Find a view and run it there."""
+    for window in context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type != 'VIEW_3D':
+                continue
+            region = next((entry for entry in area.regions if entry.type == 'WINDOW'), None)
+            if region is None:
+                continue
+            with context.temp_override(window=window, area=area, region=region,
+                                       space_data=area.spaces.active):
+                postImport(None, bpy.context)
+            return
+
+
+def drawImportProgress(layout, job):
+    box = layout.box()
+    box.label(text=job['title'], icon='IMPORT')
+    if job['phase'] == 'convert':
+        box.progress(factor=importProgress(job), type='BAR',
+                     text="IWTE: %d/%d converted" % (job['convert_done'], job['convert_total']))
+        box.label(text=job['convert_what'], icon='FILE_REFRESH')
+    else:
+        # a draw() that raises takes the whole sidebar down with it, so the
+        # queue is indexed defensively even though startBatch refuses an empty one
+        entry = job['queue'][min(job['index'], len(job['queue']) - 1)] if job['queue'] else None
+        box.progress(factor=importProgress(job), type='BAR',
+                     text="%d/%d  %s" % (job['index'], len(job['queue']),
+                                         entry['label'] if entry else ""))
+        if entry:
+            box.label(text=entry['detail'], icon='ARMATURE_DATA')
+    box.label(text="%ds elapsed - press Esc to stop" % int(time.time() - job['start']), icon='TIME')
+
+
+class BatchImportBase:
+    """Shared modal machinery for Import Full Unit and Import faction."""
+
+    _timer = None
+    mode = 'faction'
+    title = "Import"
+
+    def startBatch(self, context, unit_info_list, import_officers, hide_variations):
+        global _import_job
+        model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
+        saveFolderPaths()
+        saveSettings()
+        queue = buildImportQueue(unit_info_list, import_officers)
+        if not queue:
+            self.report({'ERROR'}, "Nothing to import")
+            return {'CANCELLED'}
+        try:
+            conversions = prepareConversions(model_folder, unit_info_list, import_officers)
+        except (OSError, KeyError) as error:
+            self.report({'ERROR'}, "Could not write the IWTE task file: %s" % error)
+            return {'CANCELLED'}
+        bmdb = None
+        if import_officers:
+            with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
+                bmdb = json.load(bmdb_input)
+        _import_job = {
+            'mode': self.mode, 'title': self.title,
+            'queue': queue, 'index': 0, 'imported': 0, 'results': [],
+            'model_folder': model_folder,
+            'faction': context.scene.med2_toolkit_units.import_faction,
+            'bmdb': bmdb, 'hide_variations': hide_variations,
+            'coordinates': [0, 0, 0], 'unit_x': 0.0, 'unit_width': 0.0,
+            'current_unit': None, 'last_offset': 0.0,
+            'officer_at': [0, 0, 0], 'officer_step': 2,
+            'start': time.time(),
+            'conversions': conversions, 'convert_index': 0, 'process': None,
+            'convert_expected': [path for entry in conversions for path in entry['expected']],
+            'convert_total': sum(len(entry['expected']) for entry in conversions),
+            'convert_done': 0, 'convert_what': "",
+            'phase': 'convert' if conversions else 'import',
+            'stall_interval': IWTE_STALL_SECONDS, 'stall_deadline': None,
+        }
+        if bpy.app.background or context.window is None:
+            # no event loop to hang a timer on, so the whole batch runs here
+            while not self.step(context):
+                if _import_job['phase'] == 'convert' and _import_job['process'] is not None:
+                    time.sleep(0.25)
+            return self.finish(context)
+        wm = context.window_manager
+        wm.progress_begin(0, 100)
+        self._timer = wm.event_timer_add(0.1, window=context.window)
+        wm.modal_handler_add(self)
+        redrawView3D(context)
+        return {'RUNNING_MODAL'}
+
+    def step(self, context):
+        """One tick of work. True once the whole batch is done."""
+        job = _import_job
+        if job['phase'] == 'convert':
+            return self.convertStep(context, job)
+        if job['index'] >= len(job['queue']):
+            return True
+        importStep(context, job)
+        return job['index'] >= len(job['queue'])
+
+    def convertStep(self, context, job):
+        job['convert_done'] = convertedCount(job)
+        process = job['process']
+        if process is None:
+            if job['convert_index'] >= len(job['conversions']):
+                job['phase'] = 'import'
+                return not job['queue']
+            conversion = job['conversions'][job['convert_index']]
+            job['convert_what'] = conversion['what']
+            try:
+                job['process'] = startTask(context.scene.med2_toolkit_reader.directory_iwte,
+                                           conversion['task'])
+            except (OSError, RuntimeError) as error:
+                job['results'].append(('ERROR', "IWTE could not be started: %s" % error))
+                return self.skipConversions(job)
+            job['stall_interval'] = IWTE_STALL_SECONDS
+            job['stall_deadline'] = time.time() + IWTE_STALL_SECONDS
+            return False
+        if job.get('aborted'):
+            job['results'].append(('WARNING', "IWTE conversion aborted - anything it had not "
+                                              "written yet will be missing from the import"))
+            return self.skipConversions(job)
+        if process.poll() is None:
+            if iwteStalled(job):
+                askAboutStall(context, job, job['convert_what'])
+            return False
+        job['process'] = None
+        job['convert_index'] += 1
+        job['stall_deadline'] = None
+        return False
+
+    def skipConversions(self, job):
+        """Give up on the remaining conversions and import what is on disk."""
+        job['process'] = None
+        job['aborted'] = False
+        job['convert_index'] = len(job['conversions'])
+        job['stall_deadline'] = None
+        job['phase'] = 'import'
+        return not job['queue']
+
+    def modal(self, context, event):
+        if _import_job is None:
+            return {'FINISHED'}
+        if event.type == 'ESC':
+            _import_job['results'].append(('WARNING', "Cancelled after %d model(s)" % _import_job['imported']))
+            if _import_job.get('process') is not None:
+                abortIWTEJob(_import_job)
+                _import_job['process'] = None
+            return self.stop(context)
+        if event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+        done = self.step(context)
+        context.window_manager.progress_update(int(importProgress(_import_job) * 100))
+        redrawView3D(context)
+        return self.stop(context) if done else {'RUNNING_MODAL'}
+
+    def stop(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+        wm.progress_end()
+        result = self.finish(context)
+        redrawView3D(context)
+        return result
+
+    def finish(self, context):
+        global _import_job
+        job = _import_job
+        _import_job = None
+        if job['hide_variations']:
+            hideVariations()
+        if not bpy.app.background:
+            postImportInView(context)
+        elapsed = time.time() - job['start']
+        failed = sum(1 for level, _ in job['results'] if level == 'ERROR')
+        problems = len(job['results'])
+        job['results'].append(('INFO', "Imported %d model(s) in %.1fs" % (job['imported'], elapsed)))
+        showResultsPopup(context, "%s: %d model(s), %d problem(s)"
+                                  % (job['title'], job['imported'], problems),
+                         sorted(job['results'], key=lambda result: SEVERITY_ORDER.get(result[0], 2)))
+        self.report({'ERROR'} if failed else {'INFO'}, job['results'][-1][1])
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Import_Full_Unit(BatchImportBase, bpy.types.Operator):
     bl_idname = "medieval2toolkit.full_unit_importer"
     bl_label = "Import full unit"
     bl_description = "Import the selected unit with all its officers and variations."
-    bl_options = {"REGISTER", "UNDO"}
+    bl_options = {"REGISTER"}
+
+    mode = 'full_unit'
+    title = "Import Full Unit"
+
+    @classmethod
+    def poll(cls, context):
+        return _import_job is None
+
     def execute(self, context):
-        model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
-        faction = context.scene.med2_toolkit_units.import_faction
         unit_info = json.loads(context.scene.med2_toolkit_units.import_unit)
-        upgrades = unit_info['Model']
-        coordinates = [0, 0, 0]
-        saveFolderPaths()
-        saveSettings()
-        unitTaskWriter()
-        engineTaskWriter()
-        for upgrade in range(len(upgrades)):
-            unitChecker(model_folder, [unit_info], upgrade)
-            offset = unitImporter(model_folder, unit_info, faction, coordinates, upgrade)
-            coordinates[0] += round(offset*0.5, 1) + 0.25
+        return self.startBatch(context, [unit_info], True,
+                               context.scene.med2_toolkit_units.hide_toggle)
 
-        with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
-            bmdb_dictionary = json.load(bmdb_input)
-        officers = unit_info['Officers']
-        coordinates = [0, -round(offset*0.5, 1)*2, 0]
-        fileChecker(model_folder, officers)
-        for officer in officers:
-            model_info = bmdb_dictionary[officer]
-            existing = set(bpy.data.objects)
-            result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
-            if result != 0:
-                imported = importedArmature(existing)
-                if imported:
-                    imported.location = coordinates
-                    imported.location[2] += z_offset
-            coordinates[1] -= round(offset*0.5, 1)*2
-        if context.scene.med2_toolkit_units.hide_toggle:
-            hideVariations()
-        postImport(self, context)
-        return{"FINISHED"}
 
-class MED_2_TOOLKIT_OT_Faction_Importer(bpy.types.Operator):
+class MED_2_TOOLKIT_OT_Faction_Importer(BatchImportBase, bpy.types.Operator):
     bl_idname = "medieval2toolkit.faction_importer"
     bl_label = "Import faction"
     bl_description = ("Import all units of the selected faction according to the ownership, "
                       "with every armour upgrade stacked on Z. Optionally also import each "
                       "unit's officers, placed behind it on -Y.")
-    bl_options = {"REGISTER", "UNDO"}
+    bl_options = {"REGISTER"}
+
+    mode = 'faction'
+    title = "Import faction"
+
+    @classmethod
+    def poll(cls, context):
+        return _import_job is None
+
     def execute(self, context):
-        model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
-        faction = context.scene.med2_toolkit_units.import_faction
-        import_officers = context.scene.med2_toolkit_units.faction_import_officers
-        coordinates = [0, 0, 0]
-        saveFolderPaths()
-        saveSettings()
-        unit_list = sortUnits(self, context)
-        unit_info_list = []
-        for unit in unit_list:
-            unit_info = json.loads(unit[0])
-            unit_info_list.append(unit_info)
-        unitTaskWriter()
-        engineTaskWriter()
-
-        if import_officers:
-            with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
-                bmdb_dictionary = json.load(bmdb_input)
-
-        for unit_info in unit_info_list:
-            unit_x = coordinates[0]
-            unit_width = 0
-            for level in range(len(unit_info['Model'])):
-                unitChecker(model_folder, [unit_info], level)
-                # apply_offset=False: every upgrade of this unit shares unit_x,
-                # only stacking upward on Z, so the auto x-spacing must stay off
-                upgrade_coordinates = [unit_x, 0, level * UPGRADE_Z_STEP]
-                offset = unitImporter(model_folder, unit_info, faction, upgrade_coordinates, level, apply_offset=False)
-                unit_width = max(unit_width, offset)
-            coordinates[0] = unit_x + round(unit_width*0.5, 1) + 0.25
-
-            if import_officers:
-                officers = unit_info['Officers']
-                fileChecker(model_folder, officers)
-                officer_coordinates = [unit_x, 0, 0]
-                for officer in officers:
-                    model_info = bmdb_dictionary[officer]
-                    existing = set(bpy.data.objects)
-                    result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
-                    if result != 0:
-                        imported = importedArmature(existing)
-                        if imported:
-                            imported.location = officer_coordinates
-                            imported.location[2] += z_offset
-                    officer_coordinates[1] -= 2
-
-        postImport(self, context)
-        return{"FINISHED"}
+        unit_info_list = [json.loads(unit[0]) for unit in sortUnits(self, context)
+                          if unit[0] != 'none']
+        if not unit_info_list:
+            self.report({'ERROR'}, "No units for this faction and ownership filter")
+            return {'CANCELLED'}
+        return self.startBatch(context, unit_info_list,
+                               context.scene.med2_toolkit_units.faction_import_officers,
+                               False)
 
 
 class MED_2_TOOLKIT_OT_Variations(bpy.types.Operator):
@@ -583,6 +900,8 @@ class MED_2_TOOLKIT_PT_EDU_Import(bpy.types.Panel):
         col = layout.column(align=True)
         col.prop (context.scene.med2_toolkit_units, "faction_import_officers", text="Import Officers")
         col.operator("medieval2toolkit.faction_importer", text="Import faction")
+        if _import_job is not None:
+            drawImportProgress(layout, _import_job)
         col = layout.column(align=True)
         col.operator("medieval2toolkit.variations", text="Shuffle variations")
         layout.label(text = "Imported Models")

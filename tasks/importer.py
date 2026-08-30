@@ -41,7 +41,12 @@ def selectionBoundingBox():
     print("Z Offset: %s" % z_offset)
     return(width, z_offset)
 
-def unitChecker(model_folder, unit_list, upgrade):
+def unitChecker(model_folder, unit_list, upgrade, defer=False):
+    # defer=True appends the missing models to the task files but does NOT hand
+    # them to IWTE, and returns (units, engines) so the caller can run one
+    # conversion for a whole batch and watch it without freezing Blender. The
+    # default runs the task straight away, which is what every single-unit
+    # import wants.
     # the Unit Output path is joined onto bare file names below, and the
     # Paths field holds it with a trailing separator only when it was
     # browsed to rather than typed
@@ -62,44 +67,67 @@ def unitChecker(model_folder, unit_list, upgrade):
         files_to_check.append(model_id)
         if unit_attachment[0] == 'engine':
             engines_to_check.append(unit_attachment[1])
-    fileChecker(model_folder, files_to_check)
-    engineChecker(model_folder, engines_to_check)
+    missing_units = fileChecker(model_folder, files_to_check, defer)
+    missing_engines = engineChecker(model_folder, engines_to_check, defer)
+    return missing_units, missing_engines
 
 
-def fileChecker(model_folder, model_list):
+def fileChecker(model_folder, model_list, defer=False):
+    # Returns the model ids that were appended to the task file. With
+    # defer=True the task is left for the caller to run - see unitChecker.
     # the Unit Output path is joined onto bare file names below, and the
     # Paths field holds it with a trailing separator only when it was
     # browsed to rather than typed
     model_folder = withTrailingSep(model_folder)
     with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
         bmdb_dictionary = json.load(bmdb_input)
-    missing_count = 0
+    missing = []
     for model_id in model_list:
         model_mesh = bmdb_dictionary[model_id]['Mesh']
         if not Path(str(model_folder)+model_mesh).exists():
             print("Model '%s' not found in folder %s." % (model_mesh, str(model_folder)))
             print("Appending to the task file")
             unitTaskAppend(model_id)
-            missing_count += 1
-    if missing_count != 0:
+            missing.append(model_id)
+    if missing and not defer:
         unitTaskRun()
+    return missing
 
 
-def engineChecker(model_folder, model_list):
+def engineChecker(model_folder, model_list, defer=False):
+    # Returns the engine ids that were appended to the task file.
     # the Unit Output path is joined onto bare file names below, and the
     # Paths field holds it with a trailing separator only when it was
     # browsed to rather than typed
     model_folder = withTrailingSep(model_folder)
-    missing_count = 0
+    missing = []
     for model_id in model_list:
         engine_mesh = model_id+'.glb'
         if not Path(str(model_folder)+engine_mesh).exists():
             print("Model '%s' not found in folder %s." % (engine_mesh, str(model_folder)))
             print("Appending to the task file")
             engineTaskAppend(model_id)
-            missing_count += 1
-    if missing_count != 0:
+            missing.append(model_id)
+    if missing and not defer:
         engineTaskRun()
+    return missing
+
+
+def missingModelPaths(model_folder, model_ids, engine_ids):
+    """Where each deferred conversion is expected to land, so a watcher can
+    count how many of them have appeared. Unit meshes are named by the BMDB, an
+    engine simply by its own id.
+
+    Deduplicated by NAME, not by model id: several BMDB entries can point at one
+    .glb - they differ only in their textures - so a caller that has already
+    deduplicated its ids still ends up asking for the same file twice. England
+    alone is 123 ids over 114 files."""
+    model_folder = withTrailingSep(model_folder)
+    with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
+        bmdb_dictionary = json.load(bmdb_input)
+    names = [bmdb_dictionary[model_id]['Mesh'] for model_id in model_ids]
+    names += [engine_id+'.glb' for engine_id in engine_ids]
+    return [Path(str(model_folder)+name) for name in dict.fromkeys(names)]
 
 
 def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, apply_offset=True):
