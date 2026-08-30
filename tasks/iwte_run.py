@@ -12,6 +12,7 @@ through here; the caller supplies the task file and the output it expects.
 """
 import os
 import math
+import shutil
 import subprocess
 import time
 
@@ -21,8 +22,37 @@ IWTE_OUTPUT_TIMEOUT = 300.0
 IWTE_QUIET_SECONDS = 1.0
 
 # Windows CREATE_NO_WINDOW: IWTE brings up its own window, the console behind it
-# is just noise.
-NO_CONSOLE_WINDOW = 0x08000000
+# is just noise. Off Windows the flag does not exist and subprocess rejects any
+# value but 0, so that is what it becomes.
+NO_CONSOLE_WINDOW = 0x08000000 if os.name == 'nt' else 0
+
+# The message every caller gives back when a Windows tool cannot be run here.
+NO_WINE = ("%s is a Windows program and Wine was not found. Install Wine and make "
+           "sure `wine` is on PATH")
+
+
+def wineWrap(command):
+    """A command for a Windows .exe, as it has to be run on this platform.
+
+    IWTE and texconv are both Windows-only, so on Linux and macOS they go
+    through Wine - which is how Medieval 2 itself is run there, so a modder on
+    Linux already has it. Returns [] when there is no way to run the program,
+    which lets callers report that instead of a FileNotFoundError coming out of
+    subprocess."""
+    if os.name == 'nt' or not command:
+        return list(command)
+    command = [str(part) for part in command]
+    if not command[0].lower().endswith('.exe'):
+        return command
+    wine = shutil.which('wine')
+    return [wine] + command if wine else []
+
+
+def canRunWindowsExe():
+    """Whether a Windows .exe can be launched at all here. Callers check this
+    up front so they can report it in their own results popup rather than
+    letting subprocess raise into the operator."""
+    return os.name == 'nt' or shutil.which('wine') is not None
 
 
 def findIWTEExe(iwte_dir):
@@ -41,13 +71,17 @@ def findIWTEExe(iwte_dir):
 
 def startIWTETask(iwte_exe, iwte_dir, task_path, output_path):
     """Run a task file and return the job dict the watchers below expect."""
+    command = wineWrap([iwte_exe, "--uh", "--st", task_path])
+    if not command:
+        raise FileNotFoundError(NO_WINE % "IWTE")
+
     try:
         previous_mtime = os.path.getmtime(output_path)
     except OSError:
         previous_mtime = None
 
     process = subprocess.Popen(
-        [iwte_exe, "--uh", "--st", task_path],
+        command,
         cwd=iwte_dir,
         creationflags=NO_CONSOLE_WINDOW
     )

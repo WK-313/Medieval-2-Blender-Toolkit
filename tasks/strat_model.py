@@ -39,7 +39,7 @@ from mathutils import Matrix, Vector, kdtree
 from .armature_tools import caseConvertedName, mergeGroupInto, skeletonUsesLowercase
 from .export_checks import activeExportArmature, deselectAll, exportMeshes, materialImages
 from .importer import principledNode
-from .iwte_run import findIWTEExe, startIWTETask
+from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask
 from .strat_data import NON_DEFORM_BONES, STRAT_BONES
 
 # The UV layer every mesh is renamed to before the join. join() only merges UV
@@ -752,6 +752,8 @@ def exportStratCAS(context):
     iwte_exe = findIWTEExe(iwte_dir)
     if not iwte_exe:
         return "IWTE executable not found"
+    if not canRunWindowsExe():
+        return NO_WINE % "IWTE"
 
     out_dir = os.path.dirname(glb_path)
     name = os.path.splitext(os.path.basename(glb_path))[0]

@@ -1,11 +1,11 @@
 import bpy
 import os
 import json
-import subprocess
 from pathlib import Path
 from..directories import saveFolderPaths, saveSettings, readJsonCached
 from ..tasks.task_writer import unitTaskWriter
 from ..tasks.importer import fileChecker, modelImporter, importedArmature, postImport
+from ..tasks.unit_exporter import reveal_file
 from bpy.props import StringProperty, CollectionProperty, IntProperty, EnumProperty, PointerProperty
 
 script_folder = Path(__file__).parent.parent
@@ -244,7 +244,7 @@ class MED2_TOOLKIT_OT_Model_Folder(bpy.types.Operator):
         model_mesh = bmdb_dictionary[model_name]['Mesh'].replace('.glb', '.mesh')
         model_path = context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].folder
         target_file = os.path.join(mod_path, model_path, model_mesh)
-        subprocess.run(r'explorer /select, "'+str(Path(target_file))+'"')
+        reveal_file(target_file)
         return{"FINISHED"}
 
 

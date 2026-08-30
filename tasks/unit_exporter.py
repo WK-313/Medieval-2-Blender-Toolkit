@@ -2,12 +2,13 @@ import os
 import shutil
 import struct
 import subprocess
+import sys
 import bpy
 from pathlib import Path
 from .export_checks import deselectAll, materialImages, activeExportArmature, exportSettings
 from ..directories import loadStoredValue
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
-from .iwte_run import findIWTEExe, startIWTETask
+from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask, wineWrap
 from .iwte_tasks import applySkeletonTask
 
 addon_folder = Path(__file__).parent.parent
@@ -16,12 +17,42 @@ def clean_path(path):
     return os.path.normpath(path.strip('"').strip("'"))
 
 def get_texconv_path():
+    """The DDS converter. The bundled binary is the Windows build, which off
+    Windows runs through Wine - but a native texconv on PATH is used in
+    preference, since it needs no Wine at all."""
+    if os.name != 'nt':
+        native = shutil.which('texconv')
+        if native:
+            return Path(native)
     texconv = addon_folder/'bin'/'texconv.exe'
     return texconv if texconv.exists() else None
 
 def open_folder(path):
-    if os.path.exists(path):
+    """Show a folder in the system's own file manager."""
+    if not os.path.exists(path):
+        return
+    if os.name == 'nt':
         os.startfile(path)
+    elif sys.platform == 'darwin':
+        subprocess.Popen(['open', str(path)])
+    else:
+        subprocess.Popen(['xdg-open', str(path)])
+
+def reveal_file(path):
+    """Open the file manager with one file highlighted. Only Windows and macOS
+    have a documented way to ask for that, so elsewhere the file's folder is
+    opened instead - which is what the caller wanted to show anyway."""
+    path = str(Path(path))
+    if not os.path.exists(path):
+        return
+    if os.name == 'nt':
+        # one argument, "/select,C:\\path\\file" - explorer does not accept the
+        # path as a separate argv entry
+        subprocess.run(['explorer', '/select,' + path])
+    elif sys.platform == 'darwin':
+        subprocess.Popen(['open', '-R', path])
+    else:
+        subprocess.Popen(['xdg-open', os.path.dirname(path)])
 
 def selectedModFolder(context):
     reader = context.scene.med2_toolkit_reader
@@ -91,13 +122,15 @@ def runTexconv(texconv, source, tex_dir, out_base, opaque_alpha=False):
     staging = os.path.join(tex_dir, "_texconv")
     shutil.rmtree(staging, ignore_errors=True)
     os.makedirs(staging, exist_ok=True)
-    command = [
+    command = wineWrap([
         str(texconv),
         "-f", "DXT5",
         "-m", "0",
         "-nologo",
         "-y",
-    ]
+    ])
+    if not command:
+        return None
     if opaque_alpha:
         command += ["-swizzle", "rgb1"]
     command += ["-o", staging, source]
@@ -385,6 +418,8 @@ def exportArmatureGLB(context):
     texconv = get_texconv_path()
     if not texconv:
         return "texconv.exe not found in the addon's bin folder"
+    if not wineWrap([str(texconv)]):
+        return NO_WINE % "texconv"
 
     arm = activeExportArmature(context)
     if not arm:
@@ -572,6 +607,9 @@ def exportToMeshIWTE(context):
 
     if not iwte_exe:
         return "IWTE executable not found"
+
+    if not canRunWindowsExe():
+        return NO_WINE % "IWTE"
 
     unit_folder = os.path.dirname(glb_path)
     unit_name = os.path.splitext(os.path.basename(glb_path))[0]

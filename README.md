@@ -173,6 +173,8 @@ Search for `medieval` in the add-on list and tick `Medieval 2 Toolkit` if it is 
 ## 4. Install IWTE
 The toolkit uses **IWTE** for the final `.mesh` and `.world` conversions. Download the **latest version** of IWTE from [makanyane/IWTE](https://github.com/makanyane/IWTE) and point the toolkit's `IWTE` path at its folder in the Paths panel.
 
+**On Linux and macOS:** IWTE and the bundled `texconv` are Windows programs, so the toolkit runs them through **Wine**, the same way Medieval 2 itself is run there. Install Wine and make sure `wine` is on your `PATH`; the rest of the addon is native. A native `texconv` on your `PATH` is used in preference to the bundled one.
+
 ## Credits
 - `WK | Kautto Ville`
     - Discord: `wk__`
