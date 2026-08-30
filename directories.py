@@ -1,8 +1,75 @@
 
 from pathlib import Path
-import json, os, bpy
+import json, os, re, bpy
 
 script_folder = Path(__file__).parent
+
+
+#   -------------  #
+#   Path handling  #
+#   -------------  #
+
+# Nothing may assume a path ends in a separator, and nothing may assume the
+# separator is a backslash. A path the user typed by hand into one of the Paths
+# fields has whatever they typed - the file browser appends a trailing one, the
+# keyboard does not - and directories.json travels between Windows and Linux, so
+# an entry saved on one is read on the other. The three places that used to
+# assume otherwise all misbehaved: the mod dropdown split on a literal backslash
+# and raised IndexError on every Linux path, the IWTE task writers joined folder
+# to file name with plain + and produced ".../IWTEiwte_tasks/...", and they cut
+# a fixed number of characters off the data folder to get the mod folder.
+SEPARATORS = ('\\', '/')
+
+
+def cleanDirectory(path):
+    """A directory path with the quotes and stray whitespace taken off. Kept
+    separate from normpath so a path meant for a Windows-only tool is not
+    rewritten with forward slashes when Blender is running on Linux."""
+    return (path or '').strip().strip('"').strip("'")
+
+
+def pathParts(path):
+    """Components of a path, splitting on BOTH separators and ignoring a
+    trailing one. os.path only knows the separators of the platform it is
+    running on, and these paths cross platforms in directories.json."""
+    return [part for part in re.split(r'[\\/]+', cleanDirectory(path)) if part]
+
+
+def withTrailingSep(path):
+    """A directory path that definitely ends in a separator, in the style the
+    path is already written in. IWTE's task files want their directories that
+    way, and that is where the values below end up."""
+    path = cleanDirectory(path)
+    if not path or path.endswith(SEPARATORS):
+        return path
+    # the separator the path is already written in, so a forward-slash path is
+    # not finished off with a backslash just because this is Windows
+    if '\\' in path:
+        return path + '\\'
+    if '/' in path:
+        return path + '/'
+    return path + os.sep
+
+
+def modFolderName(data_folder):
+    """Mod folder name for a path pointing at that mod's data folder - the
+    label the Mod dropdown shows."""
+    parts = pathParts(data_folder)
+    if len(parts) > 1:
+        return parts[-2]
+    return parts[-1] if parts else cleanDirectory(data_folder)
+
+
+def modRoot(data_folder):
+    """The mod folder holding a data folder, with a trailing separator - what
+    IWTE task files want as <mod_directory_in>. Sliced at the last separator
+    rather than rebuilt from the parts so a leading separator or a drive letter
+    survives, and so the path keeps the separator style it arrived in."""
+    path = cleanDirectory(data_folder).rstrip('\\/')
+    cut = max(path.rfind('\\'), path.rfind('/'))
+    if cut < 0:
+        return withTrailingSep(data_folder)
+    return path[:cut + 1]
 
 DEFAULT_DIRECTORIES = {
     "directory_med2": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War",

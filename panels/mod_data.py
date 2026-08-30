@@ -1,12 +1,12 @@
 import os
 import bpy
-from bpy.props import StringProperty, BoolProperty
+from bpy.props import StringProperty
 import json
 from pathlib import Path
 from .bmdb_panel import sortModels
 from .settlements_panel import sortSettlements
 from ..tasks import edu_reader, bmdb_reader, settlements_reader
-from ..directories import saveFolderPaths, saveSettings
+from ..directories import modFolderName, saveFolderPaths, saveSettings
 
 script_folder = Path(__file__).parent.parent
 
@@ -33,14 +33,38 @@ def modString():
     mod_list = file_paths["directory_mod_list"]
     return mod_list
 
-def refreshMods(self, context):
-    master_directory = os.path.join(context.scene.med2_toolkit_reader.directory_med2, "mods")
+def modFolders(master_directory):
+    """Every <mod>/data folder inside a mods folder.
+
+    A mods folder holds loose files as well as mod folders - IWTE drops its
+    extracts and a battle_models_errors.txt straight in there - and listing one
+    of those as if it were a directory raised NotADirectoryError and took the
+    whole refresh down. Anything that is not a directory is skipped, as is a
+    mod folder that cannot be listed at all, and a missing mods folder is not
+    an error either: it just means there are no mods to list yet."""
     mods = []
-    mod_list_raw = os.listdir(master_directory)
-    for mod_folder in mod_list_raw:
-        for subdir in os.listdir(os.path.join(master_directory, mod_folder)):
-            if os.path.isdir(os.path.join(master_directory, mod_folder, subdir)) and subdir == "data":
-                mods.append(os.path.join(master_directory, mod_folder, subdir))
+    try:
+        entries = sorted(os.listdir(master_directory))
+    except OSError:
+        return mods
+    for mod_folder in entries:
+        mod_path = os.path.join(master_directory, mod_folder)
+        if not os.path.isdir(mod_path):
+            continue
+        try:
+            subdirs = os.listdir(mod_path)
+        except OSError:
+            continue
+        for subdir in subdirs:
+            # case-insensitively, because a case-sensitive filesystem is
+            # perfectly happy to spell it Data
+            if subdir.lower() == "data" and os.path.isdir(os.path.join(mod_path, subdir)):
+                mods.append(os.path.join(mod_path, subdir))
+    return mods
+
+def refreshMods(self, context):
+    master_directory = os.path.join(bpy.path.abspath(context.scene.med2_toolkit_reader.directory_med2), "mods")
+    mods = modFolders(master_directory)
     with open(script_folder/('text/directories.json'), 'r') as directories_list:
         file_paths = json.load(directories_list)
     file_paths["directory_mod_list"] = ','.join(mods)
@@ -49,12 +73,18 @@ def refreshMods(self, context):
 
 def modList(self, context):
     mod_string = context.scene.med2_toolkit_reader.list_holder
-    mod_list = mod_string.split(',')
     enum_list = []
-    for mod in mod_list:
-        # entry = (mod, mod, "")
-        entry = (mod, mod.split('\\')[-2], mod)
-        enum_list.append(entry)
+    for mod in mod_string.split(','):
+        # an empty list_holder splits to [''], and an enum item with a blank
+        # identifier is not a usable entry
+        if not mod:
+            continue
+        # the label is the mod folder, the parent of the data folder this points
+        # at. modFolderName works off either separator, so a directories.json
+        # written on Windows still labels its entries when read on Linux - the
+        # old split on a literal backslash raised IndexError there, and a failing
+        # items callback leaves the dropdown with no items at all
+        enum_list.append((mod, modFolderName(mod), mod))
     entry = ("custom", "Custom", "")
     enum_list.append(entry)
     return enum_list
