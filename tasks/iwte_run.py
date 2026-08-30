@@ -48,6 +48,60 @@ def wineWrap(command):
     return [wine] + command if wine else []
 
 
+def usesWine(program):
+    """Whether running `program` here means going through Wine - which is what
+    decides whether the paths handed to it have to be Windows paths."""
+    return os.name != 'nt' and str(program).lower().endswith('.exe')
+
+
+_wine_paths = {}
+
+
+def winePath(path):
+    """A path as a program running under Wine has to be given it.
+
+    A POSIX path is not absolute to a Windows program: IWTE takes
+    /home/you/m2tw/IWTE/iwte_tasks/task.txt for a relative path and looks for it
+    under its own folder, which is where the doubled
+    z:/home/you/m2tw/iwte/home/you/m2tw/iwte/iwte_tasks/task.txt comes from. The
+    same applies to every path written INSIDE a task file, since IWTE resolves
+    those the same way.
+
+    `winepath -w` does the conversion properly, honouring whatever drives the
+    prefix maps; when it cannot be run the fallback is Wine's default mapping of
+    the filesystem root to Z:. On Windows the path is returned untouched, and so
+    is one that already carries a drive letter. A trailing separator is kept -
+    IWTE's directory fields are written with one on purpose."""
+    if os.name == 'nt' or not path:
+        return path
+    path = str(path)
+    if len(path) > 1 and path[1] == ':':
+        return path
+    cached = _wine_paths.get(path)
+    if cached is not None:
+        return cached
+    trailing = path.endswith(('/', '\\'))
+    source = path.rstrip('/\\') or '/'
+    converted = ''
+    command = ([shutil.which('winepath')] if shutil.which('winepath')
+               else ([shutil.which('wine'), 'winepath'] if shutil.which('wine') else None))
+    if command:
+        try:
+            result = subprocess.run(command + ['-w', source], capture_output=True,
+                                    text=True, timeout=20)
+            converted = result.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            converted = ''
+    if not converted:
+        # Wine maps the filesystem root to Z: unless the prefix says otherwise
+        absolute = source if source.startswith('/') else os.path.abspath(source)
+        converted = 'Z:' + absolute.replace('/', '\\')
+    if trailing and not converted.endswith('\\'):
+        converted += '\\'
+    _wine_paths[path] = converted
+    return converted
+
+
 def canRunWindowsExe():
     """Whether a Windows .exe can be launched at all here. Callers check this
     up front so they can report it in their own results popup rather than
@@ -71,7 +125,7 @@ def findIWTEExe(iwte_dir):
 
 def startIWTETask(iwte_exe, iwte_dir, task_path, output_path):
     """Run a task file and return the job dict the watchers below expect."""
-    command = wineWrap([iwte_exe, "--uh", "--st", task_path])
+    command = wineWrap([iwte_exe, "--uh", "--st", winePath(task_path)])
     if not command:
         raise FileNotFoundError(NO_WINE % "IWTE")
 

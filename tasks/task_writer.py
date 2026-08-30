@@ -3,7 +3,7 @@ import bpy
 import subprocess
 
 from ..directories import modRoot, withTrailingSep
-from .iwte_run import findIWTEExe
+from .iwte_run import NO_WINE, findIWTEExe, winePath, wineWrap
 
 # Task files the toolkit writes for IWTE, all of them in IWTE's own iwte_tasks
 # folder. Built with os.path.join rather than by adding strings: the Paths
@@ -36,12 +36,18 @@ def modDirectory():
 
 def runTask(iwte_path, task_name):
     """Hand one task file to IWTE. The executable carries its version in its
-    name, so it is matched by prefix rather than globbed onto the folder path."""
+    name, so it is matched by prefix rather than globbed onto the folder path.
+
+    Off Windows this goes through Wine, and the task file has to be named by its
+    Windows path - IWTE reads a POSIX one as relative to its own folder."""
     iwte_dir = bpy.path.abspath(iwte_path)
     iwte_exe = findIWTEExe(iwte_dir)
     if not iwte_exe:
         raise FileNotFoundError('No IWTE executable found in %s' % iwte_dir)
-    subprocess.run([iwte_exe, "--uh", "--st", taskPath(iwte_path, task_name)], cwd = iwte_dir)
+    command = wineWrap([iwte_exe, "--uh", "--st", winePath(taskPath(iwte_path, task_name))])
+    if not command:
+        raise FileNotFoundError(NO_WINE % "IWTE")
+    subprocess.run(command, cwd = iwte_dir)
 
 
 def appendToTask(iwte_path, task_name, entry):
@@ -57,10 +63,10 @@ def appendToTask(iwte_path, task_name, entry):
 #########################
 
 def unitTaskWriter():
-    vanilla_path = withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2)
-    mod_path = modDirectory()
+    vanilla_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2))
+    mod_path = winePath(modDirectory())
     iwte_path = bpy.context.scene.med2_toolkit_reader.directory_iwte
-    output_path = withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_models)
+    output_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_models))
     primary_secondary = bpy.context.scene.med2_toolkit_units.primary_secondary
     with open(taskPath(iwte_path, 'toolkit_bmdb_task.txt'), 'w') as task_file:
         task_file.writelines([
@@ -85,10 +91,10 @@ def unitTaskRun():
 #########################
 
 def engineTaskWriter():
-    vanilla_path = withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2)
-    mod_path = modDirectory()
+    vanilla_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2))
+    mod_path = winePath(modDirectory())
     iwte_path = bpy.context.scene.med2_toolkit_reader.directory_iwte
-    output_path = withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_models)
+    output_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_models))
     with open(taskPath(iwte_path, 'toolkit_engine_task.txt'), 'w') as task_file:
         task_file.writelines([
             '<task_id>                                  m2_engines_to_extract''\n'
@@ -111,10 +117,10 @@ def engineTaskRun():
 #########################
 
 def settlementTaskWriter():
-    vanilla_path = withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2)
-    mod_path = modDirectory()
+    vanilla_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2))
+    mod_path = winePath(modDirectory())
     iwte_path = bpy.context.scene.med2_toolkit_reader.directory_iwte
-    output_path = withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_settlements)
+    output_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_settlements))
     with open(taskPath(iwte_path, 'toolkit_settlement_task.txt'), 'w') as task_file:
         task_file.writelines([
             '<task_id>                                  world_list_to_extract''\n'

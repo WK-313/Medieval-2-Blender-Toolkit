@@ -39,7 +39,7 @@ from mathutils import Matrix, Vector, kdtree
 from .armature_tools import caseConvertedName, mergeGroupInto, skeletonUsesLowercase
 from .export_checks import activeExportArmature, deselectAll, exportMeshes, materialImages
 from .importer import principledNode
-from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask
+from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask, winePath
 from .strat_data import NON_DEFORM_BONES, STRAT_BONES
 
 # The UV layer every mesh is renamed to before the join. join() only merges UV
@@ -719,7 +719,10 @@ def exportStratGLB(context):
 
 def writeStratTask(task_path, glb_path, out_dir, cas_name, cas_format, skeleton_scale):
     """The IWTE extract_to_cas task file - the task behind Model Files > Cas
-    Models > dae/ms3d to cas_mesh, which is the step the guide does by hand."""
+    Models > dae/ms3d to cas_mesh, which is the step the guide does by hand.
+
+    The two paths go in as Windows paths: off Windows IWTE runs under Wine and
+    reads a POSIX path as relative to its own folder."""
     with open(task_path, 'w', encoding='utf-8') as task_file:
         task_file.write(
             '<task_id>                                           extract_to_cas'
@@ -733,7 +736,7 @@ def writeStratTask(task_path, glb_path, out_dir, cas_name, cas_format, skeleton_
             '                                                                   # rr, m2 or full\n'
             '<skeleton_scale>                                    %.4f'
             '                                                               # scaling used to reset the skeleton *.cas to scale 1.0\n'
-            % (glb_path, out_dir, cas_name, cas_format, skeleton_scale)
+            % (winePath(glb_path), winePath(out_dir), cas_name, cas_format, skeleton_scale)
         )
 
 

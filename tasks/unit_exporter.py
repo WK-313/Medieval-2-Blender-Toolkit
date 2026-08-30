@@ -8,7 +8,7 @@ from pathlib import Path
 from .export_checks import deselectAll, materialImages, activeExportArmature, exportSettings
 from ..directories import loadStoredValue
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
-from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask, wineWrap
+from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask, usesWine, winePath, wineWrap
 from .iwte_tasks import applySkeletonTask
 
 addon_folder = Path(__file__).parent.parent
@@ -133,7 +133,13 @@ def runTexconv(texconv, source, tex_dir, out_base, opaque_alpha=False):
         return None
     if opaque_alpha:
         command += ["-swizzle", "rgb1"]
-    command += ["-o", staging, source]
+    # texconv is a Windows exe too, so off Windows it reads these the same way
+    # IWTE reads a task file: as paths relative to its own folder unless they
+    # carry a drive letter. A native texconv on PATH takes them as they are.
+    if usesWine(texconv):
+        command += ["-o", winePath(staging), winePath(source)]
+    else:
+        command += ["-o", staging, source]
     try:
         subprocess.run(command, check=True)
         produced = os.path.join(staging, os.path.splitext(os.path.basename(source))[0] + ".dds")
@@ -620,9 +626,9 @@ def exportToMeshIWTE(context):
     new_lines = []
     for line in lines:
         if line.strip().startswith("<extract_file_full_path_in>"):
-            new_lines.append(f'<extract_file_full_path_in>    "{glb_path}"\n')
+            new_lines.append(f'<extract_file_full_path_in>    "{winePath(glb_path)}"\n')
         elif line.strip().startswith("<directory_out>"):
-            new_lines.append(f'<directory_out>                "{unit_folder}"\n')
+            new_lines.append(f'<directory_out>                "{winePath(unit_folder)}"\n')
         elif line.strip().startswith("<mesh_file_name_out>"):
             new_lines.append(f'<mesh_file_name_out>           "{unit_name}.mesh"\n')
         else:
