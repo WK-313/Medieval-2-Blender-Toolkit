@@ -37,14 +37,16 @@ def selectedSettlement(context):
         return None
 
 def sortFolders(self, context):
+    # An EnumProperty with an items callback cannot declare a default, so the
+    # first item is the one it starts on - and that is why All is first. It
+    # used to be last, which meant a fresh install opened on whichever folder
+    # happened to sort first and showed only that folder's settlements.
+    folder_list = [("all", "All", "")]
     with open(os.path.join(script_folder, "text", "settlement_folders.json"), 'r') as pkg_input:
         folders = json.load(pkg_input)
-    folder_list = []
     for folder in folders:
         entry = (folder.lower(), folder.title(), "")
         folder_list.append(entry)
-    entry = ("all", "All", "")
-    folder_list.append(entry)
     return folder_list
 
 def sortSettlements(self, context):
@@ -159,11 +161,18 @@ class MED_2_TOOLKIT_Settlement_Data(bpy.types.PropertyGroup):
     # .get, not [...]: menu_settings.json is only written when it is missing, so an
     # install from before this setting existed still has a file without the key
     hide_complexes: BoolProperty(name = "Hide Complexes", description = "If on, hide the settlement's complex objects after importing it", default = bool_settings.get('hide_complexes', True))
-    settlement_folders: EnumProperty(name = "Settlements", description = "List of settlement .worldpkgdesc files in the mod directory", items = sortFolders)
+    # both filters rebuild the list themselves - picking a folder and then
+    # having to press refresh to see it was the wrong way round. The refresh
+    # button stays for the case the callbacks cannot cover: the settlement scan
+    # on disk changing under a filter that is already set
+    settlement_folders: EnumProperty(name = "Settlements", description = "List of settlement .worldpkgdesc files in the mod directory", items = sortFolders, update = sortSettlements)
     # TEXTEDIT_UPDATE applies the value on every keystroke instead of waiting
     # for Return, which is what makes the list narrow as you type
     search: StringProperty(name = "Search", description = "Show only settlements whose name or in-game name contains what you type. Several words all have to match, in any order", default = "", options = {'TEXTEDIT_UPDATE'}, update = snapToSearch)
-    pkg_types: EnumProperty(name = "Pkg Types", description = "PKG groups", items = [("settlement", "Settlement", ""), ("ambient", "Ambient", ""), ("ambientmisc", "Ambient Misc", ""), ("techtree", "Tech Tree", ""), ("rivercrossing", "River Crossing", ""), ("fieldfortification", "Field Fortification", ""), ("all", "All", "")])
+    # a static enum CAN declare a default, so All is the default without moving
+    # it to the front - which matters, because reordering the items of an enum
+    # re-points every saved .blend that stored one of them
+    pkg_types: EnumProperty(name = "Pkg Types", description = "PKG groups", items = [("settlement", "Settlement", ""), ("ambient", "Ambient", ""), ("ambientmisc", "Ambient Misc", ""), ("techtree", "Tech Tree", ""), ("rivercrossing", "River Crossing", ""), ("fieldfortification", "Field Fortification", ""), ("all", "All", "")], default = "all", update = sortSettlements)
 
 
 class MED_2_TOOLKIT_PT_Settlements_Panel(bpy.types.Panel):
@@ -182,7 +191,6 @@ class MED_2_TOOLKIT_PT_Settlements_Panel(bpy.types.Panel):
 
     def draw(self, context):
         layout=self.layout
-        layout.label(text = "W.I.P.")
         box = layout.box()
         col = box.column(align=True)
         grid = col.grid_flow(row_major=True, columns=2, even_columns=True, even_rows=True, align=True)
