@@ -22,6 +22,8 @@ The addon is organised into six **workmodes**, selected from the strip of button
 Read any mod's data folder and pull its content into Blender:
 - Batch import every unit of a faction, or import single units and officers
 - Import Faction brings in **every armour upgrade** of each unit, stacked upward on Z, plus an optional **Import Officers** toggle that places each unit's officers behind it
+- **Import Faction and Import Full Unit run with a progress bar** instead of freezing Blender. The bar names the model being imported and counts through the queue (England is 91 units and 276 models), the view keeps updating as they land, and **Esc** stops the batch and reports what was brought in. A model that fails is listed at the end rather than taking the rest of the import down with it
+- Anything not yet converted is extracted **once for the whole batch** before the import starts, rather than re-running IWTE for each unit in turn, and that conversion is watched with its own counter
 - Single unit import has tick boxes for the armour upgrade levels the unit actually has, each labelled with its model ID
 - Import models directly from the battle_models.modeldb (BMDB) with faction filtering, and texture variants labelled "(Same as X)" so the genuinely unique ones stand out
 - EDU-based unit browser with mount / officer / upgrade handling
@@ -58,6 +60,7 @@ Take a rigged model from Blender back into the game:
   - every file is byte-compared against the mod's copy — identical ones are not recopied, differing ones are either kept or overwritten, and a differing file shared with other models names those models before it re-skins them
   - `battle_models.modeldb` is backed up to a timestamped `.bak` **twice** before the entry is written — once next to itself in the mod, and once into the export folder beside the mesh and textures the install came from, so the copy travels with the exported unit and is not buried among the mod's own files. Either one puts the modeldb back byte for byte. It is rewritten through a temp file, so a failure cannot leave a half-written modeldb
 - GLB → `.mesh` conversion driven through IWTE task files, with progress monitoring
+- **A conversion that runs long asks what to do with it** rather than waiting silently forever: keep waiting (the default - a big model genuinely takes minutes), open the system console to watch the toolkit's output, or abort. It asks after three minutes and backs off each time, so a long job is not a nag. IWTE is never stopped on a timer alone
 - **Sample task files** ship with the addon, one per QOL skeleton (2H, Archer, Crossbow, Jav, Spear, Sword). They carry that skeleton's bone order and case, which is what IWTE writes into the `.mesh`, so the right one matters. A rig parented through **Parent to Skeleton** is given its skeleton's file automatically; the Sample Task Files section at the bottom of the Export panel switches between them, and browsing to a task file of your own still overrides everything
 - All export settings are stored per-armature, so multiple units can live in one .blend
 
