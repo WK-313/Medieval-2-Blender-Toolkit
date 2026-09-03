@@ -8,7 +8,7 @@ The addon is organised into six **workmodes**, selected from the strip of button
 
 ***
 
-[![Build Status](https://img.shields.io/github/v/release/WK-313/Medieval-2-Toolkit?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Toolkit/releases) [![Build Status](https://img.shields.io/github/downloads/WK-313/Medieval-2-Toolkit/total?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Toolkit/releases)
+[![Build Status](https://img.shields.io/github/v/release/WK-313/Medieval-2-Blender-Toolkit?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases) [![Build Status](https://img.shields.io/github/downloads/WK-313/Medieval-2-Blender-Toolkit/total?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases)
 
 ## Table of Contents
 * [Features](#features)
@@ -153,7 +153,7 @@ For a video walkthrough of the tool, watch the tutorial on YouTube:
 ## Installation
 
 ## 1. Download the release
-Navigate to the [latest release](https://github.com/WK-313/Medieval-2-Toolkit/releases/latest) and download the zip file under the **Assets** section
+Navigate to the [latest release](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases/latest) and download the zip file under the **Assets** section
 
 ## 2. Install the addon
 
