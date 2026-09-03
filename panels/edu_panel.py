@@ -8,7 +8,7 @@ from bpy.props import StringProperty, BoolProperty, BoolVectorProperty, PointerP
 from pathlib import Path
 
 from..directories import saveFolderPaths, saveSettings, readJsonCached
-from ..tasks.card_renderer import TARGET_TAG
+from ..tasks.card_renderer import CAMERA_TAG, SUN_TAG, TARGET_TAG, cameraName
 from ..tasks.control_rig import controlRigOf, controlledRigs, isControlRig
 from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport, missingModelPaths
 from ..tasks.iwte_run import IWTE_STALL_SECONDS, abortIWTEJob, iwteStalled, redrawView3D
@@ -195,6 +195,37 @@ def retargetCardCameras(old_name, new_name):
             obj[TARGET_TAG] = new_name
 
 
+def renameCardCameras(old_id, new_id):
+    """Move a card camera - and its sun - onto a renamed unit id.
+
+    The id is what the card is FILED under: the renderer reads it off the
+    camera's tag and it becomes the .tga's name, so a camera left holding the id
+    the rig had when it was listed writes the card under the old armature name
+    however many times the rig is renamed afterwards. The object names follow too,
+    because the camera is looked up by name when one is refreshed.
+    """
+    if not old_id or old_id == new_id:
+        return 0
+    moved = 0
+    old_camera_name = cameraName(old_id)
+    new_camera_name = cameraName(new_id)
+    for obj in bpy.data.objects:
+        if obj.type == 'CAMERA' and obj.get(CAMERA_TAG, "") == old_id:
+            obj[CAMERA_TAG] = new_id
+            if obj.name == old_camera_name:
+                obj.name = new_camera_name
+                if obj.data is not None and obj.data.name == old_camera_name:
+                    obj.data.name = new_camera_name
+            moved += 1
+        elif obj.type == 'LIGHT' and obj.get(SUN_TAG, "") == old_id:
+            obj[SUN_TAG] = new_id
+            if obj.name == old_camera_name + " Sun":
+                obj.name = new_camera_name + " Sun"
+                if obj.data is not None and obj.data.name == old_camera_name + " Sun":
+                    obj.data.name = new_camera_name + " Sun"
+    return moved
+
+
 def syncImportList(scene, prune=True):
     """Follow renames and, when `prune` is on, drop entries whose object really
     is gone. Returns (renamed, pruned).
@@ -206,6 +237,9 @@ def syncImportList(scene, prune=True):
     renamed = 0
     stale = []
     seen = set()
+    # (old id, new id, group) per hand-added entry whose unit id followed its
+    # rename, so the parts folded under it can be moved over afterwards
+    renamed_ids = []
     for index, item in enumerate(scene.med2_toolkit_import_list):
         obj = trackedObject(item)
         if obj is None:
@@ -225,8 +259,23 @@ def syncImportList(scene, prune=True):
             # imported from the EDU keeps the unit name it was listed under
             if item.name == old_name:
                 item.name = obj.name
+            # the id is what names the card file, and a hand-added rig is filed
+            # under its own name - so that has to follow the rename too, or the
+            # card keeps coming out under the name the rig had when it was added.
+            # An EDU unit's id is its EDU type and is left alone
+            if item.icon == 'custom' and item.id == old_name:
+                item.id = obj.name
+                renamed_ids.append((old_name, obj.name, item.group))
             retargetCardCameras(old_name, obj.name)
             renamed += 1
+    # a mount's riders and an engine's crew carry the ROOT's name as their id, so
+    # their own name never matches and the loop above cannot move them
+    for old_id, new_id, group in renamed_ids:
+        if group:
+            for other in scene.med2_toolkit_import_list:
+                if other.is_part and other.group == group and other.id == old_id:
+                    other.id = new_id
+        renameCardCameras(old_id, new_id)
     if not prune:
         return renamed, 0
     for index in reversed(stale):
