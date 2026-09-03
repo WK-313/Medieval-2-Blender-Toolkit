@@ -1012,11 +1012,12 @@ class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
         job = _iwte_job
         _iwte_job = None
         level, message = finishIWTEJob(job, success)
+        results = [(level, message)] + job.get('version_warnings', [])
         if level == 'ERROR':
-            showResultsPopup(context, "IWTE conversion failed", [(level, message)])
+            showResultsPopup(context, "IWTE conversion failed", results)
             self.report({'ERROR'}, message)
             return {'CANCELLED'}
-        showResultsPopup(context, "IWTE conversion finished", [(level, message)])
+        showResultsPopup(context, "IWTE conversion finished", results)
         self.report({'INFO'}, message)
         return {'FINISHED'}
 

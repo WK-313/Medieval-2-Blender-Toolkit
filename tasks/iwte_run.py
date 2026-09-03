@@ -12,9 +12,16 @@ through here; the caller supplies the task file and the output it expects.
 """
 import os
 import math
+import re
 import shutil
 import subprocess
 import time
+
+# The oldest IWTE version this toolkit's task templates are known to work
+# with. Bump this alongside any change that relies on newer IWTE behaviour.
+MIN_IWTE_VERSION = (26, 3, 'A')
+# Where an out-of-date IWTE is updated from, shown with the warning.
+IWTE_DOWNLOAD_URL = "https://github.com/makanyane/IWTE"
 
 # How long to keep watching the folder after the IWTE process has exited.
 IWTE_OUTPUT_TIMEOUT = 300.0
@@ -138,6 +145,32 @@ def findIWTEExe(iwte_dir):
     )
 
 
+def parseIWTEVersion(iwte_exe):
+    """(26, 3, 'A') from a path ending in .../IWTE_v26_03_A.exe, or None if
+    the file name isn't the version-stamped form IWTE ships as."""
+    name = os.path.splitext(os.path.basename(iwte_exe))[0]
+    match = re.match(r"iwte_v(\d+)_(\d+)_([a-z])$", name, re.IGNORECASE)
+    if not match:
+        return None
+    major, minor, letter = match.groups()
+    return (int(major), int(minor), letter.upper())
+
+
+def iwteVersionWarnings(iwte_exe):
+    """The report lines for an IWTE older than MIN_IWTE_VERSION, or [] if it is
+    current. A file name that doesn't parse is left alone rather than warned
+    about - more likely a rename than an actual downgrade. Two lines rather
+    than one so neither is clipped by the popup's width."""
+    version = parseIWTEVersion(iwte_exe)
+    if version is None or version >= MIN_IWTE_VERSION:
+        return []
+    return [
+        ('WARNING', "IWTE v%02d_%02d_%s is older than v%02d_%02d_%s - update it, then point "
+                    "Paths > IWTE at the new folder" % (version + MIN_IWTE_VERSION)),
+        ('INFO', "Latest IWTE: %s" % IWTE_DOWNLOAD_URL),
+    ]
+
+
 def startIWTETask(iwte_exe, iwte_dir, task_path, output_path):
     """Run a task file and return the job dict the watchers below expect."""
     command = wineWrap([iwte_exe, "--uh", "--st", winePath(task_path)])
@@ -164,6 +197,7 @@ def startIWTETask(iwte_exe, iwte_dir, task_path, output_path):
         'start': now,
         'stall_interval': IWTE_STALL_SECONDS,
         'stall_deadline': now + IWTE_STALL_SECONDS,
+        'version_warnings': iwteVersionWarnings(iwte_exe),
     }
 
 

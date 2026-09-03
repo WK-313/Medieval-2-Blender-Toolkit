@@ -247,7 +247,7 @@ class MED_2_TOOLKIT_OT_Strat_Convert_CAS(bpy.types.Operator):
         global _iwte_job
         job = _iwte_job
         _iwte_job = None
-        results = [finishIWTEJob(job, success)]
+        results = [finishIWTEJob(job, success)] + job.get('version_warnings', [])
         if success:
             # the guide's "open the .cas and search for .tga" check, done here
             results.extend(checkCASTexture(context))
