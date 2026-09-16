@@ -168,6 +168,15 @@ def runTexconv(texconv, source, tex_dir, out_base, opaque_alpha=False):
         "-m", "0",
         "-nologo",
         "-y",
+        # -srgb is -srgbi AND -srgbo: decode sRGB on the way in, re-encode it on
+        # the way out, so the bytes come through unchanged. Without it, anything
+        # texconv reads as an _SRGB format - a Blender png, which always carries
+        # an sRGB chunk, or a BC7_UNORM_SRGB dds - is degamma'd into the linear
+        # DXT5 and lands in game visibly darker. It is a no-op on sources read as
+        # linear (tga, jpg, a png with no sRGB chunk, BC7_UNORM), so it is safe on
+        # every path through here. Mips get filtered in linear space either way,
+        # which is the correct place to filter them.
+        "-srgb",
     ])
     if not command:
         return None
