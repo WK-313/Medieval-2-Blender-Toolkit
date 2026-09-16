@@ -235,54 +235,11 @@ def writeTexture(savefiletexture, ddsdata):
         f.write(ddsdata)
     return None
 
-# a DXT5 alpha block whose 16 three-bit indices all select palette entry 6,
-# the fixed 0 of the a0 <= a1 mode - the only way a block with two non-zero
-# endpoints can still be fully transparent
-ALL_SIX_INDICES = sum(6 << (3 * i) for i in range(16)).to_bytes(6, "little")
-
-def alphaBlockIsTransparent(block, dxt3):
-    """True when every texel of one 8-byte DXT3/DXT5 alpha block is alpha 0.
-
-    DXT5 stores two endpoints and 16 three-bit indices into a palette built
-    from them, and texconv writes a flat transparent block as endpoints
-    (255, 0) with every index on the second one - so the endpoints alone are
-    not enough to tell, the indices have to be read."""
-    if dxt3:
-        return block == b"\x00" * 8
-    a0, a1 = block[0], block[1]
-    if a0 > a1:
-        if a1 > 0:
-            return False
-        palette = [a0, a1] + [((7 - i) * a0 + i * a1 + 3) // 7 for i in range(1, 7)]
-    else:
-        if a0 > 0:
-            return block[2:8] == ALL_SIX_INDICES
-        palette = [a0, a1] + [((5 - i) * a0 + i * a1 + 2) // 5 for i in range(1, 5)] + [0, 255]
-    indices = int.from_bytes(block[2:8], "little")
-    return all(palette[(indices >> (3 * i)) & 7] == 0 for i in range(16))
-
-def ddsHasTransparentAreas(path):
-    """True when the top mip of a DXT3/DXT5 .dds holds fully transparent blocks.
-    The game draws nothing where the diffuse alpha is zero, so a texture painted
-    with an empty or half-empty alpha channel comes out see-through in game. A
-    soft alpha gradient never trips it, and DXT1 has no real alpha channel."""
-    try:
-        with open(path, "rb") as dds_input:
-            header = dds_input.read(128)
-            if len(header) < 128 or header[0:4] != b'DDS ':
-                return False
-            fourcc = header[84:88].decode('ascii', errors='ignore').strip('\x00')
-            if fourcc not in ('DXT3', 'DXT5'):
-                return False
-            height, = struct.unpack("<I", header[12:16])
-            width, = struct.unpack("<I", header[16:20])
-            blocks = max(1, (width + 3) // 4) * max(1, (height + 3) // 4)
-            top_mip = dds_input.read(blocks * 16)
-    except OSError:
-        return False
-    dxt3 = fourcc == 'DXT3'
-    return any(alphaBlockIsTransparent(top_mip[i:i + 8], dxt3)
-               for i in range(0, len(top_mip) - 15, 16))
+# There was a see-through-unit warning here, raised when a diffuse came out with
+# fully transparent DXT blocks, plus the block decoder it needed. It is gone: it
+# fires on every deliberate cutout - hair, chainmail gaps, banners - which is
+# most units, so it was noise on a normal export rather than a finding. The fix
+# it pointed at, the Ignore Diffuse Alpha toggle, is unchanged.
 
 SUPPORTED_TEXTURE_EXTS = ('.png', '.jpg', '.jpeg', '.tga', '.dds')
 
@@ -337,10 +294,6 @@ def textureFromFile(texconv, source, tex_dir, out_base, diffuse=False, opaque_al
     # shimmers and stays full-resolution at every range.
     if ddsMipCount(dds) <= 1:
         return None, "%s.texture was written without mipmaps" % out_base
-    if diffuse and not force_opaque and ddsHasTransparentAreas(dds):
-        return None, ("%s.texture has fully transparent areas in its alpha channel - the game "
-                      "draws nothing there, so those parts of the unit are see-through. Tick "
-                      "Ignore Diffuse Alpha if that alpha is not a deliberate cutout" % out_base)
     return None, None
 
 def normalFromFile(prop_value, requested):
