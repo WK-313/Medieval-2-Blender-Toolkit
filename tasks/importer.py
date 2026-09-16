@@ -72,6 +72,64 @@ def unitChecker(model_folder, unit_list, upgrade, defer=False):
     return missing_units, missing_engines
 
 
+def unconvertedModels(model_folder, unit_list, upgrade):
+    """[(model id, what is wrong)] for every model these units need that is still
+    not in the import folder, ready to print as "model id: what is wrong".
+
+    unitChecker reports what it handed IWTE, not what IWTE handed back, so a
+    model whose .mesh is nowhere on disk comes out of it looking converted and
+    then imports as nothing: modelImporter returns 0, unitImporter passes that
+    straight out, and the operator finishes without a word. The usual cause is a
+    vanilla asset - a mod that rides, say, mount_armoured_horse has no loose
+    .mesh for IWTE to read unless the game's own data/packs have been unpacked -
+    and on a mounted unit it costs you the rider too, because the mount is
+    imported first and its failure returns before the rider is reached.
+
+    Run this AFTER the conversion: whatever is still missing here is something no
+    import can produce.
+    """
+    model_folder = withTrailingSep(model_folder)
+    with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
+        bmdb_dictionary = json.load(bmdb_input)
+    with open(script_folder/('text/attachment_dictionary.json'), 'r') as attachment_input:
+        attachment_dictionary = json.load(attachment_input)
+    missing = []
+    for unit_info in unit_list:
+        unit_attachment = unit_info['Attachment']
+        model_ids = []
+        if not unit_info['Model']:
+            # the EDU named no model at all - see eduEntries, which falls back to
+            # the `soldier` line, so this is a unit read before that existed or
+            # an entry with neither. Nothing to look for on disk, so say what is
+            # wrong rather than raising IndexError out of a helper.
+            missing.append((unit_info.get('ID') or unit_info.get('Type', 'unit'),
+                            'no model named in export_descr_unit.txt'))
+        else:
+            try:
+                model_ids.append(unit_info['Model'][upgrade])
+            except IndexError:
+                model_ids.append(unit_info['Model'][-1])
+        if unit_attachment[0] == 'mount':
+            # named before the unit's own model because it is imported first and
+            # a missing mount takes the rider with it
+            model_ids.insert(0, attachment_dictionary[unit_attachment[1]]['Model'])
+        for wanted in model_ids:
+            model_info = bmdb_dictionary.get(wanted)
+            if model_info is None:
+                missing.append((wanted, 'not in battle_models.modeldb'))
+            elif not Path(str(model_folder)+model_info['Mesh']).exists():
+                missing.append((wanted, 'no %s, and nothing to convert at %s/%s'
+                                        % (model_info['Mesh'], model_info['Folder'],
+                                           model_info['Mesh'].replace('.glb', '.mesh'))))
+        if unit_attachment[0] == 'engine':
+            engine_mesh = unit_attachment[1]+'.glb'
+            if not Path(str(model_folder)+engine_mesh).exists():
+                missing.append((unit_attachment[1], 'no %s, and IWTE did not convert it' % engine_mesh))
+    # a unit can name one model twice - the same upgrade on both sides of a
+    # mount, say - and it is one problem, not two
+    return list(dict.fromkeys(missing))
+
+
 def fileChecker(model_folder, model_list, defer=False):
     # Returns the model ids that were appended to the task file. With
     # defer=True the task is left for the caller to run - see unitChecker.
@@ -130,6 +188,47 @@ def missingModelPaths(model_folder, model_ids, engine_ids):
     return [Path(str(model_folder)+name) for name in dict.fromkeys(names)]
 
 
+def placeMember(member_object, role, member_coordinates, member_width, member_z,
+                unit, coordinates, apply_offset):
+    """Put one rider or crew member in place, whether or not the thing it rides
+    turned up, and record it in `unit`.
+
+    A mount or engine that would not convert used to abort the whole import -
+    see unconvertedModels for why a model goes missing at all - which cost the
+    user the rider too, and the rider is usually the model they came for. So
+    when nothing has claimed the root yet, the first member that does arrive
+    takes the mount's place on the ground, and the ones after it hang off that
+    member at their offsets MINUS its own, which keeps an elephant's crew spread
+    out and standing on the ground rather than floating at the height the
+    missing elephant would have carried them.
+
+    With a real root present nothing changes: members parent to it at exactly
+    the offsets descr_mount / descr_engines gives.
+    """
+    if unit['root']:
+        member_object.parent = unit['root']
+        location = [member_coordinates[axis] - unit['offset'][axis] for axis in range(3)]
+        if unit['grounded']:
+            # nothing is carrying them any more, so they all stand on the
+            # ground rather than keeping the heights the missing mount held
+            # them at - an elephant's crew sit in a howdah and on its neck, and
+            # the lower one would end up buried. They are all the same model,
+            # so the root's own z_offset is theirs too and z stays flat.
+            location[2] = 0
+        member_object.location = location
+        unit['parts'].append((member_object, role))
+        return
+    if apply_offset and coordinates != [0, 0, 0]:
+        coordinates[0] = coordinates[0] + round(member_width*0.5, 1) + 0.25
+    member_object.location = list(coordinates)
+    member_object.location[2] += member_z
+    unit['root'] = member_object
+    unit['role'] = "Unit"
+    unit['offset'] = list(member_coordinates)
+    unit['width'] = member_width
+    unit['grounded'] = True
+
+
 def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, apply_offset=True):
     # apply_offset=False lets a caller place this exact `coordinates` (e.g.
     # stacking a unit's armour upgrades on Z) without the auto x-spacing below,
@@ -151,13 +250,19 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
     recurlayercollection.findCollection(unit_name)
     model_info = bmdb_dictionary[model_id]
     result = 0
-    root_object = None
-    # A mount or an engine imports as several armatures - the mount itself plus
-    # one per crew member. They are collected here as [(object, role)] and tied
-    # to the root by tagGroup below, so every tool downstream can treat the lot
-    # as one unit however they end up parented once they have control rigs.
-    parts = []
-    root_role = "Unit"
+    # What the unit ends up rooted on, filled in as the import goes. A mount or
+    # an engine imports as several armatures - itself plus one per crew member -
+    # and it is the root when it arrives; when it does NOT, the first member to
+    # arrive stands in its place instead of the whole unit being abandoned (see
+    # placeMember). 'parts' collects the rest as [(object, role)], tied to the
+    # root by tagGroup below so every tool downstream can treat the lot as one
+    # unit however they end up parented once they have control rigs. 'offset' is
+    # what member offsets are measured from, which is the origin while the root
+    # is the real mount or engine.
+    # 'grounded' says the root is a member standing in for a mount or engine
+    # that never arrived, which changes how the members after it are placed.
+    unit = {'root': None, 'role': "Unit", 'offset': [0, 0, 0], 'width': 0,
+            'grounded': False, 'parts': []}
     # Every rig imported here is looked up by diffing the object set, never by
     # bpy.data.objects[unit_name]: each armour upgrade of a unit is named after
     # the same unit ID, so Blender hands the later ones a ".001" suffix and a
@@ -175,21 +280,22 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
         if root_object:
             root_object.location = coordinates
             root_object.location[2] += z_offset
+            unit['root'] = root_object
+            unit['width'] = width
     elif unit_attachment[0] == 'mount':
         mount_info = attachment_dictionary[unit_attachment[1]]
         mount_model = bmdb_dictionary[mount_info['Model']]
         existing = set(bpy.data.objects)
         result, width, z_offset = modelImporter(model_folder, unit_name, faction_id, mount_model, model_id)
-        if result == 0:
-            return(0)
-        if apply_offset and coordinates != [0, 0, 0]:
-            coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
-        mount_object = importedArmature(existing)
-        root_object = mount_object
-        root_role = "Mount"
+        mount_object = importedArmature(existing) if result != 0 else None
         if mount_object:
+            if apply_offset and coordinates != [0, 0, 0]:
+                coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
             mount_object.location = coordinates
             mount_object.location[2] += z_offset
+            unit['root'] = mount_object
+            unit['role'] = "Mount"
+            unit['width'] = width
         n = 1
         for member in mount_info['Crew']:
             rider_coordinates = [
@@ -198,30 +304,26 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
                 float(member[2])
             ]
             existing = set(bpy.data.objects)
-            result, c_width, z_offset = modelImporter(model_folder, unit_name+' Rider '+str(n), faction_id, model_info, model_id)
-            if result == 0:
-                return(0)
-            rider_object = importedArmature(existing)
+            result, rider_width, rider_z = modelImporter(model_folder, unit_name+' Rider '+str(n), faction_id, model_info, model_id)
+            rider_object = importedArmature(existing) if result != 0 else None
             if rider_object:
-                rider_object.parent = mount_object
-                rider_object.location = rider_coordinates
-                parts.append((rider_object, 'Rider %d' % n))
+                placeMember(rider_object, 'Rider %d' % n, rider_coordinates,
+                            rider_width, rider_z, unit, coordinates, apply_offset)
             n += 1
     elif unit_attachment[0] == 'engine':
         engine_info = attachment_dictionary[unit_attachment[1]]
         engine_model = unit_attachment[1]
         existing = set(bpy.data.objects)
         result, width, z_offset = engineImporter(model_folder, unit_name, faction_id, engine_model+'.glb')
-        if result == 0:
-            return(0)
-        if apply_offset and coordinates != [0, 0, 0]:
-            coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
-        engine_object = importedArmature(existing)
-        root_object = engine_object
-        root_role = "Engine"
+        engine_object = importedArmature(existing) if result != 0 else None
         if engine_object:
+            if apply_offset and coordinates != [0, 0, 0]:
+                coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
             engine_object.location = coordinates
             engine_object.location[2] += z_offset
+            unit['root'] = engine_object
+            unit['role'] = "Engine"
+            unit['width'] = width
         n = 1
         for member in engine_info['Crew']:
             rider_coordinates = [
@@ -230,19 +332,25 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
                 float(member[2])
             ]
             existing = set(bpy.data.objects)
-            result, c_width, z_offset = modelImporter(model_folder, unit_name+' Crew '+str(n), faction_id, model_info, model_id)
-            if result == 0:
-                return(0)
-            crew_object = importedArmature(existing)
+            result, crew_width, crew_z = modelImporter(model_folder, unit_name+' Crew '+str(n), faction_id, model_info, model_id)
+            crew_object = importedArmature(existing) if result != 0 else None
             if crew_object:
-                crew_object.parent = engine_object
-                crew_object.location = rider_coordinates
-                crew_object.location[2] += z_offset
-                parts.append((crew_object, 'Crew %d' % n))
+                # unlike a rider, a crew member stands on the ground beside its
+                # engine, so its own z_offset goes into the offset itself
+                rider_coordinates[2] += crew_z
+                placeMember(crew_object, 'Crew %d' % n, rider_coordinates,
+                            crew_width, crew_z, unit, coordinates, apply_offset)
             n += 1
-    if result == 2:
-        group = tagGroup(root_object, parts, root_role) if (root_object and parts) else ""
-        icon = unit_attachment if unit_attachment == 'unused' else unit_attachment[0]
+    root_object, parts, root_role = unit['root'], unit['parts'], unit['role']
+    # whatever arrived, rather than "the last modelImporter call succeeded":
+    # a unit can now be listed with its mount missing, or with one rider of
+    # three, and it is the objects in the scene the list has to match
+    if root_object:
+        group = tagGroup(root_object, parts, root_role) if parts else ""
+        # the icon comes from what arrived too - a mounted unit whose mount did
+        # not convert is on foot in this scene, and the list's type filter must
+        # not offer a mount row that has no mount behind it
+        icon = {'Mount': 'mount', 'Engine': 'engine'}.get(root_role, 'unused')
         import_list = bpy.context.scene.med2_toolkit_import_list
         item = import_list.add()
         item.name = unit_name
@@ -267,7 +375,10 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
             part_item.group = group
             part_item.role = role
             part_item.is_part = True
-    return(width)
+    # the width of whatever is standing at `coordinates`, which is the rider
+    # rather than the mount when the mount did not arrive - the caller spaces
+    # the next unit off this
+    return(unit['width'])
 
 
 def engineImporter(model_folder, unit_name, faction_id, engine_model):

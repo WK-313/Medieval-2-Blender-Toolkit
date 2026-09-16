@@ -10,7 +10,7 @@ from pathlib import Path
 from..directories import saveFolderPaths, saveSettings, readJsonCached
 from ..tasks.card_renderer import CAMERA_TAG, SUN_TAG, TARGET_TAG, cameraName
 from ..tasks.control_rig import controlRigOf, controlledRigs, isControlRig
-from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport, missingModelPaths
+from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport, missingModelPaths, unconvertedModels
 from ..tasks.iwte_run import IWTE_STALL_SECONDS, abortIWTEJob, iwteStalled, redrawView3D
 from ..tasks.task_writer import unitTaskWriter, engineTaskWriter, startTask
 from ..tasks.unit_groups import adoptGroup, deriveRole, groupId, groupParts, groupRoot, unitRole
@@ -41,11 +41,28 @@ def sortFactions(self, context):
     _faction_enum_items = faction_list
     return _faction_enum_items
 
-def sortUnits(self, context):
-    global _unit_enum_items
+# Order the Unit dropdown offers its entries in. The EDU's own order is the
+# default so a mod's own grouping survives, but a faction runs to a couple of
+# hundred units and finding one in file order is hopeless - hence A to Z and the
+# search box beside it. Same shape as SORT_ORDERS for the imported models list.
+UNIT_SORT_ORDERS = [
+    ('NONE', "EDU order", "Leave the units in export_descr_unit.txt order", 'SORTSIZE', 0),
+    ('AZ', "A to Z", "Sort the units alphabetically", 'SORTALPHA', 1),
+    ('ZA', "Z to A", "Sort the units reverse-alphabetically", 'SORT_DESC', 2),
+]
+
+
+def factionUnits(settings):
+    """[(unit json, display name, "")] for every unit the faction and the
+    ownership filter allow, in export_descr_unit.txt order.
+
+    This is the whole faction. The dropdown's search and sort are applied on top
+    of it by sortUnits and deliberately do NOT narrow it: Import faction means
+    the faction, not whatever is left after a search box.
+    """
     unit_dictionary = readJsonCached(script_folder/('text/unit_dictionary.json'))
-    import_faction = context.scene.med2_toolkit_units.import_faction
-    filter = context.scene.med2_toolkit_units.import_filter
+    import_faction = settings.import_faction
+    filter = settings.import_filter
     faction_units = []
     for unit in unit_dictionary:
         if not import_faction in unit_dictionary[unit]['Owners'][filter]:
@@ -53,6 +70,23 @@ def sortUnits(self, context):
         unit_info = json.dumps(unit_dictionary[unit])
         entry = (unit_info, unit, "")
         faction_units.append(entry)
+    return faction_units
+
+
+def sortUnits(self, context):
+    global _unit_enum_items
+    settings = context.scene.med2_toolkit_units
+    faction_units = factionUnits(settings)
+    search = settings.unit_search.strip().lower()
+    if search:
+        # every word has to appear somewhere in the name rather than the lot of
+        # them in order, so "khitai noble" finds "Khitai Mounted Noblemen"
+        terms = search.split()
+        faction_units = [entry for entry in faction_units
+                         if all(term in entry[1].lower() for term in terms)]
+    if settings.unit_sort != 'NONE':
+        faction_units.sort(key=lambda entry: entry[1].lower(),
+                           reverse=settings.unit_sort == 'ZA')
     if len(faction_units) == 0:
         faction_units = [('none','None','')]
     _unit_enum_items = faction_units
@@ -353,12 +387,24 @@ class MED_2_TOOLKIT_Unit_data(bpy.types.PropertyGroup):
     import_faction: EnumProperty(name = "Faction list", description = "List of factions", items = sortFactions)
     import_unit: EnumProperty(name = "Unit list", description = "List of units in faction", items = sortUnits)
     import_filter: EnumProperty(name = "Ownership filter", description = "Unit ownership filter", items = [('ownership','Ownership',''),('era 0','Era 0',''),('era 1','Era 1',''),('era 2','Era 2','')], default = 1)
+    unit_search: StringProperty(name = "Search", description = "Only list units whose name contains every word typed here", options = {'TEXTEDIT_UPDATE'})
+    unit_sort: EnumProperty(name = "Sort", description = "Order the unit list is shown in", items = UNIT_SORT_ORDERS, default = 'NONE')
     faction_import_officers: BoolProperty(name = "Import Officers", description = "Also import each unit's officers, placed behind it on the -Y axis", default = False)
     use_existing: BoolProperty(name = "Use existing", description = "Toggle between using existing .GLB files or always converting from .mesh", default =  bool_settings['use_existing'])
     hide_toggle: BoolProperty(name = "Hide variations", description = "Toggle to automatically hide model variations when importing units", default = bool_settings['hide_toggle'])
     frame_toggle: BoolProperty(name = "Frame models", description = "Toggle to automatically focus the view on imported models", default = bool_settings['frame_toggle'])
     textured_toggle: BoolProperty(name = "Display textures", description = "Toggle to automatically change to solid texture mode", default = bool_settings['textured_toggle'])
     primary_secondary: EnumProperty(name = "Skeleton type", description = "Choose which skeleton to use when converting", items = [('primary','Primary',''),('secondary','Secondary','')])
+
+
+def resultsTitle(what, results):
+    """"Import unit: 1 problem(s)", counting only what actually went wrong - a
+    partial import adds an INFO line saying what it came in without, and that
+    is a note rather than a problem."""
+    problems = sum(1 for level, _message in results if level != 'INFO')
+    if not problems:
+        return what
+    return "%s: %d problem(s)" % (what, problems)
 
 
 class MED_2_TOOLKIT_OT_Unit_Importer(bpy.types.Operator):
@@ -386,11 +432,34 @@ class MED_2_TOOLKIT_OT_Unit_Importer(bpy.types.Operator):
         saveSettings()
         unitTaskWriter()
         engineTaskWriter()
+        results = []
         for upgrade in upgrades:
             unitChecker(model_folder, [unit_info], upgrade)
+            # unitChecker only says what it asked IWTE for. Anything still not on
+            # disk after that conversion is a model the import cannot produce,
+            # and it used to come out as nothing happening at all - no object, no
+            # message, a FINISHED operator.
+            missing = unconvertedModels(model_folder, [unit_info], upgrade)
             offset = unitImporter(model_folder, unit_info, faction, coordinates, upgrade)
+            # an ERROR when the unit came out empty, a WARNING when the rest of
+            # it imported around the missing model - unitImporter no longer
+            # abandons a unit because its mount or engine would not convert
+            level = 'ERROR' if offset == 0 else 'WARNING'
+            for model_id, problem in missing:
+                results.append((level, "%s: %s" % (model_id, problem)))
+            if offset == 0 and not missing:
+                results.append(('ERROR', "Upgrade %d of %s imported nothing"
+                                         % (upgrade, unit_info['ID'])))
+            elif missing:
+                results.append(('INFO', "Upgrade %d of %s imported without %s"
+                                        % (upgrade, unit_info['ID'],
+                                           ", ".join(model for model, _ in missing))))
             coordinates[0] += round(offset*0.5, 1) + 0.25
         postImport(self, context)
+        if results:
+            for level, message in results:
+                self.report({level}, message)
+            showResultsPopup(context, resultsTitle("Import unit", results), results)
         return{"FINISHED"}
 
 
@@ -418,17 +487,32 @@ class MED_2_TOOLKIT_OT_Officer_Importer(bpy.types.Operator):
         unitTaskWriter()
         engineTaskWriter()
         fileChecker(model_folder, officers)
+        results = []
         for officer in officers:
-            model_info = bmdb_dictionary[officer]
+            # .get, not [officer]: the officer line of an EDU entry can name a
+            # model the modeldb has nothing for, and that is a message rather
+            # than a KeyError out of the middle of the import
+            model_info = bmdb_dictionary.get(officer)
+            if model_info is None:
+                results.append(('ERROR', "%s is not in battle_models.modeldb - officer skipped" % officer))
+                continue
             existing = set(bpy.data.objects)
             result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
-            if result != 0:
-                imported = importedArmature(existing)
-                if imported:
-                    imported.location = coordinates
-                    imported.location[2] += z_offset
+            if result == 0:
+                results.append(('ERROR', "%s: no %s, and nothing to convert at %s/%s"
+                                         % (officer, model_info['Mesh'], model_info['Folder'],
+                                            model_info['Mesh'].replace('.glb', '.mesh'))))
+                continue
+            imported = importedArmature(existing)
+            if imported:
+                imported.location = coordinates
+                imported.location[2] += z_offset
             coordinates[1] -= 2
         postImport(self, context)
+        if results:
+            for level, message in results:
+                self.report({level}, message)
+            showResultsPopup(context, resultsTitle("Import officers", results), results)
         return{"FINISHED"}
 
 # ---------------------------------------------------------------------------
@@ -821,8 +905,8 @@ class MED_2_TOOLKIT_OT_Faction_Importer(BatchImportBase, bpy.types.Operator):
         return _import_job is None
 
     def execute(self, context):
-        unit_info_list = [json.loads(unit[0]) for unit in sortUnits(self, context)
-                          if unit[0] != 'none']
+        unit_info_list = [json.loads(unit[0])
+                          for unit in factionUnits(context.scene.med2_toolkit_units)]
         if not unit_info_list:
             self.report({'ERROR'}, "No units for this faction and ownership filter")
             return {'CANCELLED'}
@@ -838,8 +922,13 @@ class MED_2_TOOLKIT_OT_Variations(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
     @classmethod
     def poll(cls, context):
-        if len(context.selected_objects) == 0: return False
-        return context.object.select_get() and context.object.type == 'ARMATURE'
+        # hideVariations walks the whole selection, so the poll asks the
+        # selection - not context.object, which is the ACTIVE object and is a
+        # different thing: deleting the active object leaves a scene with a
+        # selection and no active object at all, and .select_get() on that None
+        # threw an AttributeError straight out of poll, which Blender prints on
+        # every redraw of the panel.
+        return any(obj.type == 'ARMATURE' for obj in context.selected_objects)
     def execute(self, context):
         hideVariations()
         return{"FINISHED"}
@@ -929,6 +1018,11 @@ class MED_2_TOOLKIT_PT_EDU_Import(bpy.types.Panel):
         col = layout.column(align=True)
         col.prop (context.scene.med2_toolkit_units, "import_faction", text="Faction")
         col.prop (context.scene.med2_toolkit_units, "import_filter", text="Filter")
+        row = col.row(align=True)
+        row.prop (context.scene.med2_toolkit_units, "unit_search", text="", icon='VIEWZOOM')
+        sort = row.row(align=True)
+        for identifier, _label, _description, _icon, _number in UNIT_SORT_ORDERS:
+            sort.prop_enum(context.scene.med2_toolkit_units, "unit_sort", identifier, text="")
         col.prop (context.scene.med2_toolkit_units, "import_unit", text="Unit")
         col.prop (context.scene.med2_toolkit_units, "primary_secondary", text="Skeleton")
         upgrade_models = upgradeModels(context)

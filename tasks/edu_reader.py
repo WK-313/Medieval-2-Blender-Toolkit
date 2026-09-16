@@ -7,7 +7,7 @@ from .text_io import readModLines
 
 # Lines of an EDU entry the toolkit cares about. Everything else - the stats,
 # the costs, the attributes - is left to the game and to a text editor.
-EDU_KEYWORDS = ['type', 'dictionary', 'officer', 'formation', 'mount', 'engine',
+EDU_KEYWORDS = ['type', 'dictionary', 'soldier', 'officer', 'formation', 'mount', 'engine',
                 'armour_ug_models', 'ownership', 'era', 'info_pic_dir', 'card_pic_dir']
 
 # M2TWEOP lets a mod spell the type line "eopOnlyType" so the mod refuses to
@@ -76,6 +76,7 @@ def eduEntries(cleaned, eop_file=''):
     unit_officers = []
     unit_formation = []
     unit_models = []
+    unit_soldier = ''
     unit_ownership = {'ownership': [], 'era 0': [], 'era 1': [], 'era 2': []}
     unit_info_dir = 'faction'
     unit_card_dir = 'faction'
@@ -85,7 +86,15 @@ def eduEntries(cleaned, eop_file=''):
     # key is not (two units may share one) and neither is the name it looks up
     # in export_units.txt - so it is kept and used to tell units apart below.
     def unitEntry():
-        return {'Type': unit_type, 'ID': unit_id, 'Model': unit_models, 'Officers': unit_officers,
+        # armour_ug_models lists a model per upgrade level INCLUDING level 0, so
+        # it is the whole answer whenever it is there. It is optional, though -
+        # a unit that has no armour upgrades can leave it out and the game falls
+        # back to the `soldier` model, which is the one thing every entry has.
+        # Read only armour_ug_models and those units come back with no model at
+        # all: no upgrade tick boxes in the panel, and Import unit refusing with
+        # "Tick at least one upgrade level to import" against an empty list.
+        models = unit_models if unit_models else ([unit_soldier] if unit_soldier else [])
+        return {'Type': unit_type, 'ID': unit_id, 'Model': models, 'Officers': unit_officers,
                 'Formation': unit_formation, 'Attachment': unit_attachment, 'Owners': unit_ownership,
                 'Info Card': unit_info_dir, 'Unit Card': unit_card_dir, 'EOP': eop_file}
 
@@ -103,11 +112,14 @@ def eduEntries(cleaned, eop_file=''):
             unit_officers = []
             unit_formation = []
             unit_models = []
+            unit_soldier = ''
             unit_ownership = {'ownership': [], 'era 0': [], 'era 1': [], 'era 2': []}
             unit_info_dir = 'faction'
             unit_card_dir = 'faction'
         elif identifier == 'dictionary':
             unit_id = line[1]
+        elif identifier == 'soldier':
+            unit_soldier = line[1]
         elif identifier == 'officer':
             unit_officers.append(' '.join(line[1:]))
         elif identifier == 'formation':
