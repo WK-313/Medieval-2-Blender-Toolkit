@@ -1,6 +1,7 @@
 import bpy
 import os
 import json
+from bpy.app.handlers import persistent
 from pathlib import Path
 from..directories import saveFolderPaths, saveSettings, readJsonCached
 from ..tasks.task_writer import unitTaskWriter
@@ -57,8 +58,48 @@ def sortModels(self, context):
             item.name = model
             item.folder = bmdb_dictionary[model]['Folder']
             item.bmdb_info = json.dumps(bmdb_dictionary[model])
+    context.scene.med2_toolkit_bmdb_data.built_from = str(modelDictionaryVersion())
     snapToSearch(self, context)
-    return{'FINISHED'}
+    # no return value: this is filter_faction's update callback as well as a
+    # plain function, and Blender rejects an update callback that returns
+    # anything but None ("ValueError: the return value must be None"). Neither
+    # caller ever read the {'FINISHED'} this used to hand back.
+
+
+def bmdbListIsCurrent(context):
+    """Is the scene's model list built from the model_dictionary.json that is
+    on disk now?
+
+    The list is a Scene CollectionProperty, so it is saved into the .blend and
+    a fresh file starts with nothing in it: the panel opened on an empty list
+    with a few thousand models sitting in the dictionary, waiting for someone
+    to press the refresh button. It is rebuilt on file load instead - but only
+    when that would change something, so that merely opening a file whose list
+    already matches does not rewrite the scene and mark it as modified.
+    """
+    data = getattr(context.scene, 'med2_toolkit_bmdb_data', None)
+    if data is None:
+        return True
+    return data.built_from == str(modelDictionaryVersion())
+
+
+def refreshModelList():
+    if getattr(bpy.context, 'scene', None) is None or bmdbListIsCurrent(bpy.context):
+        return
+    sortModels(None, bpy.context)
+
+
+@persistent
+def refreshAfterLoad(_file_path):
+    refreshModelList()
+
+
+def refreshOnStartup():
+    """One build for whatever file Blender opened with. The load_post handler
+    is not in place yet when the startup file loads, and enabling the addon by
+    hand mid-session gets no load_post at all, so register() schedules this."""
+    refreshModelList()
+    return None
 
 
 def searchTerms(text):
@@ -162,7 +203,14 @@ class MED_2_TOOLKIT_OT_Model_Importer(bpy.types.Operator):
 
 
 class MED_2_TOOLKIT_BMDB_data(bpy.types.PropertyGroup):
-    filter_faction: EnumProperty(name = "Faction list", description = "Factions found in descr_sm_factions", items = sortFactions)
+    # update: changing the faction rebuilds the list then and there. It used to
+    # need the refresh button beside it, which left the panel showing the models
+    # of the faction you had just switched away from
+    filter_faction: EnumProperty(name = "Faction list", description = "Factions found in descr_sm_factions", items = sortFactions, update = sortModels)
+    # The model_dictionary.json mtime the list was last built from, saved with
+    # the file so a .blend that was left on an older mod read rebuilds itself
+    # when it is opened. See bmdbListIsCurrent.
+    built_from: StringProperty(name = "Built from", description = "Which read of battle_models.modeldb this list came from", default = "", options = {'HIDDEN'})
     # TEXTEDIT_UPDATE applies the value on every keystroke instead of waiting
     # for Return, which is what makes the list narrow as you type
     search: StringProperty(name = "Search", description = "Show only models whose name contains what you type. Several words all have to match, in any order, so \"eng knight\" finds ug_english_knight", default = "", options = {'TEXTEDIT_UPDATE'}, update = snapToSearch)
@@ -290,8 +338,16 @@ def register():
     bpy.types.Scene.med2_toolkit_bmdb_data = PointerProperty(type=MED_2_TOOLKIT_BMDB_data)
     bpy.types.Scene.med2_toolkit_bmdb_list = CollectionProperty(type = MED_2_TOOLKIT_BMDB_List_Items)
     bpy.types.Scene.med2_toolkit_bmdb_list_index = IntProperty(name = "Index of imported units", default = 0)
+    if refreshAfterLoad not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(refreshAfterLoad)
+    if not bpy.app.timers.is_registered(refreshOnStartup):
+        bpy.app.timers.register(refreshOnStartup, first_interval=0)
 
 def unregister():
+    if refreshAfterLoad in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(refreshAfterLoad)
+    if bpy.app.timers.is_registered(refreshOnStartup):
+        bpy.app.timers.unregister(refreshOnStartup)
     for item in classes:
         bpy.utils.unregister_class(item)
     del bpy.types.Scene.med2_toolkit_bmdb_data
