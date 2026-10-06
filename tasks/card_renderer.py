@@ -32,6 +32,7 @@ from mathutils import Euler, Vector
 from ..directories import readJsonCached
 from .control_rig import controlRigOf, controlledRigs, isControlRig
 from .recurlayercollection import linkBeside, recurLayerCollection
+from .tga_dds import gameTexturePath, viewablePath, writeTgaDds
 from .unit_groups import createGroupControlRigs, groupParts, groupRoot
 
 script_folder = Path(__file__).parent.parent
@@ -2130,10 +2131,13 @@ def restoreVisibility(context, state):
 def copyCard(source_path, paths):
     """Drop the finished card into the other folders it was pinned to. Returns
     None or a reason string."""
+    dds = gameTexturePath(source_path)
     for path in paths or ():
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             shutil.copyfile(source_path, path)
+            if os.path.isfile(dds):
+                shutil.copyfile(dds, gameTexturePath(path))
         except OSError as error:
             return "Could not copy the card to %s: %s" % (os.path.dirname(path), error)
     return None
@@ -2243,6 +2247,12 @@ def renderCard(context, entry, width, height, supersample):
         reason = saveCard(context, entry['path'], width, height, supersample, full_path)
         if reason is not None:
             return reason
+        # the game reads <card>.tga.dds whenever it is there, so the card goes
+        # out as that plus an empty .tga - the TGA Optimizer's layout. A failed
+        # conversion leaves a full .tga, which the game reads just as well
+        _dds, warning = writeTgaDds(entry['path'])
+        if warning is not None:
+            entry['warning'] = warning
         reason = copyCard(entry['path'], entry.get('extra_paths'))
         if reason is not None:
             return reason
@@ -2262,7 +2272,8 @@ def renderedPaths(entry):
     """Every file one card render writes, most interesting first. The extra
     copies in other faction folders are the same picture again, so they are left
     out - showing them would just pad the image list."""
-    paths = [entry.get('path'), entry.get('hd_path'), entry.get('full_path')]
+    # the card's .tga is the empty placeholder once its .tga.dds is written
+    paths = [viewablePath(entry['path']) if entry.get('path') else None, entry.get('hd_path'), entry.get('full_path')]
     return [path for path in paths if path]
 
 

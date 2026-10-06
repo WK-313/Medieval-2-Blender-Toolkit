@@ -7,7 +7,7 @@ from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty, FloatProperty
 from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJsonCached
 from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate, bmdbEntryText, normalFileName
-from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV, CLEANUP_PASSES
+from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV, CLEANUP_PASSES, imageBaseName, textureBaseName
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, abortIWTEJob, finishIWTEJob,
                               hasSystemConsole, iwteOutputReady, iwteProgress,
@@ -57,17 +57,12 @@ def fillNormalOutputNames(self):
     attach_diff, attach_norm = materialImages(attach_mat) if attach_mat else (None, None)
 
     def base_name(image, requested):
-        if requested:
-            return requested
-        if image:
-            return os.path.splitext(os.path.basename(image.filepath) or image.name)[0]
-        return ""
+        # extension-free, so a diffuse named black_numenorean.png or
+        # generalsk_tx.dds.001 gives black_numenorean_norm / generalsk_tx_norm
+        return textureBaseName(requested) if requested else imageBaseName(image)
 
     def norm_name(name):
-        # insert _norm before the file extension so black_numenorean.png
-        # becomes black_numenorean_norm.png, not black_numenorean.png_norm
-        root, ext = os.path.splitext(name)
-        return root + "_norm" + ext
+        return name + "_norm"
 
     # a slot pointed at a normal map file keeps that file's name unless the
     # user typed one, so it is not renamed here
@@ -1229,7 +1224,9 @@ class MED_2_TOOLKIT_PT_Export_Materials(bpy.types.Panel):
         def image_row(label, image, prop_name, current=None, icon=None):
             row = grid.row(align=True)
             split = row.split(factor=0.45, align=True)
-            current = current or (image.name if image else "missing")
+            # the name the export writes, not the datablock's: that one can
+            # carry the file extension and Blender's .001
+            current = current or (imageBaseName(image) if image else "missing")
             split.label(text="%s: %s" % (label, current),
                         icon=icon or ('IMAGE_DATA' if image else 'X'))
             split.prop(export_data, prop_name, text="")

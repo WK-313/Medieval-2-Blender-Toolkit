@@ -5,7 +5,8 @@ import subprocess
 import sys
 import bpy
 from pathlib import Path
-from .export_checks import deselectAll, materialImages, activeExportArmature, exportSettings
+from .export_checks import (deselectAll, materialImages, activeExportArmature, exportSettings,
+                            imageBaseName, textureBaseName)
 from ..directories import loadStoredValue
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
 from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask, usesWine, winePath, wineWrap
@@ -314,7 +315,7 @@ def normalFromFile(prop_value, requested):
     path = clean_path(bpy.path.abspath(prop_value))
     if not os.path.isfile(path):
         return None, ""
-    return path, (requested or os.path.splitext(os.path.basename(path))[0])
+    return path, textureBaseName(requested or os.path.basename(path))
 
 def normalFileName(prop_value):
     """What to show for a browsed normal map: its file name, or "" when nothing
@@ -336,10 +337,8 @@ def texturePlan(context):
 
     def out_name(image, requested):
         if requested:
-            return requested
-        if image:
-            return os.path.splitext(os.path.basename(image.filepath) or image.name)[0]
-        return ""
+            return textureBaseName(requested)
+        return imageBaseName(image)
 
     plan = {
         'main': (main_diff, out_name(main_diff, export_data.out_main)),
@@ -427,10 +426,10 @@ def bmdbEntryText(context, plan=None):
     relative = parseRelativeUnitPath(export_data.bmdb_unit_path)
     main_name = plan['main'][1]
     main_norm_name = (plan['main_norm'][1] or plan['main_norm_file'][1]
-                      or (export_data.out_main_norm if export_data.gen_blank_normals else ""))
+                      or (textureBaseName(export_data.out_main_norm) if export_data.gen_blank_normals else ""))
     attach_name = plan['attach'][1] or main_name
     attach_norm_name = (plan['attach_norm'][1] or plan['attach_norm_file'][1]
-                        or (export_data.out_attach_norm if export_data.gen_blank_normals else "")
+                        or (textureBaseName(export_data.out_attach_norm) if export_data.gen_blank_normals else "")
                         or main_norm_name)
     entry_name = export_data.bmdb_entry_name or export_data.export_glb_name
     entry = buildEntry(
@@ -602,7 +601,7 @@ def exportArmatureGLB(context):
             diffuse, _ = plan[slot]
             norm_image, _ = plan[slot + '_norm']
             norm_file, _ = plan[slot + '_norm_file']
-            requested = getattr(export_data, norm_out_prop)
+            requested = textureBaseName(getattr(export_data, norm_out_prop))
             # a browsed normal map has already been converted for this slot
             if diffuse is None or norm_image is not None or norm_file or not requested:
                 continue

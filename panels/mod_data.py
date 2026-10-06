@@ -119,7 +119,6 @@ class MED2_TOOLKIT_OT_Properties(bpy.types.PropertyGroup):
     directory_unit_export: StringProperty(name = "Unit export output path", description = "Directory to save exported unit GLB/textures", default = file_paths["directory_unit_export"], subtype = "DIR_PATH")
     # .get: directories.json files written by an older toolkit have no card path
     directory_unit_cards: StringProperty(name = "Unit card output path", description = "Directory the rendered unit cards are written under, normally the mod's data\\ui folder", default = file_paths.get("directory_unit_cards", file_paths["directory_unit_export"]), subtype = "DIR_PATH")
-    directory_strat: StringProperty(name = "Strat model output path", description = "Directory the built strat models, their combined textures and the converted .cas files are written under", default = file_paths.get("directory_strat", file_paths["directory_unit_export"]), subtype = "DIR_PATH")
     directory_iwte_task_template: StringProperty(name = "IWTE task template", description = "IWTE task template file used for GLB to .mesh conversion", default = file_paths["directory_iwte_task_template"], subtype = "FILE_PATH")
     # .get: directories.json files written by an older toolkit have no EOP path
     directory_eop: StringProperty(name = "EOP unit folder", description = "Folder of M2TWEOP unit files to read alongside export_descr_unit.txt, searched recursively. Leave blank to use the mod's own eopData\\unitTypes folder", default = file_paths.get("directory_eop", ""), subtype = "DIR_PATH")
@@ -185,7 +184,8 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
             col.prop (context.scene.med2_toolkit_reader, "directory_models", text="Unit Output")
             col.prop (context.scene.med2_toolkit_reader, "directory_unit_cards", text="Card Output")
         elif mode == 'strat':
-            col.prop (context.scene.med2_toolkit_reader, "directory_strat", text="Strat Output")
+            # strat models are built under <Export Output>\Strat_Export
+            col.prop (context.scene.med2_toolkit_reader, "directory_unit_export", text="Export Output")
         else:
             col.prop (context.scene.med2_toolkit_reader, "directory_settlements", text="Settlement Output")
         row = col.row(align=True)

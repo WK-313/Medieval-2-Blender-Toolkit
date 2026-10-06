@@ -1,3 +1,4 @@
+import os
 import re
 import math
 import bpy
@@ -46,6 +47,28 @@ def baseName(name):
     if "." in name and name.split(".")[-1].isdigit():
         return name.rsplit(".", 1)[0]
     return name
+
+IMAGE_EXTENSIONS = ('.dds', '.tga', '.png', '.jpg', '.jpeg', '.texture')
+
+def textureBaseName(name):
+    """A texture's output name with no extension: `generalsk_tx.dds.001` ->
+    `generalsk_tx`. An image the glTF importer names after its file keeps the
+    extension in the datablock name, and a clash adds Blender's .001 AFTER it,
+    so a plain splitext takes the .001 for the extension and leaves the .dds
+    in - which then ends up in the .texture file name and the BMDB entry.
+
+    Split by hand rather than with os.path.basename: on Windows that reads a
+    Blender-relative `//generalsk_tx.dds` as a UNC share and returns ''."""
+    name = baseName(name.replace('\\', '/').rsplit('/', 1)[-1])
+    while True:
+        root, ext = os.path.splitext(name)
+        if not root or ext.lower() not in IMAGE_EXTENSIONS:
+            return name
+        name = root
+
+def imageBaseName(image):
+    """Output name for an image: its file on disk, else its datablock name."""
+    return textureBaseName(image.filepath or image.name) if image else ""
 
 # The __opt marker flags a mesh as an optional part. It is applied by the QOL
 # "Toggle __opt Suffix" tool and must survive every naming cleanup untouched:

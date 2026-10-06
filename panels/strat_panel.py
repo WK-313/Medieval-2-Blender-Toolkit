@@ -13,12 +13,12 @@ from bpy.props import (BoolProperty, EnumProperty, FloatProperty, PointerPropert
                        StringProperty)
 
 from ..directories import saveFolderPaths
-from ..tasks.export_checks import activeExportArmature
+from ..tasks.export_checks import activeExportArmature, deselectAll
 from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, finishIWTEJob, iwteOutputReady, iwteStalled,
                               iwteProgress, redrawView3D, waitForIWTEJob)
 from ..tasks.strat_model import (STRAT_TRIANGLE_LIMIT, activeStratArmature, buildStratModel,
-                                 checkCASTexture, exportStratCAS, exportStratGLB,
-                                 installStratModel, modelTriangles, triangleLevel)
+                                 checkCASTexture, existingStratModel, exportStratCAS, exportStratGLB,
+                                 installStratModel, modelTriangles, stratInstallFolder, triangleLevel)
 from ..tasks.unit_exporter import open_folder, selectedModFolder
 from .unit_export_panel import askAboutStall, showResultsPopup
 
@@ -88,10 +88,6 @@ class MED_2_TOOLKIT_Strat_Data(bpy.types.PropertyGroup):
                        "which is what the strat skeleton is already at - only change this if the .cas a "
                        "model came from was extracted at another scale"),
         default = 1.0, min = 0.01, max = 10.0)
-    install_directory: StringProperty(
-        name = "Install to",
-        description = "Folder in the mod the finished .cas and .tga are copied into",
-        subtype = "DIR_PATH")
 
     last_build_dir: StringProperty(name = "Last build folder")
     last_texture: StringProperty(name = "Last combined texture")
@@ -260,7 +256,8 @@ class MED_2_TOOLKIT_OT_Strat_Convert_CAS(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Strat_Build_And_Convert(bpy.types.Operator):
     bl_idname = "medieval2toolkit.strat_build_and_convert"
     bl_label = "Build + Convert"
-    bl_description = ("The whole thing in one go: build the strat model, export the GLB and hand it to IWTE. "
+    bl_description = ("Export the GLB and hand it to IWTE. Uses the strat model Create Strat Model already built "
+                      "for the selected unit, and only builds one first when there is none. "
                       "Stops and reports if the build finds something wrong")
     bl_options = {"REGISTER", "UNDO"}
 
@@ -271,11 +268,21 @@ class MED_2_TOOLKIT_OT_Strat_Build_And_Convert(bpy.types.Operator):
 
     def execute(self, context):
         saveFolderPaths()
-        report, armature = buildStratModel(context)
-        if armature is None:
-            showResultsPopup(context, "Strat model build", report)
-            self.report({'ERROR'}, report[0][1] if report else "Could not build the strat model")
-            return {'CANCELLED'}
+        existing = existingStratModel(context)
+        if existing is not None:
+            # built already - building again would make a second copy, and
+            # from a selected strat rig a strat model of the strat model
+            report = [('INFO', "Using the strat model already built: %s (Create Strat Model rebuilds it)"
+                       % existing.name)]
+            deselectAll(context)
+            existing.select_set(True)
+            context.view_layer.objects.active = existing
+        else:
+            report, armature = buildStratModel(context)
+            if armature is None:
+                showResultsPopup(context, "Strat model build", report)
+                self.report({'ERROR'}, report[0][1] if report else "Could not build the strat model")
+                return {'CANCELLED'}
         error, _path = exportStratGLB(context)
         if error:
             showResultsPopup(context, "Strat model build", report + [('ERROR', error)])
@@ -314,7 +321,8 @@ class MED_2_TOOLKIT_OT_Strat_Check_CAS(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Strat_Install(bpy.types.Operator):
     bl_idname = "medieval2toolkit.strat_install"
     bl_label = "Copy to Mod"
-    bl_description = "Copy the converted .cas and its .tga into the mod folder"
+    bl_description = ("Copy the converted .cas into the selected mod's data/models_strat and its texture into "
+                      "data/models_strat/textures: the .tga.dds the game reads and the empty .tga placeholder it asks for")
     bl_options = {"REGISTER"}
 
     @classmethod
@@ -340,22 +348,6 @@ class MED_2_TOOLKIT_OT_Strat_Open_Folder(bpy.types.Operator):
 
     def execute(self, context):
         open_folder(context.scene.med2_toolkit_strat.last_build_dir)
-        return {'FINISHED'}
-
-
-class MED_2_TOOLKIT_OT_Strat_Guess_Install(bpy.types.Operator):
-    bl_idname = "medieval2toolkit.strat_guess_install"
-    bl_label = "Use Mod Folder"
-    bl_description = "Point Install To at the selected mod's data folder"
-    bl_options = {"REGISTER", "UNDO"}
-
-    def execute(self, context):
-        mod = bpy.path.abspath(selectedModFolder(context))
-        if not mod or not os.path.isdir(mod):
-            self.report({'ERROR'}, "No mod folder selected in Paths")
-            return {'CANCELLED'}
-        context.scene.med2_toolkit_strat.install_directory = mod
-        self.report({'INFO'}, "Install folder set to %s" % mod)
         return {'FINISHED'}
 
 
@@ -465,13 +457,14 @@ class MED_2_TOOLKIT_PT_Strat_Export(bpy.types.Panel):
             box = layout.box()
             box.label(text=os.path.basename(settings.last_cas), icon='FILE_3D')
             box.operator("medieval2toolkit.strat_check_cas", icon='VIEWZOOM')
-            row = box.row(align=True)
-            row.prop(settings, "install_directory", text="")
-            row.operator("medieval2toolkit.strat_guess_install", icon='FILE_FOLDER', text="")
+            destination = stratInstallFolder(bpy.path.abspath(selectedModFolder(context)))
+            if destination:
+                # the mod is picked in Paths; this says where that lands
+                box.label(text=destination, icon='FILE_FOLDER')
             box.operator("medieval2toolkit.strat_install", icon='COPYDOWN')
 
         layout.operator("medieval2toolkit.strat_open_folder", icon='FILEBROWSER')
-        layout.label(text="Then add a strat model entry in descr_character.txt", icon='INFO')
+        layout.label(text="Then add a type entry in descr_model_strat.txt", icon='INFO')
 
         if context.mode != 'OBJECT':
             layout.enabled = False
@@ -487,7 +480,6 @@ classes = [
     MED_2_TOOLKIT_OT_Strat_Check_CAS,
     MED_2_TOOLKIT_OT_Strat_Install,
     MED_2_TOOLKIT_OT_Strat_Open_Folder,
-    MED_2_TOOLKIT_OT_Strat_Guess_Install,
 ]
 
 

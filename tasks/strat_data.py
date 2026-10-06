@@ -50,5 +50,21 @@ STRAT_BONES = [
     ('Particle__View__01', '',                 (0.0,         0.0,          0.0),        (0.0, 0.5,        0.0)),
 ]
 
+# Where the battle skeleton's extra bones fold to, lowercased, from the vanilla
+# battle rigs' own hierarchy (Sword.glb). Only used when the source rig cannot
+# answer for itself - an armature that came through with no bones, its meshes
+# still carrying the vertex groups - since a real rig's parent chain is always
+# asked first and also covers custom bones this table cannot know.
+BATTLE_BONE_FALLBACK = {
+    'bone_rclavical': 'bone_torso',
+    'bone_lclavical': 'bone_torso',
+    'bone_jaw': 'bone_head',
+    'bone_eyebrow': 'bone_head',
+    'bone_weapon_group01': 'bone_Rhand',
+    'bone_weapon_group02': 'bone_Rhand',
+    'bone_weapon_group03': 'bone_Lhand',
+    'bone_weapon_group04': 'bone_Rhand',
+}
+
 # Bones that carry no skin weights, so nothing should ever be folded into them.
 NON_DEFORM_BONES = {'particle__view__01'}

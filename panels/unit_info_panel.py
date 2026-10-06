@@ -793,6 +793,8 @@ class MED_2_TOOLKIT_OT_Render_Cards(bpy.types.Operator):
         if reason is None:
             job['written'] += 1
             job['paths'].extend(renderedPaths(entry))
+            if entry.get('warning'):
+                job['results'].append(('WARNING', "%s: %s" % (entry['id'], entry['warning'])))
         else:
             job['results'].append(('ERROR', "%s: %s" % (entry['id'], reason)))
         job['index'] += 1

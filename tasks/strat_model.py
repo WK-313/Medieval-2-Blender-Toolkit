@@ -28,6 +28,7 @@ modder:
   assigned to the models first bone eg pelvis" warning and the limbs that trail
   off the model on the campaign map.
 """
+import math
 import os
 import re
 import shutil
@@ -37,10 +38,13 @@ import numpy as np
 from mathutils import Matrix, Vector, kdtree
 
 from .armature_tools import caseConvertedName, mergeGroupInto, skeletonUsesLowercase
-from .export_checks import activeExportArmature, deselectAll, exportMeshes, materialImages
+from .export_checks import (activeExportArmature, deselectAll, exportMeshes, imageBaseName, looksLikeAttach,
+                            looksLikeMain, materialImages)
 from .importer import principledNode
 from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask, winePath
-from .strat_data import NON_DEFORM_BONES, STRAT_BONES
+from .strat_data import BATTLE_BONE_FALLBACK, NON_DEFORM_BONES, STRAT_BONES
+from .tga_dds import gameTexturePath, writeTgaDds
+from .unit_exporter import selectedModFolder
 
 # The UV layer every mesh is renamed to before the join. join() only merges UV
 # layers that share a name; differently named ones each become a separate layer
@@ -48,6 +52,9 @@ from .strat_data import NON_DEFORM_BONES, STRAT_BONES
 JOINED_UV = 'joined_uv'
 
 STRAT_TAG = 'med2_strat_model'
+# the battle rig a strat model was built from, so Build + Convert can find the
+# model Create Strat Model already made instead of building a second one
+STRAT_SOURCE_TAG = 'med2_strat_source'
 
 # The campaign map crashes on load on a strat model past 10,000 triangles, so
 # this is the game's own ceiling rather than a style guide. Nothing here refuses
@@ -115,6 +122,21 @@ def freeName(collection, name):
         existing.name = name + "_previous"
 
 
+def stratUsesLowercase(armature, meshes):
+    """The bone name case to build the strat skeleton in. The rig's bones say,
+    when it has any; a rig that came through with none would read as
+    lowercase by default, so the meshes' vertex groups are asked instead - a
+    skeleton named in one case and groups in the other leave every vertex
+    weighted to nothing."""
+    if len(armature.data.bones):
+        return skeletonUsesLowercase(armature)
+    for obj in meshes:
+        for group in obj.vertex_groups:
+            if '_R' in group.name or '_L' in group.name:
+                return False
+    return True
+
+
 def stratBoneNames(lowercase):
     return [caseConvertedName(name, True) if lowercase else name
             for name, _parent, _head, _tail in STRAT_BONES]
@@ -123,6 +145,18 @@ def stratBoneNames(lowercase):
 #   -------------------  #
 #   The strat skeleton    #
 #   -------------------  #
+
+# Each strat bone points up Blender's +Z with its Z axis along -Y. That is the
+# glTF exporter's Z-up -> Y-up conversion undone, so every bone goes into the
+# GLB with an identity rotation and its offset from its parent already in Y-up
+# - exactly how IWTE writes a strat skeleton when it extracts a .cas to GLB.
+# Bones lying along +Y (identity in Blender, as the guide's .dae has them) put
+# a -90 degree X rotation on the pelvis node instead, which IWTE does not carry
+# into the .cas: it wrote the Z-up offsets as they stood, and the skeleton came
+# out turned 90 degrees against the mesh.
+STRAT_BONE_UP = Vector((0.0, 0.0, 1.0))
+STRAT_BONE_ROLL_AXIS = Vector((0.0, -1.0, 0.0))
+
 
 def buildStratArmature(context, collection, name, lowercase, matrix):
     """Create the strat skeleton from strat_data, in the bone name case the
@@ -144,8 +178,8 @@ def buildStratArmature(context, collection, name, lowercase, matrix):
                 parent = caseConvertedName(parent, True) if parent else ''
             bone = data.edit_bones.new(bone_name)
             bone.head = Vector(head)
-            bone.tail = Vector(head) + Vector(tail)
-            bone.roll = 0.0
+            bone.tail = Vector(head) + STRAT_BONE_UP * Vector(tail).length
+            bone.align_roll(STRAT_BONE_ROLL_AXIS)
             if parent:
                 bone.parent = data.edit_bones[parent]
             # every strat bone is a free-standing joint: connecting them would
@@ -184,6 +218,19 @@ def remapOrphanGroups(source_armature, meshes, strat_names):
             orphans.append(bone.name)
         else:
             mapping[bone.name.lower()] = parent.name
+
+    # groups naming a bone the rig has not got (a rig that lost its bones on
+    # the way in) fall back to where the battle skeleton puts that bone
+    strat_case = {name.lower(): name for name in strat_names}
+    bone_names = {bone.name.lower() for bone in source_armature.data.bones}
+    for obj in meshes:
+        for group in obj.vertex_groups:
+            key = group.name.lower()
+            if key in keep or key in mapping or key in bone_names:
+                continue
+            target = BATTLE_BONE_FALLBACK.get(key)
+            if target is not None:
+                mapping[key] = strat_case[target.lower()]
 
     remapped = set()
     for obj in meshes:
@@ -373,18 +420,40 @@ def buildAtlas(name, main_image, attach_image, size, square, filepath):
     return result, None
 
 
+def writeGameTexture(image, tga_path):
+    """Turn the atlas .tga into the .tga.dds the campaign map loads plus an
+    empty .tga placeholder - the layout of every strat texture in a mod.
+    Returns report entries.
+
+    The atlas image is pointed at the .tga.dds afterwards: its .tga is empty
+    now, and an image that reloads from it would come back blank."""
+    dds, reason = writeTgaDds(tga_path)
+    report = []
+    if dds is not None:
+        if image is not None:
+            image.filepath = dds
+        report.append(('INFO', "Game texture written: %s (the .tga beside it is the empty placeholder)" % dds))
+    if reason is not None:
+        report.append(('WARNING', reason + " - the campaign map reads the .tga.dds, not the .tga"))
+    return report
+
+
 #   ---------------  #
 #   UVs              #
 #   ---------------  #
 
-def remapUVs(obj, main_material, attach_material, square):
+def remapUVs(obj, main_material, attach_material, square, shared=False):
     """Scale each face's UVs into its half of the atlas.
 
     Done per face rather than per object so a mesh carrying both materials
     still comes out right, and the tile shift is measured rather than assumed:
     an attachment island already sitting in u 1-2 is brought back a tile first,
     one left in u 0-1 is taken as it is.
+
+    shared: the attachment material shows the same texture as the main one, so
+    its faces go into the main cell too and the atlas holds that texture once.
     """
+    attach_offset = 0.0 if shared else 0.5
     uv_layer = obj.data.uv_layers.active
     if uv_layer is None:
         return
@@ -402,10 +471,13 @@ def remapUVs(obj, main_material, attach_material, square):
 
     shift = 0.0
     if attach_loops:
-        lowest = min(uv_layer.data[index].uv[0] for index in attach_loops)
         # the addon's own export check puts the attachment island in u 1-2; a
-        # model that never moved it there is scaled where it stands
-        shift = 1.0 if lowest >= 0.5 else 0.0
+        # model that never moved it there is scaled where it stands. The tile
+        # is the one the island's median sits in - testing the lowest u
+        # against 0.5 shifted an island lying in u 0.5-1 a whole tile left,
+        # onto the main texture's half of the atlas
+        us = sorted(uv_layer.data[index].uv[0] for index in attach_loops)
+        shift = float(math.floor(us[len(us) // 2]))
 
     for index in main_loops:
         uv = uv_layer.data[index].uv
@@ -414,7 +486,7 @@ def remapUVs(obj, main_material, attach_material, square):
             uv[1] = uv[1] * 0.5 + 0.5
     for index in attach_loops:
         uv = uv_layer.data[index].uv
-        uv[0] = 0.5 + (uv[0] - shift) * 0.5
+        uv[0] = attach_offset + (uv[0] - shift) * 0.5
         if square:
             uv[1] = uv[1] * 0.5 + 0.5
 
@@ -523,6 +595,14 @@ def resolveMaterials(armature, meshes):
 
     main_material = resolve(getattr(export_data, 'material_main', ''))
     attach_material = resolve(getattr(export_data, 'material_attach', ''))
+    # nothing picked in the Export workmode: the same naming rules its
+    # auto-detect uses (`..._main`, `..._attach`), without that operator's
+    # folding of extra materials, which would change the battle model
+    used = [slot.material for obj in meshes for slot in obj.material_slots if slot.material is not None]
+    if attach_material is None:
+        attach_material = next((m for m in used if looksLikeAttach(m.name) and m != main_material), None)
+    if main_material is None:
+        main_material = next((m for m in used if looksLikeMain(m.name)), None)
     if main_material is None:
         # nothing picked and nothing detectable: whatever the first mesh uses
         for obj in meshes:
@@ -532,11 +612,16 @@ def resolveMaterials(armature, meshes):
     return main_material, attach_material
 
 
+# Strat models are built beside the unit exports, in their own subfolder of the
+# Export Output path, so the one path in Paths serves both workmodes.
+STRAT_EXPORT_FOLDER = "Strat_Export"
+
+
 def stratOutputFolder(context, name):
-    """Every model gets its own folder under the Strat Output path, the same
-    way the unit export lays out its GLB, textures and task file."""
-    base = cleanPath(bpy.path.abspath(context.scene.med2_toolkit_reader.directory_strat))
-    return os.path.join(base, name) if base else ''
+    """Every model gets its own folder under <Export Output>/Strat_Export, the
+    same way the unit export lays out its GLB, textures and task file."""
+    base = cleanPath(bpy.path.abspath(context.scene.med2_toolkit_reader.directory_unit_export))
+    return os.path.join(base, STRAT_EXPORT_FOLDER, name) if base else ''
 
 
 def buildStratModel(context):
@@ -545,6 +630,12 @@ def buildStratModel(context):
     armature = activeExportArmature(context)
     if armature is None:
         return [('ERROR', "Select the unit's armature, or a mesh under it")], None
+    if armature.get(STRAT_TAG):
+        # the build leaves its own result active, so without this a second press
+        # turns the strat model into a strat model of itself
+        return [('ERROR', "'%s' is already a strat model - select the battle unit's armature to build a new one"
+                 % armature.name)], None
+    source_name = armature.name
 
     meshes = [obj for obj in armature.children_recursive
               if obj.type == 'MESH' and (not settings.visible_only or obj.visible_get())]
@@ -555,7 +646,7 @@ def buildStratModel(context):
     texture_name = settings.texture_name.strip() or (name + "_strat")
     out_dir = stratOutputFolder(context, name)
     if not out_dir:
-        return [('ERROR', "Set the Strat Output path first")], None
+        return [('ERROR', "Set the Export Output path in Paths first - strat models are built in its Strat_Export folder")], None
     try:
         os.makedirs(out_dir, exist_ok=True)
     except OSError as error:
@@ -569,6 +660,22 @@ def buildStratModel(context):
     attach_image, _normal = materialImages(attach_material)
     if main_image is None:
         report.append(('WARNING', "The main material has no image texture, so the atlas has no main half"))
+    # a kitbash often points both materials at one texture (two datablocks, e.g.
+    # generalsk_tx.dds.001 and generalsk_tx.tga); copying it into both halves
+    # only halves its share of the atlas, so the attachment faces share the
+    # main cell instead - what a hand-made strat atlas of such a unit does
+    shared = (main_image is not None and attach_image is not None
+              and (attach_image == main_image or imageBaseName(attach_image) == imageBaseName(main_image)))
+    if shared:
+        report.append(('INFO', "Main and attachment use the same texture (%s) - it goes into the atlas once"
+                       % imageBaseName(main_image)))
+        attach_image = None
+    elif attach_material is not None and attach_image is None and main_image is not None:
+        # the attachment half would be left blank and the faces mapped into it
+        # (the sword) would show nothing on the campaign map
+        shared = True
+        report.append(('WARNING', "The attachment material '%s' has no image texture - its faces are mapped "
+                       "onto the main texture instead of a blank half of the atlas" % attach_material.name))
 
     # 1. a copy to work on, in its own collection, so the battle unit survives
     collection = bpy.data.collections.new(name)
@@ -581,7 +688,7 @@ def buildStratModel(context):
                 parent_collection.objects.unlink(obj)
             collection.objects.link(obj)
 
-    lowercase = skeletonUsesLowercase(armature)
+    lowercase = stratUsesLowercase(armature, meshes)
     strat_names = stratBoneNames(lowercase)
     report.append(('INFO', "Strat skeleton built with %s bone names" % ("lowercase" if lowercase else "uppercase")))
 
@@ -592,7 +699,7 @@ def buildStratModel(context):
     # 3. UVs into their half of the atlas, per mesh, before the join loses
     #    which material each face used
     for obj in meshes:
-        remapUVs(obj, main_material, attach_material, settings.atlas_layout == 'square')
+        remapUVs(obj, main_material, attach_material, settings.atlas_layout == 'square', shared)
 
     # 4. one mesh
     mesh = joinMeshes(context, meshes, name)
@@ -643,10 +750,12 @@ def buildStratModel(context):
     if atlas is not None:
         assignAtlasMaterial(mesh, atlas, texture_name)
         report.append(('INFO', "Combined texture written: %s" % atlas_path))
+        report.extend(writeGameTexture(atlas, atlas_path))
 
     settings.last_build_dir = out_dir
     settings.last_texture = atlas_path
     strat_armature[STRAT_TAG] = name
+    strat_armature[STRAT_SOURCE_TAG] = source_name
 
     deselectAll(context)
     strat_armature.select_set(True)
@@ -672,6 +781,26 @@ def activeStratArmature(context):
     return built[0] if len(built) == 1 else None
 
 
+def existingStratModel(context):
+    """The strat model already built for what is selected, or None: the
+    selection itself when it is a strat model, else the newest strat model
+    built from the selected battle rig. Build + Convert converts this one
+    rather than building again."""
+    obj = context.object
+    while obj is not None:
+        if obj.type == 'ARMATURE' and obj.get(STRAT_TAG):
+            return obj
+        obj = obj.parent
+    source = activeExportArmature(context)
+    if source is None:
+        return None
+    # newest last: Blender numbers a rebuild's rig Armature_x.001, .002, ...
+    built = sorted((o for o in context.view_layer.objects
+                    if o.type == 'ARMATURE' and o.get(STRAT_TAG) and o.get(STRAT_SOURCE_TAG) == source.name),
+                   key=lambda o: o.name)
+    return built[-1] if built else None
+
+
 def exportStratGLB(context):
     """Write the strat rig out as a GLB for IWTE. Returns (error, path)."""
     settings = context.scene.med2_toolkit_strat
@@ -685,7 +814,7 @@ def exportStratGLB(context):
     name = settings.model_name.strip() or armature.get(STRAT_TAG) or armature.name
     out_dir = stratOutputFolder(context, name)
     if not out_dir:
-        return "Set the Strat Output path first", ''
+        return "Set the Export Output path in Paths first - strat models are built in its Strat_Export folder", ''
     os.makedirs(out_dir, exist_ok=True)
     glb_path = os.path.join(out_dir, name + ".glb")
 
@@ -819,24 +948,46 @@ def checkCASTexture(context):
     return report
 
 
-def installStratModel(context):
-    """Copy the .cas and its .tga into the mod folder the user picked."""
-    settings = context.scene.med2_toolkit_strat
-    destination = cleanPath(bpy.path.abspath(settings.install_directory))
-    if not destination:
-        return [('ERROR', "Set the Install To folder first")]
-    try:
-        os.makedirs(destination, exist_ok=True)
-    except OSError as error:
-        return [('ERROR', "Could not create %s: %s" % (destination, error))]
+def stratInstallFolder(mod_folder):
+    """The models_strat folder of a mod, which is where every
+    descr_model_strat.txt entry points. Takes the mod's data folder - what
+    Paths -> Mod holds - or the mod folder above it."""
+    mod_folder = cleanPath(mod_folder)
+    if not mod_folder:
+        return ''
+    if os.path.basename(mod_folder).lower() != 'data' and os.path.isdir(os.path.join(mod_folder, 'data')):
+        mod_folder = os.path.join(mod_folder, 'data')
+    return os.path.join(mod_folder, "models_strat")
 
+
+def installStratModel(context):
+    """Copy the .cas into the selected mod's data/models_strat and its
+    textures into data/models_strat/textures - the .cas names its texture as
+    textures\\<name>.tga, relative to itself, the same layout as every strat
+    model in a mod's models_strat."""
+    settings = context.scene.med2_toolkit_strat
+    mod_folder = bpy.path.abspath(selectedModFolder(context))
+    if not mod_folder or not os.path.isdir(cleanPath(mod_folder)):
+        return [('ERROR', "No mod selected in Paths - Copy to Mod installs into that mod's data/models_strat")]
+    destination = stratInstallFolder(mod_folder)
+    texture_folder = os.path.join(destination, "textures")
+    try:
+        os.makedirs(texture_folder, exist_ok=True)
+    except OSError as error:
+        return [('ERROR', "Could not create %s: %s" % (texture_folder, error))]
+
+    texture = cleanPath(settings.last_texture)
     report = []
-    for label, source in (("model", settings.last_cas), ("texture", settings.last_texture)):
+    for label, source, folder in (("model", settings.last_cas, destination),
+                                  ("texture placeholder (.tga)", texture, texture_folder),
+                                  ("game texture (.tga.dds)", gameTexturePath(texture), texture_folder)):
         source = cleanPath(source)
         if not source or not os.path.isfile(source):
-            report.append(('WARNING', "No %s to install yet" % label))
+            level = 'ERROR' if source.endswith('.dds') else 'WARNING'
+            report.append((level, "No %s to install yet%s" % (
+                label, " - rebuild the strat model, the campaign map reads this file" if level == 'ERROR' else "")))
             continue
-        target = os.path.join(destination, os.path.basename(source))
+        target = os.path.join(folder, os.path.basename(source))
         try:
             shutil.copy2(source, target)
         except OSError as error:
