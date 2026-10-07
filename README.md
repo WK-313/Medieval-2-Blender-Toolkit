@@ -89,7 +89,7 @@ Turn a finished battle unit into a campaign map model. The nine-step manual proc
 - **Convert to .cas (IWTE)** runs the conversion with a progress bar; **Build + Convert** does both
 - **Triangle count** is shown before you build and in the report — the campaign map crashes on load above 10,000 triangles
 - **Check .cas Texture** reads the texture name back out of the converted `.cas`; a mismatch there is what crashes the campaign map, and is otherwise found by opening the binary in a text editor
-- **Copy to Mod** puts the `.cas` and its `.tga` in place. The `descr_character.txt` entry is still yours to write
+- **Open Output Folder** shows the converted `.cas` and its `textures\` folder. Copying them into the mod's `data/models_strat` and writing the `descr_model_strat.txt` entry are still yours to do
 
 > Start from a unit imported through **Unit Import** with its main and attachment materials set — running **Check Model for Export** is the easy way, since the Strat workmode reads the same two materials.
 

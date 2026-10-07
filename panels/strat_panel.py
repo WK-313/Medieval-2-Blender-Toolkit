@@ -18,8 +18,8 @@ from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, finishIWTEJob, iwteOutputRead
                               iwteProgress, redrawView3D, waitForIWTEJob)
 from ..tasks.strat_model import (STRAT_TRIANGLE_LIMIT, activeStratArmature, buildStratModel,
                                  checkCASTexture, existingStratModel, exportStratCAS, exportStratGLB,
-                                 installStratModel, modelTriangles, stratInstallFolder, triangleLevel)
-from ..tasks.unit_exporter import open_folder, selectedModFolder
+                                 modelTriangles, triangleLevel)
+from ..tasks.unit_exporter import open_folder
 from .unit_export_panel import askAboutStall, showResultsPopup
 
 
@@ -318,25 +318,6 @@ class MED_2_TOOLKIT_OT_Strat_Check_CAS(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class MED_2_TOOLKIT_OT_Strat_Install(bpy.types.Operator):
-    bl_idname = "medieval2toolkit.strat_install"
-    bl_label = "Copy to Mod"
-    bl_description = ("Copy the converted .cas into the selected mod's data/models_strat and its texture into "
-                      "data/models_strat/textures: the .tga.dds the game reads and the empty .tga placeholder it asks for")
-    bl_options = {"REGISTER"}
-
-    @classmethod
-    def poll(cls, context):
-        return bool(context.scene.med2_toolkit_strat.last_cas)
-
-    def execute(self, context):
-        results = installStratModel(context)
-        showResultsPopup(context, "Strat install", results)
-        level = 'ERROR' if any(entry[0] == 'ERROR' for entry in results) else 'INFO'
-        self.report({level}, results[0][1])
-        return {'FINISHED'}
-
-
 class MED_2_TOOLKIT_OT_Strat_Open_Folder(bpy.types.Operator):
     bl_idname = "medieval2toolkit.strat_open_folder"
     bl_label = "Open Output Folder"
@@ -426,7 +407,7 @@ class MED_2_TOOLKIT_PT_Strat_Build(bpy.types.Panel):
 class MED_2_TOOLKIT_PT_Strat_Export(bpy.types.Panel):
     bl_idname = "MED_2_TOOLKIT_PT_Strat_Export"
     bl_parent_id = "MED_2_TOOLKIT_PT_Main_Panel"
-    bl_label = "Convert + Install"
+    bl_label = "Convert"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Medieval 2 Toolkit"
@@ -457,14 +438,11 @@ class MED_2_TOOLKIT_PT_Strat_Export(bpy.types.Panel):
             box = layout.box()
             box.label(text=os.path.basename(settings.last_cas), icon='FILE_3D')
             box.operator("medieval2toolkit.strat_check_cas", icon='VIEWZOOM')
-            destination = stratInstallFolder(bpy.path.abspath(selectedModFolder(context)))
-            if destination:
-                # the mod is picked in Paths; this says where that lands
-                box.label(text=destination, icon='FILE_FOLDER')
-            box.operator("medieval2toolkit.strat_install", icon='COPYDOWN')
 
         layout.operator("medieval2toolkit.strat_open_folder", icon='FILEBROWSER')
-        layout.label(text="Then add a type entry in descr_model_strat.txt", icon='INFO')
+        col = layout.column(align=True)
+        col.label(text="Copy the .cas and textures\\ into data/models_strat,", icon='INFO')
+        col.label(text="then add a type entry in descr_model_strat.txt", icon='BLANK1')
 
         if context.mode != 'OBJECT':
             layout.enabled = False
@@ -478,7 +456,6 @@ classes = [
     MED_2_TOOLKIT_OT_Strat_Convert_CAS,
     MED_2_TOOLKIT_OT_Strat_Build_And_Convert,
     MED_2_TOOLKIT_OT_Strat_Check_CAS,
-    MED_2_TOOLKIT_OT_Strat_Install,
     MED_2_TOOLKIT_OT_Strat_Open_Folder,
 ]
 
