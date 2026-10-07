@@ -28,6 +28,7 @@ modder:
   assigned to the models first bone eg pelvis" warning and the limbs that trail
   off the model on the campaign map.
 """
+import json
 import math
 import os
 import re
@@ -842,8 +843,117 @@ def exportStratGLB(context):
             if was_hidden:
                 obj.hide_set(True)
 
+    error = orderGLBBones(glb_path, [name for name, _parent, _head, _tail in STRAT_BONES])
+    if error:
+        return error, ''
     settings.last_exported_glb = glb_path
     return '', glb_path
+
+
+#   ------------------------  #
+#   Bone order in the GLB     #
+#   ------------------------  #
+
+GLB_MAGIC = b'glTF'
+GLB_JSON = 0x4E4F534A
+GLB_BIN = 0x004E4942
+JOINT_TYPES = {5121: np.uint8, 5123: np.uint16}
+
+
+def accessorView(gltf, binary, accessor_index, dtype, width):
+    """A writable numpy view of one accessor's elements, (count, width)."""
+    accessor = gltf['accessors'][accessor_index]
+    view = gltf['bufferViews'][accessor['bufferView']]
+    start = view.get('byteOffset', 0) + accessor.get('byteOffset', 0)
+    item = np.dtype(dtype).itemsize * width
+    stride = view.get('byteStride') or item
+    count = accessor['count']
+    raw = np.frombuffer(binary, dtype=np.uint8, count=stride * (count - 1) + item, offset=start)
+    return np.lib.stride_tricks.as_strided(raw.view(dtype), shape=(count, width),
+                                           strides=(stride, np.dtype(dtype).itemsize))
+
+
+def orderGLBBones(glb_path, order):
+    """Rewrite the GLB so its skeleton is listed in the strat skeleton's own
+    order. Returns '' or an error string.
+
+    The campaign map animates a strat model by bone POSITION, and IWTE writes
+    the .cas bones in the order the GLB lists them - so that order has to be
+    the vanilla one. Blender 5.1's glTF exporter happened to keep the order the
+    bones were made in; 5.2's sorts each bone's children by name (abs before
+    RThigh, Lupperarm before Rupperarm), and the .cas came out with the left
+    leg's animation driving the left arm. Fixed here, after the export, so no
+    exporter version can change it: the skin's joint list, the inverse bind
+    matrices and every vertex's joint indices are permuted together, and each
+    node's children are put in the same order.
+    """
+    rank = {name.lower(): index for index, name in enumerate(order)}
+    try:
+        with open(glb_path, 'rb') as glb_file:
+            data = glb_file.read()
+        if data[:4] != GLB_MAGIC:
+            return "%s is not a GLB" % os.path.basename(glb_path)
+        json_length, json_type = np.frombuffer(data, dtype='<u4', count=2, offset=12)
+        if json_type != GLB_JSON:
+            return "%s has no JSON chunk first" % os.path.basename(glb_path)
+        gltf = json.loads(data[20:20 + json_length])
+        bin_start = 20 + json_length
+        bin_length, bin_type = np.frombuffer(data, dtype='<u4', count=2, offset=bin_start)
+        if bin_type != GLB_BIN:
+            return "%s has no binary chunk" % os.path.basename(glb_path)
+        binary = bytearray(data[bin_start + 8:bin_start + 8 + bin_length])
+    except (OSError, ValueError) as error:
+        return "Could not read %s: %s" % (os.path.basename(glb_path), error)
+
+    nodes = gltf.get('nodes', [])
+
+    def node_rank(index):
+        return rank.get(nodes[index].get('name', '').lower(), len(order))
+
+    for node in nodes:
+        if node.get('children'):
+            # stable: anything that is not a strat bone keeps its place behind them
+            node['children'] = sorted(node['children'], key=node_rank)
+
+    for skin in gltf.get('skins', []):
+        joints = skin['joints']
+        new_order = sorted(range(len(joints)), key=lambda k: node_rank(joints[k]))
+        if new_order == list(range(len(joints))):
+            continue
+        remap = np.empty(len(joints), dtype=np.int64)
+        for new_index, old_index in enumerate(new_order):
+            remap[old_index] = new_index
+        skin['joints'] = [joints[k] for k in new_order]
+        if 'inverseBindMatrices' in skin:
+            matrices = accessorView(gltf, binary, skin['inverseBindMatrices'], np.float32, 16)
+            matrices[:] = matrices[new_order].copy()
+        skin_index = gltf['skins'].index(skin)
+        for node in nodes:
+            if node.get('skin') != skin_index or 'mesh' not in node:
+                continue
+            for primitive in gltf['meshes'][node['mesh']]['primitives']:
+                for attribute, accessor_index in primitive['attributes'].items():
+                    if not attribute.startswith('JOINTS_'):
+                        continue
+                    dtype = JOINT_TYPES.get(gltf['accessors'][accessor_index]['componentType'])
+                    if dtype is None:
+                        return "%s uses joint indices of a type this cannot rewrite" % os.path.basename(glb_path)
+                    indices = accessorView(gltf, binary, accessor_index, dtype, 4)
+                    indices[:] = remap[indices].astype(dtype)
+
+    payload = json.dumps(gltf, separators=(',', ':')).encode('utf-8')
+    payload += b' ' * (-len(payload) % 4)
+    binary += b'\0' * (-len(binary) % 4)
+    total = 12 + 8 + len(payload) + 8 + len(binary)
+    header = np.array([0x46546C67, 2, total], dtype='<u4').tobytes()
+    try:
+        with open(glb_path, 'wb') as glb_file:
+            glb_file.write(header)
+            glb_file.write(np.array([len(payload), GLB_JSON], dtype='<u4').tobytes() + payload)
+            glb_file.write(np.array([len(binary), GLB_BIN], dtype='<u4').tobytes() + bytes(binary))
+    except OSError as error:
+        return "Could not rewrite %s: %s" % (os.path.basename(glb_path), error)
+    return ''
 
 
 def writeStratTask(task_path, glb_path, out_dir, cas_name, cas_format, skeleton_scale):
