@@ -71,7 +71,22 @@ def modRoot(data_folder):
         return withTrailingSep(data_folder)
     return path[:cut + 1]
 
+# Keep the numeric enum values stable for preferences stored in .blend files.
+# These are saved preferences only until each converter is integrated.
+BACKEND_ITEMS = (
+    ('BUILTIN', 'Built-in', 'Use the built-in converter when available for this job', 0),
+    ('IWTE', 'IWTE', 'Use IWTE for this job', 1),
+)
+DEFAULT_BACKENDS = {
+    'backend_battle_import': 'IWTE',
+    'backend_battle_export': 'IWTE',
+    'backend_strat_import': 'IWTE',
+    'backend_strat_export': 'IWTE',
+    'backend_settlement_import': 'IWTE',
+}
+
 DEFAULT_DIRECTORIES = {
+    **DEFAULT_BACKENDS,
     "directory_med2": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War",
     "directory_iwte": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
     "directory_mod_list": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Medieval II Total War\\mods",
@@ -153,6 +168,8 @@ def saveFolderPaths():
         "directory_iwte_task_template": bpy.context.scene.med2_toolkit_reader.directory_iwte_task_template,
         "directory_eop": bpy.context.scene.med2_toolkit_reader.directory_eop
     })
+    reader = bpy.context.scene.med2_toolkit_reader
+    directories.update({key: getattr(reader, key) for key in DEFAULT_BACKENDS})
     with open(script_folder/('text/directories.json'), 'w') as directories_output:
         json.dump(directories, directories_output, indent=2)
     return{"FINISHED"}
@@ -191,6 +208,13 @@ def loadStoredValue(key, default=""):
             return json.load(directories_input).get(key, default)
     except (OSError, ValueError):
         return default
+
+
+def loadBackend(key):
+    """Restore a backend preference, including legacy or invalid saved values."""
+    default = DEFAULT_BACKENDS[key]
+    value = loadStoredValue(key, default)
+    return value if value in ('BUILTIN', 'IWTE') else default
 
 
 def storeValue(key, value):

@@ -6,7 +6,8 @@ from pathlib import Path
 from .bmdb_panel import sortModels
 from .settlements_panel import sortSettlements
 from ..tasks import edu_reader, bmdb_reader, settlements_reader
-from ..directories import modFolderName, readJsonCached, saveFolderPaths, saveSettings
+from ..directories import (modFolderName, readJsonCached, saveFolderPaths, saveSettings,
+                           BACKEND_ITEMS, loadBackend, storeValue)
 
 script_folder = Path(__file__).parent.parent
 
@@ -92,7 +93,34 @@ def modList(self, context):
     return enum_list
 
 
+def backendChanged(key):
+    """Save a preference immediately, without requiring Read Mod Data."""
+    def update(self, context):
+        storeValue(key, getattr(self, key))
+    return update
+
+
 class MED2_TOOLKIT_OT_Properties(bpy.types.PropertyGroup):
+    backend_battle_import: bpy.props.EnumProperty(
+        name="Battle Import", items=BACKEND_ITEMS,
+        default=loadBackend('backend_battle_import'),
+        update=backendChanged('backend_battle_import'))
+    backend_battle_export: bpy.props.EnumProperty(
+        name="Battle Export", items=BACKEND_ITEMS,
+        default=loadBackend('backend_battle_export'),
+        update=backendChanged('backend_battle_export'))
+    backend_strat_import: bpy.props.EnumProperty(
+        name="Strat Import", items=BACKEND_ITEMS,
+        default=loadBackend('backend_strat_import'),
+        update=backendChanged('backend_strat_import'))
+    backend_strat_export: bpy.props.EnumProperty(
+        name="Strat Export", items=BACKEND_ITEMS,
+        default=loadBackend('backend_strat_export'),
+        update=backendChanged('backend_strat_export'))
+    backend_settlement_import: bpy.props.EnumProperty(
+        name="Settlement Import", items=BACKEND_ITEMS,
+        default=loadBackend('backend_settlement_import'),
+        update=backendChanged('backend_settlement_import'))
     with open(script_folder/('text/directories.json'), 'r') as directories_list:
         try:
             file_paths = json.load(directories_list)
@@ -199,6 +227,21 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
             col.prop (context.scene.med2_toolkit_reader, "directory_eop", text="EOP Units")
         col = layout.column(align=True)
         col.operator ("medieval2toolkit.reader", text="Read Mod Data")
+        backends = {
+            'unit_import': ('backend_battle_import',),
+            'unit_info': ('backend_battle_import',),
+            'unit_export': ('backend_battle_export',),
+            'strat': ('backend_strat_import', 'backend_strat_export'),
+            'settlements': ('backend_settlement_import',),
+        }.get(mode, ())
+        if backends:
+            box = layout.box()
+            box.label(text="Conversion preferences")
+            col = box.column(align=True)
+            col.label(text="Built-in conversion is not available yet.")
+            col.label(text="Jobs currently use IWTE.")
+            for key in backends:
+                col.prop(context.scene.med2_toolkit_reader, key)
         if(context.mode != 'OBJECT'):
             layout.enabled = False
 
@@ -217,4 +260,3 @@ def register():
 def unregister():
     for item in classes:
         bpy.utils.unregister_class(item)
-    
