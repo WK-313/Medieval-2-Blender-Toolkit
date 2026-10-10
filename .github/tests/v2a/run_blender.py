@@ -154,7 +154,7 @@ def addon_settings(args, report):
             directories = importlib.import_module("v2a_addon.directories")
             reader = bpy.context.scene.med2_toolkit_reader
             for key in directories.DEFAULT_BACKENDS:
-                check(getattr(reader, key) == "IWTE", "legacy default " + key)
+                check(getattr(reader, key) == directories.DEFAULT_BACKENDS[key], "legacy default " + key)
                 setattr(reader, key, "BUILTIN")
                 check(json.loads(config.read_text())[key] == "BUILTIN", "immediate save " + key)
                 check(directories.loadBackend(key) == "BUILTIN", "reload " + key)
@@ -179,7 +179,7 @@ def addon_settings(args, report):
                 saved[key] = "INVALID"
             config.write_text(json.dumps(saved))
             for key in directories.DEFAULT_BACKENDS:
-                check(directories.loadBackend(key) == "IWTE", "invalid fallback " + key)
+                check(directories.loadBackend(key) == directories.DEFAULT_BACKENDS[key], "invalid fallback " + key)
                 setattr(reader, key, "IWTE")
             panels = importlib.import_module("v2a_addon.panels.multi_panel")
             draws = 0

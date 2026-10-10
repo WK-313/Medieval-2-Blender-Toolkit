@@ -238,10 +238,17 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
             box = layout.box()
             box.label(text="Conversion preferences")
             col = box.column(align=True)
-            col.label(text="Built-in conversion is not available yet.")
-            col.label(text="Jobs currently use IWTE.")
-            for key in backends:
-                col.prop(context.scene.med2_toolkit_reader, key)
+            if mode == 'strat':
+                col.prop(context.scene.med2_toolkit_reader, 'backend_strat_import')
+                col.label(text="Older CAS versions fall back to IWTE.")
+                col.separator()
+                col.label(text="Export currently uses IWTE.")
+                col.prop(context.scene.med2_toolkit_reader, 'backend_strat_export')
+            else:
+                col.label(text="Built-in conversion is not available yet.")
+                col.label(text="Jobs currently use IWTE.")
+                for key in backends:
+                    col.prop(context.scene.med2_toolkit_reader, key)
         if(context.mode != 'OBJECT'):
             layout.enabled = False
 

@@ -21,6 +21,7 @@ from ..tasks.strat_model import (STRAT_TRIANGLE_LIMIT, activeStratArmature, buil
                                  modelTriangles, triangleLevel)
 from ..tasks.unit_exporter import open_folder
 from .unit_export_panel import askAboutStall, showResultsPopup
+from . import strat_import_panel
 
 
 def suggestedNames(context):
@@ -464,9 +465,11 @@ def register():
     for item in classes:
         bpy.utils.register_class(item)
     bpy.types.Scene.med2_toolkit_strat = PointerProperty(type=MED_2_TOOLKIT_Strat_Data)
+    strat_import_panel.register()
 
 
 def unregister():
+    strat_import_panel.unregister()
     for item in classes:
         bpy.utils.unregister_class(item)
     del bpy.types.Scene.med2_toolkit_strat

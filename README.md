@@ -85,7 +85,11 @@ Render a faction's unit cards and unit info images without leaving Blender.
 
 Turn a finished battle unit into a campaign map model. The nine-step manual process — combining the two textures in another addon, stripping bones, re-rigging, joining, limiting weights and scaling both UV islands — is one button.
 
+- **Strat Models browser** reads the selected mod's `descr_model_strat.txt`, with search by type or skeleton, faction textures, model LODs and shadow models. Select **Load Strat Models**, choose a variant, then **Import Strat Model**.
+- **Built-in strat import** reads supported `.cas` files directly into editable meshes and a rig. Paths offers an IWTE import option, and older 2.x CAS files fall back to IWTE automatically. Missing files are reported; textures are resolved from the mod first, then vanilla data.
+- Imported rigs retain their descriptor entry, faction, LOD and campaign scale in the `.blend`. Campaign scale stays as metadata so exporting does not bake it into the model. Importing does not change mod files.
 - **Create Strat Model** combines the main and attachment textures into a single `.tga` and remaps the UVs exactly (no Material Combiner needed), folds weights from bones the strat skeleton lacks into their nearest surviving bone, welds anything still loose, joins every mesh, re-rigs onto the strat skeleton at one bone per vertex, and builds on a copy in its own collection
+- Imported models can use the existing GLB/Convert workflow. Export preserves their bone order and stages the current diffuse image without changing scene materials; unchanged compatible DDS files are copied without recompression.
 - **Convert to .cas (IWTE)** runs the conversion with a progress bar; **Build + Convert** does both
 - **Triangle count** is shown before you build and in the report — the campaign map crashes on load above 10,000 triangles
 - **Check .cas Texture** reads the texture name back out of the converted `.cas`; a mismatch there is what crashes the campaign map, and is otherwise found by opening the binary in a text editor

@@ -45,7 +45,7 @@ from .importer import principledNode
 from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask, winePath
 from .strat_data import BATTLE_BONE_FALLBACK, NON_DEFORM_BONES, STRAT_BONES
 from .tga_dds import gameTexturePath, writeTgaDds
-from .unit_exporter import selectedModFolder
+from .unit_exporter import ddsMipCount, selectedModFolder
 
 # The UV layer every mesh is renamed to before the join. join() only merges UV
 # layers that share a name; differently named ones each become a separate layer
@@ -820,7 +820,107 @@ def exportStratGLB(context):
     glb_path = os.path.join(out_dir, name + ".glb")
 
     hidden = [(obj, obj.hide_get()) for obj in [armature] + meshes]
+    selected = list(context.selected_objects)
+    active = context.view_layer.objects.active
+    original_meshes = []
+    original_slots = []
+    temporary_materials = []
+    temporary_images = []
+    displaced_names = []
+    staged_texture = ''
     try:
+        source_texture = armature.get('med2_strat_source_texture', '')
+        source_image = None
+        if armature.get('med2_strat_import_backend'):
+            diffuse_images = set()
+            for obj in meshes:
+                for slot in obj.material_slots:
+                    material = slot.material
+                    if material is None or not material.use_nodes:
+                        continue
+                    shader = next((node for node in material.node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
+                    if shader is None:
+                        continue
+                    links = shader.inputs['Base Color'].links
+                    if links:
+                        node = links[0].from_node
+                        if node.type != 'TEX_IMAGE' or node.image is None:
+                            return 'Strat export needs one image linked directly to material Base Color', ''
+                        diffuse_images.add(node.image)
+            if len(diffuse_images) > 1:
+                return 'Strat export supports one diffuse image; combine the model textures first', ''
+            source_image = next(iter(diffuse_images), None)
+        if source_image is not None:
+            source_texture = bpy.path.abspath(source_image.filepath)
+            texture_name = settings.texture_name.strip() or name
+            if os.path.basename(texture_name) != texture_name or texture_name in ('.', '..'):
+                return 'Texture name must be a filename without folders', ''
+            staged_texture = os.path.join(out_dir, texture_name + '.tga')
+            if os.path.normcase(os.path.realpath(source_texture)) in (
+                    os.path.normcase(os.path.realpath(staged_texture)),
+                    os.path.normcase(os.path.realpath(staged_texture + '.dds'))):
+                return 'Choose an export folder separate from the source texture', ''
+            # Displace names only for this export; both GLB names must match
+            # the game texture exactly, including when the names already exist.
+            for collection in (bpy.data.images, bpy.data.materials):
+                existing = collection.get(texture_name)
+                if existing is not None:
+                    displaced_names.append((existing, existing.name))
+                    existing.name = texture_name + '_export_original'
+            width, height = source_image.size
+            if not width or not height:
+                return 'Selected source texture has no readable image data', ''
+            staged_image = bpy.data.images.new(texture_name, width, height, alpha=True)
+            temporary_images.append(staged_image)
+            staged_image.colorspace_settings.name = source_image.colorspace_settings.name
+            pixels = np.empty(width * height * 4, dtype=np.float32)
+            source_image.pixels.foreach_get(pixels)
+            staged_image.pixels.foreach_set(pixels)
+            staged_image.filepath_raw = staged_texture
+            staged_image.file_format = 'TARGA'
+            dds_copy = False
+            if source_texture.lower().endswith('.dds') and not source_image.is_dirty and not source_image.packed_file and os.path.isfile(source_texture):
+                with open(source_texture, 'rb') as source_file:
+                    header = source_file.read(128)
+                dds_copy = (len(header) == 128 and header[:4] == b'DDS ' and
+                            header[84:88] in (b'DXT1', b'DXT3', b'DXT5') and
+                            ddsMipCount(source_texture) >= max(width, height).bit_length())
+            if dds_copy:
+                shutil.copy2(source_texture, staged_texture + '.dds')
+                open(staged_texture, 'wb').close()
+                staged_image.filepath = staged_texture + '.dds'
+            else:
+                render_scene = bpy.data.scenes.new('Strat texture export')
+                try:
+                    render_scene.render.image_settings.file_format = 'TARGA'
+                    render_scene.render.image_settings.color_mode = 'RGBA'
+                    render_scene.view_settings.view_transform = 'Standard'
+                    staged_image.save_render(staged_texture, scene=render_scene)
+                finally:
+                    bpy.data.scenes.remove(render_scene)
+                texture_report = writeGameTexture(staged_image, staged_texture)
+                warnings = [message for level, message in texture_report if level in ('ERROR', 'WARNING')]
+                if warnings:
+                    return '; '.join(warnings), ''
+            material = bpy.data.materials.new(texture_name)
+            temporary_materials.append(material)
+            material.use_nodes = True
+            shader = principledNode(material)
+            node = material.node_tree.nodes.new('ShaderNodeTexImage')
+            node.image = staged_image
+            material.node_tree.links.new(node.outputs['Color'], shader.inputs['Base Color'])
+            material.node_tree.links.new(node.outputs['Alpha'], shader.inputs['Alpha'])
+            for obj in meshes:
+                original_meshes.append((obj, obj.data))
+                obj.data = obj.data.copy()
+                if not obj.data.materials:
+                    obj.data.materials.append(None)
+                # Export copies only: material/image names determine IWTE's
+                # texture reference, but shared scene materials stay intact.
+                for slot in obj.material_slots:
+                    if slot.link == 'OBJECT':
+                        original_slots.append((slot, slot.material))
+                    slot.material = material
         for obj, was_hidden in hidden:
             if was_hidden:
                 obj.hide_set(False)
@@ -838,15 +938,44 @@ def exportStratGLB(context):
             export_apply=True,
             export_animations=False,
         )
+    except Exception as error:
+        return 'Strat export failed: %s' % error, ''
     finally:
+        for slot, material in original_slots:
+            slot.material = material
+        for obj, mesh in original_meshes:
+            temporary = obj.data
+            obj.data = mesh
+            bpy.data.meshes.remove(temporary)
+        for material in temporary_materials:
+            bpy.data.materials.remove(material)
+        for image in temporary_images:
+            bpy.data.images.remove(image)
+        for block, original_name in displaced_names:
+            block.name = original_name
+        deselectAll(context)
+        for obj in selected:
+            obj.select_set(True)
+        context.view_layer.objects.active = active
         for obj, was_hidden in hidden:
             if was_hidden:
                 obj.hide_set(True)
 
-    error = orderGLBBones(glb_path, [name for name, _parent, _head, _tail in STRAT_BONES])
+    try:
+        order = json.loads(armature.get('med2_strat_bone_order', 'null'))
+        if not isinstance(order, list) or not all(isinstance(value, str) for value in order):
+            order = [name for name, _parent, _head, _tail in STRAT_BONES]
+    except (ValueError, TypeError):
+        order = [name for name, _parent, _head, _tail in STRAT_BONES]
+    error = orderGLBBones(glb_path, order)
     if error:
         return error, ''
     settings.last_exported_glb = glb_path
+    if staged_texture:
+        settings.last_texture = staged_texture
+        settings.last_build_dir = out_dir
+    elif armature.get('med2_strat_import_backend'):
+        settings.last_texture = ''
     return '', glb_path
 
 

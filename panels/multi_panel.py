@@ -35,6 +35,7 @@ from .qol_panel import (MED_2_TOOLKIT_PT_Armature, MED_2_TOOLKIT_PT_Interface,
 from .settlements_panel import (MED_2_TOOLKIT_PT_Settlement_Buildings,
                                 MED_2_TOOLKIT_PT_Settlements_Panel)
 from .strat_panel import MED_2_TOOLKIT_PT_Strat_Build, MED_2_TOOLKIT_PT_Strat_Export
+from .strat_import_panel import MED_2_TOOLKIT_PT_Strat_Import
 from .unit_export_panel import (MED_2_TOOLKIT_PT_Export_BMDB, MED_2_TOOLKIT_PT_Export_Materials,
                                 MED_2_TOOLKIT_PT_Export_Run, MED_2_TOOLKIT_PT_Unit_Export)
 from .unit_info_panel import (MED_2_TOOLKIT_PT_Card_Render, MED_2_TOOLKIT_PT_Card_Scene,
@@ -65,6 +66,7 @@ EMBEDDED_PANELS = [
     MED_2_TOOLKIT_PT_Export_Materials,
     MED_2_TOOLKIT_PT_Export_BMDB,
     MED_2_TOOLKIT_PT_Export_Run,
+    MED_2_TOOLKIT_PT_Strat_Import,
     MED_2_TOOLKIT_PT_Strat_Build,
     MED_2_TOOLKIT_PT_Strat_Export,
     MED_2_TOOLKIT_PT_Settlements_Panel,
