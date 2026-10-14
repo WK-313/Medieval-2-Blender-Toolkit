@@ -127,8 +127,11 @@ stored, a character is its pieces piled on the origin.
 from __future__ import annotations
 
 import struct
+import math
+import pickle
+import sys
 from array import array
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -188,6 +191,8 @@ class CasError(Exception):
 class CasMaterial:
     """One material: the texture a mesh is painted with, and its two colours."""
 
+    #: Compatibility field for legacy decoded data. External texture entries
+    #: have an embedded-image flag, not a material name; writers require "".
     name: str = ""
     #: the path as the file writes it, backslashes and all:
     #: ``textures\\#banner_symbol_wales.tga``. Some mods lead with a backslash.
@@ -373,12 +378,28 @@ class _Reader:
         return out
 
 
+def _remember(r, owner, key, read):
+    """Retain spelling/padding and float bits alongside a decoded value."""
+    start = r.p
+    value = read()
+    owner._wire[key] = (pickle.dumps(value), r.d[start:r.p])
+    return value
+
+
+def _signature(scene):
+    values = asdict(scene)
+    values.pop("source", None)
+    values.pop("notes", None)
+    return pickle.dumps(values)
+
+
 # ---------------------------------------------------------------------------
 # the header and the node hierarchy
 
 
 def _read_header(r: _Reader, out: CasScene) -> None:
     """Version, scene length, node hierarchy and key times."""
+    out._wire = {"prefix": r.d[:NODE_COUNT_AT], "nodes": [], "chunks": [], "partial": False}
     out.version = r.f32()
     if not MIN_VERSION <= out.version <= MAX_VERSION:
         raise r.fail(_i18n.msg("eng.cas.opens_with_version_g_which_is", "opens with {version:g}, which is not a .cas version (the installed set runs {MIN_VERSION:g} to {MAX_VERSION:g})", version=out.version, MIN_VERSION=MIN_VERSION, MAX_VERSION=MAX_VERSION))
@@ -387,7 +408,7 @@ def _read_header(r: _Reader, out: CasScene) -> None:
     out.length = r.f32()
     r.p = NODE_COUNT_AT                         # over the two RGB triples
     nodes = r.count("the node count")
-    r.skip(2)                                   # pad, back onto the 32-bit grid
+    out._wire["pad"] = r.skip(2)                 # preserve exporter padding
     out.parents = [-1] + [r.u32() for _ in range(max(nodes - 1, 0))]
     keys = r.count("the key count")
     out.key_times = r.floats(keys)
@@ -401,6 +422,7 @@ def _read_header(r: _Reader, out: CasScene) -> None:
     # the keys and the chunk list after them read as a size in the billions.
     block = 0
     for _ in range(nodes):
+        name_start = r.p
         try:
             out.nodes.append(r.text())
         except CasError:
@@ -408,15 +430,18 @@ def _read_header(r: _Reader, out: CasScene) -> None:
             # wall - are stamped 2.23 and lay their header out differently.
             # Saying so by version beats a string length in the billions.
             raise r.fail(_i18n.msg("eng.cas.its_header_is_version_version_g", "its header is version {version:g}, and the layout this reader knows starts at 3.02 - the node names are not where {version2:g} puts them", version=out.version, version2=out.version)) from None
+        name_end = r.p
         nrot, npos, roff, poff, zero = struct.unpack_from("<5I", r.skip(20), 0)
         r.text()                                # the bone's properties
+        out._wire["nodes"].append((out.nodes[-1], r.d[name_start:name_end], r.d[name_end:r.p]))
         if nrot > len(out.key_times) or npos > len(out.key_times) or zero:
             raise r.fail(_i18n.msg("eng.cas.node_has_rotation_and_position_keys", "node {nodes} has {nrot} rotation and {npos} position keys of the file's {key_times_n}", nodes=repr(out.nodes[-1]), nrot=nrot, npos=npos, key_times_n=len(out.key_times)))
         block += nrot * ROT_BYTES + npos * POS_BYTES
+    out._wire["keys"] = r.skip(block)
     if block:
-        r.skip(block)
         out.baked_keys = block
     out.pivots = r.floats(nodes * 3)
+    out._wire["skeleton_size"] = r.p - (NODE_COUNT_AT - 8)
 
     bad = [p for p in out.parents[1:] if not 0 <= p < nodes]
     if bad:
@@ -434,13 +459,16 @@ def _trailer(version: float, kind: int) -> int:
 
 def _read_object(r: _Reader, kind: int, out: CasScene) -> CasObject:
     """One mesh: its name, its counts, and the arrays those counts size."""
-    obj = CasObject(name=r.text(), skinned=(kind == SKINNED_MESHES))
-    obj.properties = r.text()
-    r.skip(OBJECT_HEADER[kind])
+    obj = CasObject(name="", skinned=(kind == SKINNED_MESHES))
+    obj._wire = {}
+    obj.name = _remember(r, obj, "name", r.text)
+    obj.properties = _remember(r, obj, "properties", r.text)
+    obj._wire["header"] = r.skip(OBJECT_HEADER[kind])
     verts = r.u16()
     faces = r.u16()
     has_uvs = r.u8()
     has_colours = r.u8()
+    obj._wire["flags"] = (has_uvs, has_colours)
     if has_uvs > 1 or has_colours > 1:
         raise r.fail(_i18n.msg("eng.cas.mesh_says_its_uv_flag_is", "mesh {name} says its UV flag is {has_uvs} and its colour flag is {has_colours}; both are 0 or 1 in every file measured, so the record is not where we think", name=repr(obj.name), has_uvs=has_uvs, has_colours=has_colours))
 
@@ -455,7 +483,7 @@ def _read_object(r: _Reader, kind: int, out: CasScene) -> CasObject:
         obj.uvs = r.floats(verts * 2)
     if has_colours:
         obj.colours = r.u32s(verts)
-    r.skip(4)                                   # 0 between one mesh and the next
+    obj._wire["tail"] = r.skip(4)                 # exporter object terminator
 
     if verts and obj.indices and max(obj.indices) >= verts:
         raise r.fail(_i18n.msg("eng.cas.mesh_indexes_vertex_of", "mesh {name} indexes vertex {max} of {verts}", name=repr(obj.name), max=max(obj.indices), verts=verts))
@@ -483,14 +511,19 @@ def _read_meshes(r: _Reader, kind: int, end: int, out: CasScene) -> None:
     count = r.count("an object count")
     for i in range(count):
         try:
-            out.objects.append(_read_object(r, kind, out))
+            obj = _read_object(r, kind, out)
+            obj._chunk = len(out._wire["chunks"])
+            out.objects.append(obj)
         except CasError as exc:
+            out._wire["partial"] = True
             out.notes.append(_i18n.msg("eng.cas.mesh_of_in_the_chunk_and", "{split} - mesh {x} of {count} in the {kind_name} chunk and every mesh after it was left out", split=str(exc).split(': ', 1)[-1], x=i + 1, count=count, kind_name=_kind_name(kind)))
             r.p = end
             return
     want = _trailer(out.version, kind)
     if r.p + want != end:
+        out._wire["partial"] = True
         out.notes.append(_i18n.msg("eng.cas.the_chunk_ends_at_byte_end", "the {kind_name} chunk ends at byte {end:,} and its {count} meshes end at {p:,}, {x:+,} bytes out - what was read may not be the whole of it", kind_name=_kind_name(kind), end=end, count=count, p=r.p, x=end - r.p - want))
+    out._wire["chunk_tail"] = r.d[r.p:end]
     r.p = end
 
 
@@ -507,11 +540,12 @@ def _looks_like_path(text: str) -> bool:
 def _read_materials(r: _Reader, end: int, out: CasScene) -> None:
     """The material list: a name, a texture path, and two colours each.
 
-    **The leading flag is whether the material is named at all**, and it has to
-    be read before the strings and not after. A material with the flag clear
-    writes no name and no path - not two empty strings - and 31 objects across
-    the installed set point at one. Reading two strings anyway eats the first
-    two bytes of the diffuse colour and slides every material after it.
+    The leading uint32 says whether texture data follows. For an external
+    sheet it is followed by a zero embedded-image byte and the NUL-terminated
+    texture path. The compatibility ``name`` string consumes that zero byte;
+    it is not a writable material name. Embedded data remains opaque, and
+    partially decoded material records can only be serialized unchanged.
+    A clear leading flag goes straight to the colours, with no texture bytes.
 
     The 29 bytes past the two colours are three more triples and a scalar, and
     are not decoded. They are skipped by length and the chunk is required to
@@ -521,9 +555,11 @@ def _read_materials(r: _Reader, end: int, out: CasScene) -> None:
     for _ in range(count):
         named = r.u32()
         mat = CasMaterial()
+        mat._wire = {"named": named}
+        mat._chunk = len(out._wire["chunks"])
         if named:
-            mat.name = r.cstring()
-            mat.texture = r.cstring()
+            mat.name = _remember(r, mat, "name", r.cstring)
+            mat.texture = _remember(r, mat, "texture", r.cstring)
             if mat.texture and not _looks_like_path(mat.texture):
                 # The 22 tree models in Reference/ EMBED their bitmap in this
                 # chunk - one of them is 262,253 bytes for a 256x256 sheet -
@@ -532,13 +568,16 @@ def _read_materials(r: _Reader, end: int, out: CasScene) -> None:
                 # texture is not a path at all, so it is dropped by name rather
                 # than handed to a renderer that would go looking for it.
                 out.notes.append(_i18n.msg("eng.cas.material_names_which_is_not_a", "material {materials_n} names {texture}, which is not a texture path - this material's sheet is inside the file rather than beside it", materials_n=len(out.materials), texture=repr(mat.texture[:24])))
+                out._wire["partial"] = True
                 mat.texture = ""
-        mat.diffuse = tuple(r.floats(4))        # type: ignore[assignment]
-        mat.specular = tuple(r.floats(3))       # type: ignore[assignment]
-        r.skip(MATERIAL_TAIL)
+        mat.diffuse = _remember(r, mat, "diffuse", lambda: tuple(r.floats(4)))
+        mat.specular = _remember(r, mat, "specular", lambda: tuple(r.floats(3)))
+        mat._wire["tail"] = r.skip(MATERIAL_TAIL)
         out.materials.append(mat)
     if r.p != end:
+        out._wire["partial"] = True
         out.notes.append(_i18n.msg("eng.cas.the_material_chunk_has_x_bytes", "the material chunk has {x:+,} bytes after its {count} materials that this reader does not read", x=end - r.p, count=count))
+    out._wire["chunk_tail"] = r.d[r.p:end]
     r.p = end
 
 
@@ -546,6 +585,7 @@ def _read_chunks(r: _Reader, out: CasScene) -> None:
     while r.p < len(r.d):
         start = r.p
         if start + 8 > len(r.d):
+            out._wire["trailing"] = r.d[start:]
             out.notes.append(_i18n.msg("eng.cas.bytes_after_the_last_chunk_too", "{x} bytes after the last chunk, too few to be another one", x=len(r.d) - start))
             return
         size = r.u32()
@@ -553,6 +593,7 @@ def _read_chunks(r: _Reader, out: CasScene) -> None:
         if size < 8 or start + size > len(r.d):
             raise r.fail(_i18n.msg("eng.cas.the_chunk_at_byte_start_says", "the chunk at byte {start:,} says it is {size:,} bytes of the {d_n:,} in the file", start=start, size=size, d_n=len(r.d)))
         end = start + size
+        out._wire["chunk_tail"] = b""
         if kind in (STATIC_MESHES, SKINNED_MESHES):
             _read_meshes(r, kind, end, out)
         elif kind == MATERIALS:
@@ -563,6 +604,7 @@ def _read_chunks(r: _Reader, out: CasScene) -> None:
             elif size > 20:
                 out.notes.append(_i18n.msg("eng.cas.chunk_kind_is_size_bytes_and", "chunk kind {kind} is {size:,} bytes and is empty in every file measured", kind=kind, size=size))
             r.p = end
+        out._wire["chunks"].append((kind, r.d[start:end], out._wire.pop("chunk_tail", b"")))
         r.p = end
 
 
@@ -594,8 +636,252 @@ def read_cas_bytes(data: bytes, source: str) -> CasScene:
     for obj in out.objects:
         if obj.material is not None and obj.material >= len(out.materials):
             out.notes.append(_i18n.msg("eng.cas.mesh_asks_for_material_of", "mesh {name} asks for material {material} of {materials_n}", name=repr(obj.name), material=obj.material, materials_n=len(out.materials)))
+            out._wire["partial"] = True
             obj.material = None
+    out._wire["original"] = bytes(data)
+    out._wire["baseline"] = _signature(out)
+    out._wire["hierarchy"] = (list(out.nodes), list(out.parents), out.key_times.tobytes())
     return out
+
+
+# ---------------------------------------------------------------------------
+# lossless model serialization
+
+
+def _numbers(values, code):
+    """Pack arrays explicitly little endian, including on big endian hosts."""
+    result = array(code, values)
+    if sys.byteorder != "little":
+        result.byteswap()
+    return result.tobytes()
+
+
+def _encoded(owner, key, value, encode):
+    old = getattr(owner, "_wire", {}).get(key)
+    if old is not None and old[0] == pickle.dumps(value):
+        return old[1]
+    return encode(value)
+
+
+def _text_bytes(value, counted=True):
+    if not isinstance(value, str) or "\x00" in value:
+        raise CasError(_i18n.msg("eng.cas.w_text_nul", "a name in a .cas is text with no NUL in it"))
+    try:
+        raw = value.encode("latin-1") + b"\x00"
+    except UnicodeEncodeError as exc:
+        raise CasError(_i18n.msg("eng.cas.w_text_latin1", "{value} has a character a .cas cannot hold (it is written in Latin-1)", value=repr(value))) from exc
+    if len(raw) > MAX_COUNT:
+        raise CasError(_i18n.msg("eng.cas.w_text_long", "a name of {n:,} characters is longer than the reader takes", n=len(value)))
+    return (struct.pack("<I", len(raw)) if counted else b"") + raw
+
+
+def _validate_write(scene):
+    """Refuse a scene the game, or this module's own reader, could not open."""
+    def require(condition, message):
+        if not condition:
+            raise CasError(message)
+
+    def integer(value, low, high):
+        return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
+
+    def floats(values, label):
+        try:
+            valid = all(math.isfinite(v) and abs(v) <= 3.4028234663852886e38 for v in values)
+        except (TypeError, ValueError, OverflowError):
+            valid = False
+        require(valid, _i18n.msg("eng.cas.w_float_out_of_range", "{label} holds a number that is not finite or does not fit a 32-bit float", label=label))
+
+    version = scene.version or 3.2
+    require(math.isfinite(version) and struct.unpack('<f', struct.pack('<f', 3.02))[0] <= version <= MAX_VERSION,
+            _i18n.msg("eng.cas.w_version", "version {version:g} cannot be written: the writer knows the 3.02 to {MAX_VERSION:g} layout", version=version, MAX_VERSION=MAX_VERSION))
+    floats([scene.length], "the scene length")
+    n = len(scene.nodes)
+    require(0 < n <= MAX_COUNT, _i18n.msg("eng.cas.w_node_count", "a model needs at least one node, and has {n:,}", n=n))
+    require(len(scene.parents) == n and scene.parents[0] == -1,
+            _i18n.msg("eng.cas.w_parent_table", "the parent table needs one entry per node, the root's -1"))
+    for i, parent in enumerate(scene.parents[1:], 1):
+        require(integer(parent, 0, n - 1) and parent != i,
+                _i18n.msg("eng.cas.w_parent_index", "node {node} names parent {parent}, which is not another node", node=repr(scene.nodes[i]), parent=parent))
+    for start in range(n):
+        visited, cursor = set(), start
+        while cursor != -1:
+            require(cursor not in visited, _i18n.msg("eng.cas.w_parent_cycle", "the parent table goes round in a circle at node {node}", node=repr(scene.nodes[cursor])))
+            visited.add(cursor)
+            cursor = scene.parents[cursor]
+    require(len(scene.pivots) == n * 3, _i18n.msg("eng.cas.w_pivots", "{pivots_n} pivot numbers for {n} nodes; each node takes three", pivots_n=len(scene.pivots), n=n))
+    floats(scene.pivots, "the pivots")
+    require(len(scene.key_times) <= MAX_COUNT, _i18n.msg("eng.cas.w_key_count", "{key_times_n:,} key times is more than the reader takes", key_times_n=len(scene.key_times)))
+    floats(scene.key_times, "the key times")
+    require(all(b >= a for a, b in zip(scene.key_times, scene.key_times[1:])),
+            _i18n.msg("eng.cas.w_key_order", "the key times go backwards"))
+    require(len(scene.objects) <= MAX_COUNT and len(scene.materials) <= MAX_COUNT,
+            _i18n.msg("eng.cas.w_too_many", "{objects_n:,} meshes and {materials_n:,} materials is more than the reader takes", objects_n=len(scene.objects), materials_n=len(scene.materials)))
+    for obj in scene.objects:
+        name = repr(obj.name)
+        require(len(obj.positions) % 3 == 0, _i18n.msg("eng.cas.w_positions", "mesh {name} has positions that are not whole triples", name=name))
+        v = obj.vertices
+        require(v <= 65535, _i18n.msg("eng.cas.w_vertex_limit", "mesh {name} has {v:,} vertices; a .cas mesh holds 65,535", name=name, v=v))
+        require(len(obj.indices) % 3 == 0 and obj.triangles <= 65535,
+                _i18n.msg("eng.cas.w_triangles", "mesh {name} has more than 65,535 triangles, or a triangle short of its three corners", name=name))
+        require(len(obj.normals) == v * 3, _i18n.msg("eng.cas.w_normals", "mesh {name} needs one normal per vertex", name=name))
+        require(len(obj.uvs) in (0, v * 2), _i18n.msg("eng.cas.w_uvs", "mesh {name} has UVs for some of its vertices and not others", name=name))
+        require(len(obj.colours) in (0, v), _i18n.msg("eng.cas.w_colour_count", "mesh {name} has colours for some of its vertices and not others", name=name))
+        require(all(integer(c, 0, 0xffffffff) for c in obj.colours),
+                _i18n.msg("eng.cas.w_colour_value", "mesh {name} has a vertex colour that is not a 32-bit number", name=name))
+        require(all(integer(i, 0, v - 1) for i in obj.indices), _i18n.msg("eng.cas.w_index", "mesh {name} has a triangle on a vertex it has not got", name=name))
+        require(len(obj.bones) == (v if obj.skinned else 0), _i18n.msg("eng.cas.w_bone_count", "mesh {name} needs one bone per vertex when skinned and none when not", name=name))
+        require(all(integer(b, 0, n - 1) for b in obj.bones), _i18n.msg("eng.cas.w_bone", "mesh {name} ties a vertex to a node the model has not got", name=name))
+        require(obj.material is None or integer(obj.material, 0, len(scene.materials) - 1),
+                _i18n.msg("eng.cas.w_material", "mesh {name} names material {material} of {materials_n}", name=name, material=obj.material, materials_n=len(scene.materials)))
+        for values, label in ((obj.positions, "positions"), (obj.normals, "normals"), (obj.uvs, "UVs")):
+            floats(values, _i18n.msg("eng.cas.w_mesh_label", "mesh {name}'s {label}", name=name, label=label))
+    for mat in scene.materials:
+        require(not mat.name, _i18n.msg("eng.cas.w_material_name", "external CAS textures have no material-name field; keep the material name empty"))
+        require(len(mat.diffuse) == 4 and len(mat.specular) == 3,
+                _i18n.msg("eng.cas.w_material_colours", "material {name} needs four diffuse and three specular numbers", name=repr(mat.name)))
+        floats(mat.diffuse, "a diffuse colour")
+        floats(mat.specular, "a specular colour")
+
+
+def _write_object(obj):
+    kind = SKINNED_MESHES if obj.skinned else STATIC_MESHES
+    wire = getattr(obj, "_wire", {})
+    header = wire.get("header", b"")
+    if len(header) != OBJECT_HEADER[kind]:
+        # Static objects carry an identity quaternion after their zero fields;
+        # skinned objects' transform block is zero in the measured exporter.
+        header = (bytes.fromhex("0100000000000000000000000000000000000000000000803f000000000000000000000000")
+                  if kind == STATIC_MESHES else b"\0" * 28)
+    flags = wire.get("flags", (0, 0)) if obj.vertices == 0 else (bool(obj.uvs), bool(obj.colours))
+    out = [_encoded(obj, "name", obj.name, _text_bytes),
+           _encoded(obj, "properties", obj.properties, _text_bytes), header,
+           struct.pack("<HHBB", obj.vertices, obj.triangles, *flags)]
+    if obj.skinned:
+        out.append(_numbers(obj.bones, "I"))
+    out += [_numbers(obj.positions, "f"), _numbers(obj.normals, "f"),
+            _numbers(obj.indices, "H"), struct.pack("<I", NO_MATERIAL if obj.material is None else obj.material),
+            _numbers(obj.uvs, "f"), _numbers(obj.colours, "I"), wire.get("tail", b"\0" * 4)]
+    return b"".join(out)
+
+
+def _write_material(mat):
+    wire = getattr(mat, "_wire", {})
+    named = wire.get("named", 1 if mat.name or mat.texture else 0)
+    if mat.name or mat.texture:
+        named = named or 1
+    out = [struct.pack("<I", named)]
+    if named:
+        out += [_encoded(mat, "name", mat.name, lambda v: _text_bytes(v, False)),
+                _encoded(mat, "texture", mat.texture, lambda v: _text_bytes(v, False))]
+    out += [_encoded(mat, "diffuse", mat.diffuse, lambda v: _numbers(v, "f")),
+            _encoded(mat, "specular", mat.specular, lambda v: _numbers(v, "f")),
+            wire.get("tail", b"\0" * 28 + b"\1")]
+    return b"".join(out)
+
+
+def write_cas(scene: CasScene) -> bytes:
+    """Serialize a CAS model without writing a file or touching ``source``.
+
+    Parsed scenes retain exporter settings, animation records, opaque object
+    and material fields, unknown chunks and padding. Known geometry, strings,
+    pivots and material fields are encoded afresh; unchanged spellings and
+    float bit patterns survive exactly. A partially decoded scene can only be
+    written unchanged, because editing its visible subset could destroy data
+    whose layout is unknown. Baked animation tracks are preserved, not edited;
+    their hierarchy/key-time table cannot change here (use casanim for that).
+
+    Fresh scenes use version 3.2 when ``version`` is zero and the measured
+    static/skinned exporter defaults. Positions remain in CAS coordinates and
+    skinned vertices remain relative to their single weighted bone.
+    """
+    wire = getattr(scene, "_wire", {})
+    unchanged = wire.get("baseline") == _signature(scene)
+    if wire.get("partial"):
+        if not unchanged:
+            raise CasError(_i18n.msg("eng.cas.w_partial", "{name} was only partly read, so it can be written back unchanged and not edited: the part not understood would be lost", name=Path(scene.source).name or "the model"))
+        # No reconstruction of a partial record is possible. This is the only
+        # passthrough path; complete scenes always serialize their records.
+        return wire["original"]
+    if not unchanged:
+        _validate_write(scene)
+    keys = wire.get("keys", b"")
+    if scene.baked_keys != len(keys):
+        raise CasError(_i18n.msg("eng.cas.w_baked_keys", "the model writer keeps the baked animation keys as they were read; it cannot add or resize them"))
+    if keys and wire.get("hierarchy") != (list(scene.nodes), list(scene.parents), _numbers(scene.key_times, "f")):
+        raise CasError(_i18n.msg("eng.cas.w_baked_hierarchy", "this model carries baked animation, so its nodes and key times cannot change here (casanim edits those)"))
+    try:
+        version = scene.version or 3.2
+        prefix = bytearray(wire.get("prefix", bytes.fromhex(
+            "000000002600000009000000000000000000000001000000000000000000000100000000000000000000f107000000000000")))
+        struct.pack_into("<f", prefix, 0, version)
+        struct.pack_into("<f", prefix, 16, scene.length)
+        out = [bytes(prefix), struct.pack("<I", len(scene.nodes)), wire.get("pad", b"\0\0"),
+               _numbers(scene.parents[1:], "I"), struct.pack("<I", len(scene.key_times)), _numbers(scene.key_times, "f")]
+        old_nodes = wire.get("nodes", [])
+        for i, name in enumerate(scene.nodes):
+            old = old_nodes[i] if i < len(old_nodes) else None
+            out += [old[1] if old and old[0] == name else _text_bytes(name),
+                    old[2] if old else b"\0" * 20 + _text_bytes("")]
+        out += [keys, _numbers(scene.pivots, "f")]
+        # The last eight prefix bytes start the skeleton chunk (size, kind 0).
+        # Preserve a noncanonical original declaration unless its layout grows.
+        skeleton_size = sum(map(len, out)) - (NODE_COUNT_AT - 8)
+        if not wire or skeleton_size != wire.get("skeleton_size", skeleton_size):
+            struct.pack_into("<I", prefix, NODE_COUNT_AT - 8, skeleton_size)
+            out[0] = bytes(prefix)
+        chunks = list(wire.get("chunks", []))
+        kinds = [c[0] for c in chunks]
+        for kind in (STATIC_MESHES, SKINNED_MESHES, MATERIALS):
+            needed = (any((SKINNED_MESHES if o.skinned else STATIC_MESHES) == kind for o in scene.objects)
+                      if kind in OBJECT_HEADER else bool(scene.materials))
+            if kind not in kinds and (not wire or needed):
+                # Keep even empty categories in fresh scene exports.
+                tail = b"\0" * _trailer(version, kind) if kind in OBJECT_HEADER else b""
+                chunks.append((kind, b"", tail))
+                kinds.append(kind)
+        if not wire:
+            chunks += [(kind, struct.pack("<II", 16, kind) + b"\0" * 8, b"") for kind in ALWAYS_EMPTY]
+            rank = {kind: i for i, kind in enumerate((1, 2, 3, 8, 10, 5))}
+            chunks.sort(key=lambda item: rank[item[0]])
+        last = {kind: i for i, (kind, _, _) in enumerate(chunks)}
+        material_members = {}
+        material_cursor = 0
+        for i, (kind, raw, _tail) in enumerate(chunks):
+            if kind != MATERIALS:
+                continue
+            count = (len(scene.materials) - material_cursor if i == last[MATERIALS]
+                     else struct.unpack_from('<I', raw, 8)[0])
+            material_members[i] = scene.materials[material_cursor:material_cursor + count]
+            material_cursor += len(material_members[i])
+        def belongs(item, kind, i):
+            original = getattr(item, "_chunk", -1)
+            target = original if 0 <= original < len(chunks) and chunks[original][0] == kind else last[kind]
+            return target == i
+        for i, (kind, raw, tail) in enumerate(chunks):
+            if kind in OBJECT_HEADER:
+                members = [o for o in scene.objects if (SKINNED_MESHES if o.skinned else STATIC_MESHES) == kind and belongs(o, kind, i)]
+                # A version change may alter the known static trailer width.
+                if len(tail) != _trailer(version, kind):
+                    tail = b"\0" * _trailer(version, kind)
+                # Known exporter trailers repeat the mesh count. Older static
+                # trailers and unrecognized source bytes remain opaque.
+                count_at = 2 if kind == STATIC_MESHES else 0
+                if len(tail) == count_at + 4:
+                    old_count = struct.unpack_from("<I", raw, 8)[0] if raw else None
+                    if not raw or struct.unpack_from("<I", tail, count_at)[0] == old_count:
+                        tail = tail[:count_at] + struct.pack("<I", len(members))
+                payload = struct.pack("<I", len(members)) + b"".join(_write_object(o) for o in members) + tail
+            elif kind == MATERIALS:
+                members = material_members[i]
+                payload = struct.pack("<I", len(members)) + b"".join(_write_material(m) for m in members) + tail
+            else:
+                out.append(raw)
+                continue
+            out.append(struct.pack("<II", len(payload) + 8, kind) + payload)
+        out.append(wire.get("trailing", b""))
+        return b"".join(out)
+    except (ValueError, TypeError, OverflowError, struct.error) as exc:
+        raise CasError(_i18n.msg("eng.cas.w_encode", "the model could not be written: {exc}", exc=exc)) from exc
 
 
 # ---------------------------------------------------------------------------
