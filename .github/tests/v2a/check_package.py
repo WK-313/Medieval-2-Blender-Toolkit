@@ -19,7 +19,7 @@ with zipfile.ZipFile(archive) as package:
             assert name in names, name
             assert package.read(name) == path.read_bytes(), name
     for relative in ("tasks/strat_reader.py", "tasks/strat_importer.py", "tasks/strat_iwte.py", "panels/strat_import_panel.py",
-                     "tasks/strat_cas_export.py", "tasks/strat_model.py", "panels/strat_panel.py", "panels/mod_data.py"):
+                     "tasks/strat_cas_export.py", "tasks/animation_engine.py", "tasks/strat_model.py", "panels/strat_panel.py", "panels/mod_data.py"):
         name = module_name + "/" + relative
         assert package.read(name) == (source / relative).read_bytes(), name
     assert not any("/__pycache__/" in name or "/text/" in name for name in names)
@@ -39,6 +39,7 @@ try:
     for name in ("mesh", "cas", "casanim", "animpack", "modelexport"):
         importlib.import_module(module_name + ".m2formats." + name)
     importlib.import_module(module_name + '.tasks.strat_cas_export')
+    importlib.import_module(module_name + '.tasks.animation_engine')
     print("PASS fresh zip install, addon enable, backend defaults, and format imports", flush=True)
 finally:
     bpy.ops.preferences.addon_disable(module=module_name)
