@@ -183,15 +183,16 @@ _iwte_job = None
 
 class MED_2_TOOLKIT_OT_Strat_Convert_CAS(bpy.types.Operator):
     bl_idname = "medieval2toolkit.strat_convert_cas"
-    bl_label = "Convert to .cas (IWTE)"
-    bl_description = ("Send the exported GLB to IWTE's extract_to_cas task - the same job as Model Files > "
-                      "Cas Models > dae/ms3d to cas_mesh - and watch until the .cas is written")
+    bl_label = "Convert to .cas"
+    bl_description = "Convert the selected strat model with Built-in, or the exported GLB with IWTE, using the selected backend"
     bl_options = {"REGISTER"}
 
     _timer = None
 
     @classmethod
     def poll(cls, context):
+        if context.scene.med2_toolkit_reader.backend_strat_export == 'BUILTIN':
+            return _iwte_job is None and context.mode == 'OBJECT' and activeStratArmature(context) is not None
         return _iwte_job is None and bool(context.scene.med2_toolkit_strat.last_exported_glb)
 
     def execute(self, context):
@@ -201,6 +202,11 @@ class MED_2_TOOLKIT_OT_Strat_Convert_CAS(bpy.types.Operator):
         if isinstance(result, str):
             self.report({'ERROR'}, result)
             return {'CANCELLED'}
+        if result.get('builtin'):
+            results = result['report']
+            showResultsPopup(context, 'Strat conversion', results)
+            self.report({'ERROR'} if any(level == 'ERROR' for level, _ in results) else {'INFO'}, results[0][1])
+            return {'FINISHED'}
         _iwte_job = result
         if bpy.app.background or context.window is None:
             return self.finish(context, waitForIWTEJob(result))
@@ -257,7 +263,7 @@ class MED_2_TOOLKIT_OT_Strat_Convert_CAS(bpy.types.Operator):
 class MED_2_TOOLKIT_OT_Strat_Build_And_Convert(bpy.types.Operator):
     bl_idname = "medieval2toolkit.strat_build_and_convert"
     bl_label = "Build + Convert"
-    bl_description = ("Export the GLB and hand it to IWTE. Uses the strat model Create Strat Model already built "
+    bl_description = ("Export with the selected backend. Uses the strat model Create Strat Model already built "
                       "for the selected unit, and only builds one first when there is none. "
                       "Stops and reports if the build finds something wrong")
     bl_options = {"REGISTER", "UNDO"}
@@ -284,7 +290,7 @@ class MED_2_TOOLKIT_OT_Strat_Build_And_Convert(bpy.types.Operator):
                 showResultsPopup(context, "Strat model build", report)
                 self.report({'ERROR'}, report[0][1] if report else "Could not build the strat model")
                 return {'CANCELLED'}
-        error, _path = exportStratGLB(context)
+        error, _path = ('', '') if context.scene.med2_toolkit_reader.backend_strat_export == 'BUILTIN' else exportStratGLB(context)
         if error:
             showResultsPopup(context, "Strat model build", report + [('ERROR', error)])
             self.report({'ERROR'}, error)
@@ -296,8 +302,8 @@ class MED_2_TOOLKIT_OT_Strat_Build_And_Convert(bpy.types.Operator):
         # INVOKE_DEFAULT so the conversion runs as its own modal operator with
         # its progress bar. Its RUNNING_MODAL is not passed on - this operator
         # has no modal() of its own to hand it to
-        bpy.ops.medieval2toolkit.strat_convert_cas('INVOKE_DEFAULT')
-        return {'FINISHED'}
+        result = bpy.ops.medieval2toolkit.strat_convert_cas('INVOKE_DEFAULT')
+        return {'CANCELLED'} if 'CANCELLED' in result else {'FINISHED'}
 
 
 class MED_2_TOOLKIT_OT_Strat_Check_CAS(bpy.types.Operator):
@@ -422,6 +428,7 @@ class MED_2_TOOLKIT_PT_Strat_Export(bpy.types.Panel):
         settings = context.scene.med2_toolkit_strat
 
         col = layout.column(align=True)
+        col.prop(context.scene.med2_toolkit_reader, 'backend_strat_export', text='Backend')
         col.prop(settings, "cas_format", text="Format")
         col.prop(settings, "skeleton_scale", text="Skeleton Scale")
 

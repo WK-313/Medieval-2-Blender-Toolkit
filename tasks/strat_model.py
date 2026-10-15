@@ -33,6 +33,7 @@ import math
 import os
 import re
 import shutil
+import tempfile
 
 import bpy
 import numpy as np
@@ -802,7 +803,7 @@ def existingStratModel(context):
     return built[-1] if built else None
 
 
-def exportStratGLB(context):
+def exportStratGLB(context, *, texture_subfolder=False):
     """Write the strat rig out as a GLB for IWTE. Returns (error, path)."""
     settings = context.scene.med2_toolkit_strat
     armature = activeStratArmature(context)
@@ -831,7 +832,7 @@ def exportStratGLB(context):
     try:
         source_texture = armature.get('med2_strat_source_texture', '')
         source_image = None
-        if armature.get('med2_strat_import_backend'):
+        if armature.get('med2_strat_import_backend') or texture_subfolder:
             diffuse_images = set()
             for obj in meshes:
                 for slot in obj.material_slots:
@@ -850,16 +851,20 @@ def exportStratGLB(context):
             if len(diffuse_images) > 1:
                 return 'Strat export supports one diffuse image; combine the model textures first', ''
             source_image = next(iter(diffuse_images), None)
+        if texture_subfolder and source_image is None:
+            return 'Strat export needs one diffuse image linked directly to material Base Color', ''
         if source_image is not None:
             source_texture = bpy.path.abspath(source_image.filepath)
             texture_name = settings.texture_name.strip() or name
             if os.path.basename(texture_name) != texture_name or texture_name in ('.', '..'):
                 return 'Texture name must be a filename without folders', ''
-            staged_texture = os.path.join(out_dir, texture_name + '.tga')
+            texture_dir = os.path.join(out_dir, 'textures') if texture_subfolder else out_dir
+            staged_texture = os.path.join(texture_dir, texture_name + '.tga')
             if os.path.normcase(os.path.realpath(source_texture)) in (
                     os.path.normcase(os.path.realpath(staged_texture)),
                     os.path.normcase(os.path.realpath(staged_texture + '.dds'))):
                 return 'Choose an export folder separate from the source texture', ''
+            os.makedirs(texture_dir, exist_ok=True)
             # Displace names only for this export; both GLB names must match
             # the game texture exactly, including when the names already exist.
             for collection in (bpy.data.images, bpy.data.materials):
@@ -1113,6 +1118,8 @@ def exportStratCAS(context):
     dict for the caller to watch until IWTE has written the .cas."""
     settings = context.scene.med2_toolkit_strat
     reader = context.scene.med2_toolkit_reader
+    if reader.backend_strat_export == 'BUILTIN':
+        return exportStratCASBuiltin(context)
     glb_path = cleanPath(settings.last_exported_glb)
     if not os.path.isfile(glb_path):
         return "No exported GLB found - run Export GLB first"
@@ -1137,6 +1144,49 @@ def exportStratCAS(context):
     return startIWTETask(iwte_exe, iwte_dir, task_path, cas_path)
 
 
+def exportStratCASBuiltin(context):
+    """Write a fresh CAS atomically; return a report dict or an error string."""
+    from ..m2formats import cas
+    from .strat_cas_export import stratCasScene
+    settings = context.scene.med2_toolkit_strat
+    rig = activeStratArmature(context)
+    if rig is None or context.mode != 'OBJECT':
+        return 'Select a strat armature in Object Mode first'
+    if settings.cas_format != 'm2' or abs(settings.skeleton_scale - 1.0) > 1e-6:
+        return 'Built-in strat export supports M2 at skeleton scale 1.0; select IWTE for other settings'
+    name = settings.model_name.strip() or rig.get(STRAT_TAG) or rig.name
+    texture = settings.texture_name.strip() or name
+    if not isinstance(name, str) or not name or any(c in name for c in '/\\:') or name in ('.', '..'):
+        return 'Model name must be a filename without folders'
+    if not texture or any(c in texture for c in '/\\:') or texture in ('.', '..'):
+        return 'Texture name must be a filename without folders'
+    temporary = ''
+    try:
+        scene = stratCasScene(context, rig, 'textures\\' + texture + '.tga')
+        # Reuse staging for painted/packed images, DDS mipmaps and exact names.
+        error, glb_path = exportStratGLB(context, texture_subfolder=True)
+        if error:
+            return error
+        if not settings.last_texture or not os.path.isfile(settings.last_texture + '.dds'):
+            return 'No exported diffuse texture found; build the atlas or assign one diffuse image first'
+        scene.materials[0].texture = 'textures\\' + os.path.basename(settings.last_texture)
+        data = cas.write_cas(scene)
+        path = os.path.splitext(glb_path)[0] + '.cas'
+        fd, temporary = tempfile.mkstemp(prefix='.strat-', suffix='.cas', dir=os.path.dirname(path))
+        with os.fdopen(fd, 'wb') as output:
+            output.write(data)
+        os.replace(temporary, path)
+        temporary = ''
+        settings.last_cas = path
+        return {'builtin': True, 'report': [('INFO', 'Wrote %s: %d meshes, %d triangles, %d bones (Built-in)' %
+                (os.path.basename(path), len(scene.objects), scene.triangles, len(scene.nodes) - 1))] + checkCASTexture(context)}
+    except Exception as error:
+        return 'Built-in strat export failed: %s' % error
+    finally:
+        if temporary and os.path.exists(temporary):
+            os.remove(temporary)
+
+
 #   ---------------  #
 #   Checking         #
 #   ---------------  #
@@ -1149,6 +1199,11 @@ CAS_NAME_BYTES = re.compile(rb'[A-Za-z0-9_\-./\\ ]{1,160}\.tga')
 
 def casTextureNames(cas_path):
     """Every .tga the converted .cas refers to."""
+    from ..m2formats import cas
+    try:
+        return cas.read_cas(cas_path).textures()
+    except (cas.CasError, OSError, ValueError):
+        pass  # Keep the byte scan for legacy formats the reader cannot decode.
     try:
         with open(cas_path, 'rb') as cas_file:
             data = cas_file.read()

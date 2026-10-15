@@ -1,6 +1,6 @@
 # Medieval 2: Total War — Blender Toolkit
 
-A complete asset pipeline for Medieval II: Total War modding, inside Blender. Import a mod's units, models and settlements, work on them, and export them back into the game's formats — textures, normal maps and a ready-made `battle_models.modeldb` entry included — with IWTE handling the final `.mesh`, `.world` and `.cas` conversions.
+A complete asset pipeline for Medieval II: Total War modding, inside Blender. Import a mod's units, models and settlements, work on them, and export them back into the game's formats — textures, normal maps and a ready-made `battle_models.modeldb` entry included. Strat CAS import/export has a built-in backend; IWTE handles battle mesh and settlement conversion and remains available for CAS.
 
 [![Latest release](https://img.shields.io/github/v/release/WK-313/Medieval-2-Blender-Toolkit?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases) [![Downloads](https://img.shields.io/github/downloads/WK-313/Medieval-2-Blender-Toolkit/total?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases)
 
@@ -90,7 +90,8 @@ Turn a finished battle unit into a campaign map model. The nine-step manual proc
 - Imported rigs retain their descriptor entry, faction, LOD and campaign scale in the `.blend`. Campaign scale stays as metadata so exporting does not bake it into the model. Importing does not change mod files.
 - **Create Strat Model** combines the main and attachment textures into a single `.tga` and remaps the UVs exactly (no Material Combiner needed), folds weights from bones the strat skeleton lacks into their nearest surviving bone, welds anything still loose, joins every mesh, re-rigs onto the strat skeleton at one bone per vertex, and builds on a copy in its own collection
 - Imported models can use the existing GLB/Convert workflow. Export preserves their bone order and stages the current diffuse image without changing scene materials; unchanged compatible DDS files are copied without recompression.
-- **Convert to .cas (IWTE)** runs the conversion with a progress bar; **Build + Convert** does both
+- **Convert to .cas** uses the **Strat Export** backend in Paths or Convert. **Built-in** exports the selected rig's rest mesh directly to M2 CAS at skeleton scale 1.0, with one bone per vertex and UV/normal seams preserved. It stages the current diffuse texture and checks the CAS texture reference automatically. **Build + Convert** also works without IWTE.
+- **IWTE** remains selectable for other CAS formats or skeleton scales. Existing backend preferences are preserved; the default stays IWTE while campaign-map validation is pending.
 - **Triangle count** is shown before you build and in the report — the campaign map crashes on load above 10,000 triangles
 - **Check .cas Texture** reads the texture name back out of the converted `.cas`; a mismatch there is what crashes the campaign map, and is otherwise found by opening the binary in a text editor
 - **Open Output Folder** shows the converted `.cas` and its `textures\` folder. Copying them into the mod's `data/models_strat` and writing the `descr_model_strat.txt` entry are still yours to do
@@ -151,7 +152,7 @@ Or install it manually from `Edit → Preferences → Add-ons → ⌄ → Instal
 
 ### 3. Install IWTE
 
-The toolkit uses **IWTE** for the final `.mesh`, `.world` and `.cas` conversions. Download the latest version from [makanyane/IWTE](https://github.com/makanyane/IWTE) and point the toolkit's `IWTE` path at its folder in the Paths panel.
+The toolkit uses **IWTE** for battle `.mesh` and settlement `.world` conversion, and optionally for `.cas`. Download the latest version from [makanyane/IWTE](https://github.com/makanyane/IWTE) and point the toolkit's `IWTE` path at its folder in the Paths panel.
 
 **On Linux and macOS**, IWTE and the bundled `texconv` are Windows programs, so the toolkit runs them through **Wine** — the same way Medieval 2 itself is run there. Install Wine and make sure `wine` is on your `PATH`; a native `texconv` on `PATH` is used in preference to the bundled one. The rest of the addon is native.
 
