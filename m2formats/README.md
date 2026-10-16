@@ -55,3 +55,12 @@ this provenance record does not add or assert a license grant.
 | `casanim.py` | `e89777f9b4e68243400085d684a0c451275c84c1ad60ea9a0360745544405ecf` |
 | `animpack.py` | `97d9ab82bd663493088c65381d765d3eebe6bb0e972bb3364cff63b7f81b1d41` |
 | `modelexport.py` | `7c5da3ef6215582947327932eb8eff4a7df1f520f8b65537ebd7dcdca01e5d1d` |
+
+## Animation slot labels (2026-10-16)
+
+`skelslots.py` retains the donor slot-name lookup and family grouping only;
+comparison/reporting and application integration are omitted. `data/skeleton_slots.json`
+is copied unchanged. Source checkout: `3cfef41839a34bf0ad59f8912fc3c04622cb8876`.
+
+- `skelslots.py`: SHA-256 `d6d7cf08b8edd26bf0bd039d0cb0c995005fe4a46efa3186d45350ec05bb002e` (original input).
+- `data/skeleton_slots.json`: SHA-256 `b38b435c5df4a2b98c7c60b893dd77e558a4b46b66c998d38d55f132c43d816a` (original input).

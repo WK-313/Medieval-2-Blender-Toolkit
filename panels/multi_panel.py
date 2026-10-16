@@ -25,6 +25,7 @@ Two things worth knowing:
 import bpy
 from bpy.props import EnumProperty, StringProperty
 
+from .animation_panel import MED_2_TOOLKIT_PT_Animations
 from .bmdb_panel import MED_2_TOOLKIT_PT_BMDB_Import
 from .edu_panel import MED_2_TOOLKIT_PT_EDU_Import
 from .mod_data import MED2_TOOLKIT_PT_Mod_Data
@@ -76,6 +77,7 @@ EMBEDDED_PANELS = [
     MED_2_TOOLKIT_PT_Rename_Tools,
     MED_2_TOOLKIT_PT_QOL_Advanced,
     MED_2_TOOLKIT_PT_Poses,
+    MED_2_TOOLKIT_PT_Animations,
     MED_2_TOOLKIT_PT_Texture_Assets,
     MED_2_TOOLKIT_PT_Interface,
     MED_2_TOOLKIT_PT_Unit_Info,

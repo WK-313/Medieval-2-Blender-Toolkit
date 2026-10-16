@@ -13,7 +13,7 @@ bl_info = {
 import bpy
 from .directories import ensureDataFiles
 ensureDataFiles()
-from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel, unit_export_panel, unit_info_panel, qol_panel, pose_panel, strat_panel
+from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel, unit_export_panel, unit_info_panel, qol_panel, pose_panel, strat_panel, animation_panel
 from .panels import multi_panel
 from bpy.props import EnumProperty, PointerProperty
 
@@ -63,6 +63,7 @@ def register():
     qol_panel.register()
     pose_panel.register()
     strat_panel.register()
+    animation_panel.register()
     # last: it imports the panel classes the modules above define
     multi_panel.register()
 
@@ -80,6 +81,7 @@ def unregister():
     qol_panel.unregister()
     pose_panel.unregister()
     strat_panel.unregister()
+    animation_panel.unregister()
 
 if __name__ == "__main__":
     register()

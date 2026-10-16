@@ -111,6 +111,14 @@ Turn a finished battle unit into a campaign map model. The nine-step manual proc
 - **Rename tools** — clean `.001` suffixes, switch bone case (`_R/_L` ↔ `_r/_l`), apply or swap game part prefixes (`weapon0__`, `shield0__`, …), toggle the `__opt` optional-part suffix
 - **Clean UV Maps** on the selected meshes, and SimpleBake helpers
 
+#### Game animations
+
+- Available in **Import**, **Export**, **Strat**, and **QOL**. Select a rig, open **Game Animations**, choose **Refresh Skeletons**, pick a skeleton, then **Load Actions**. Imported strat models suggest their own skeleton.
+- Filter by action family or search, select an action, then **Build & Play**. The browser lists source frames and duration, reads mod/vanilla packs and loose overrides, and plays a Blender Action without IWTE. The timeline preview range changes to fit the animation.
+- Switching keeps previous Actions. Unchanged animations reuse cached Actions, including after saving/reopening the blend. Changed sources, rig rest bones, frame rate, or edited/cleared curves rebuild the cache.
+- Playback requires a local rig without active bone constraints, NLA tracks or drivers that override it. Detach its control rig first; the existing pose-library controls remain available.
+- Root motion is retained. Missing tracks are reported and follow the pelvis; separate weapon skeleton animation assembly is not included yet.
+
 #### Pose library
 
 A 231-pose asset library ships with the addon and registers itself on first enable.
