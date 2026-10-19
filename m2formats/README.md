@@ -64,3 +64,10 @@ is copied unchanged. Source checkout: `3cfef41839a34bf0ad59f8912fc3c04622cb8876`
 
 - `skelslots.py`: SHA-256 `d6d7cf08b8edd26bf0bd039d0cb0c995005fe4a46efa3186d45350ec05bb002e` (original input).
 - `data/skeleton_slots.json`: SHA-256 `b38b435c5df4a2b98c7c60b893dd77e558a4b46b66c998d38d55f132c43d816a` (original input).
+
+## Model database reader (2026-10-18)
+
+`modeldb.py` retains the donor parser, entry records and raw-text serialization through
+`parse_entry`; repair and editing workflows are omitted. The two BOM constants are
+inlined from keyblock to avoid application dependencies. Original source SHA-256: `5846a00a99bed32a9a2e0064c0ae0857325a4d0a96e46817e4f76bdd94c92cdd`.
+Source checkout: `3cfef41839a34bf0ad59f8912fc3c04622cb8876`.

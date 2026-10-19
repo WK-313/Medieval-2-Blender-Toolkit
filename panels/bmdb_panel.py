@@ -192,7 +192,11 @@ class MED_2_TOOLKIT_OT_Model_Importer(bpy.types.Operator):
         unitTaskWriter()
         fileChecker(model_folder, [model])
         existing = set(bpy.data.objects)
-        result, width, z_offset = modelImporter(model_folder, model, faction, model_info, model)
+        try:
+            result, width, z_offset = modelImporter(model_folder, model, faction, model_info, model)
+        except Exception as error:
+            self.report({'ERROR'}, str(error))
+            return {'CANCELLED'}
         if result != 0:
             imported = importedArmature(existing)
             if imported:

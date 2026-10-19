@@ -1,0 +1,768 @@
+"""Parser/writer for battle_models.modeldb (M2TW).
+
+The file is a length-prefixed token stream ("serialization archive"):
+  * a string is stored as ``<byte-length> <that many chars>``
+  * numbers are bare whitespace-delimited tokens
+
+Header:  ``<len> serialization::archive 3 0 0 0 0 <COUNT> 0 0``
+where ``<len>`` is the length of the literal "serialization::archive" and
+``<COUNT>`` = number-of-real-models + 1 (the extra one is the leading ``blank`` entry).
+
+Verified end-to-end against Third_Age_Reforged (1026 models) and
+Divide_and_Conquer_EUR (2192 models): both parse to a clean EOF and round-trip
+byte-exact through :meth:`ModelDb.to_text`.
+
+For every entry we keep the *raw source substring* that produced it, so a
+transfer appends a source entry verbatim and only bumps the header count -
+untouched entries are never re-serialized.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+BOMS = ("\xef\xbb\xbf", "\ufeff")
+from typing import Dict, List, Optional, Tuple
+from . import i18n as _i18n
+
+# modeldb is single-byte text (paths are ASCII). latin-1 round-trips every byte
+# 1:1, which keeps raw spans exact.
+ENCODING = "latin-1"
+ARCHIVE_MAGIC = "serialization::archive"
+
+
+@dataclass
+class Animation:
+    mount_type: str            # horse | none | elephant | camel
+    primary_skeleton: str
+    secondary_skeleton: str
+    pri_weapons: List[str] = field(default_factory=list)
+    sec_weapons: List[str] = field(default_factory=list)
+
+    def skeletons(self) -> List[str]:
+        return [s for s in (self.primary_skeleton, self.secondary_skeleton) if s]
+
+    def weapon_skeletons(self) -> List[str]:
+        """The weapon skeletons, primary then secondary: skeleton names too, in
+        the same pack as the body's (ROCSS 5 372 of 5 375 found there)."""
+        return [s for s in self.pri_weapons + self.sec_weapons if s]
+
+
+@dataclass
+class Texture:
+    faction: str
+    texture: str
+    normal: str
+    sprite: str
+
+
+@dataclass
+class ModelEntry:
+    name: str
+    scale: float
+    lods: List[Tuple[str, int]]          # (mesh, distance)
+    main_textures: List[Texture]
+    attach_textures: List[Texture]
+    animations: List[Animation]
+    torch_index: int
+    torch: List[float]                   # 6 floats
+    raw: str = ""                        # verbatim source text for this entry
+    first_entry_pad: bool = False        # see _read_entry's ``pad`` argument
+
+    def skeletons(self) -> List[str]:
+        out: List[str] = []
+        for a in self.animations:
+            out.extend(a.skeletons())
+        return out
+
+    def weapon_skeletons(self) -> List[str]:
+        out: List[str] = []
+        for a in self.animations:
+            out.extend(a.weapon_skeletons())
+        return out
+
+    def mesh_files(self) -> List[str]:
+        return [mesh for mesh, _ in self.lods if mesh]
+
+    def texture_files(self) -> List[str]:
+        files: List[str] = []
+        for t in list(self.main_textures) + list(self.attach_textures):
+            for p in (t.texture, t.normal, t.sprite):
+                if p and p != "0":
+                    files.append(p)
+        # de-dup, keep order
+        seen, out = set(), []
+        for f in files:
+            if f not in seen:
+                seen.add(f)
+                out.append(f)
+        return out
+
+    def factions(self) -> List[str]:
+        return sorted({t.faction for t in self.main_textures} |
+                      {t.faction for t in self.attach_textures})
+
+    def content_key_mapped(self, path_fn):
+        """content_key with every file path passed through ``path_fn``.
+
+        Lets callers compare two entries *modulo* a path rewrite (e.g. the
+        reroute/mod_folder relocation), so a model copied into a mod-specific
+        folder still counts as identical to its original for dedup purposes.
+        """
+        mp = path_fn
+        return (
+            round(self.scale, 4),
+            tuple((mp(m), d) for m, d in self.lods),
+            tuple((t.faction, mp(t.texture), mp(t.normal), mp(t.sprite))
+                  for t in self.main_textures),
+            tuple((t.faction, mp(t.texture), mp(t.normal), mp(t.sprite))
+                  for t in self.attach_textures),
+            tuple((a.mount_type, a.primary_skeleton, a.secondary_skeleton,
+                   tuple(a.pri_weapons), tuple(a.sec_weapons)) for a in self.animations),
+            self.torch_index,
+            tuple(round(x, 4) for x in self.torch),
+        )
+
+    def content_key(self):
+        """Everything that defines the entry EXCEPT its name (for dedup compare).
+
+        Includes LOD mesh filenames + all texture paths, so 'identical' means
+        truly identical (same content including file names), per spec.
+        """
+        return self.content_key_mapped(lambda p: p)
+
+    def content_equals(self, other: "ModelEntry") -> bool:
+        return self.content_key() == other.content_key()
+
+
+class _Desync(ValueError):
+    """The stream stopped making sense, and where.
+
+    Every field in this file is found by counting from the one before it, so the
+    first wrong number does not fail - it silently shifts everything after it by
+    a field, and the read dies somewhere else entirely, on whatever innocent word
+    now sits where a number should be. ``at`` is that landing point;
+    :func:`_desync_message` turns it and the reader's trail back into the place a
+    person can actually go and look.
+    """
+
+    def __init__(self, at: int, what: str, exact: bool = False):
+        self.at = at
+        self.what = what
+        #: what the reader was counting through when it lost the thread, set by
+        #: whichever loop knows - a list whose count is one too many is the
+        #: commonest hand-edit in this file and the only one worth naming.
+        self.note = ""
+        #: True when ``what`` is pointing AT the mistake rather than at where the
+        #: read fell over. The long explanation below - "the number that did this
+        #: is somewhere above" - is for the second case; printing it after a
+        #: sentence that just named the exact character reads like the tool does
+        #: not know what it found.
+        self.exact = exact
+        #: the one edit that mends the file at this spot, when the damage is a
+        #: shape this module recognises for certain: ``(start, end, replacement,
+        #: note)``. :func:`repair_text` applies it; the reader never does.
+        self.fix: Optional[Tuple[int, int, str, str]] = None
+        super().__init__(what)
+
+
+def _is_number(v: str) -> bool:
+    try:
+        float(v)
+    except ValueError:
+        return False
+    return v[-1:].isdigit()             # not "inf", "nan" or "1e"
+
+
+def _line_col(text: str, i: int) -> Tuple[int, int]:
+    return text.count("\n", 0, i) + 1, i - text.rfind("\n", 0, i)
+
+
+def _snippet(text: str, i: int, before: int = 30, after: int = 40) -> str:
+    """The file either side of ``i``, on one line, with the spot marked."""
+    lead = text[max(0, i - before):i].replace("\n", " | ")
+    rest = text[i:i + after].replace("\n", " | ")
+    return f"...{lead}>>{rest}..."
+
+
+class _Reader:
+    """Length-prefixed token reader mirroring the ModdingTool FileStream."""
+
+    def __init__(self, text: str):
+        self.s = text
+        self.i = 0
+        self.n = len(text)
+        #: the last few strings read, as (offset, declared length, value, end
+        #: offset) - kept only so a failure can point back at the number that
+        #: caused it
+        self.trail: List[Tuple[int, int, str, int]] = []
+        #: name of the entry being read, for the same reason
+        self.entry = ""
+
+    def _skip_ws(self) -> None:
+        while self.i < self.n and self.s[self.i].isspace():
+            self.i += 1
+
+    def token(self) -> str:
+        self._skip_ws()
+        start = self.i
+        while self.i < self.n and not self.s[self.i].isspace():
+            self.i += 1
+        return self.s[start:self.i]
+
+    def get_int(self) -> int:
+        self._skip_ws()
+        at, tok = self.i, self.token()
+        try:
+            return int(tok)
+        except ValueError:
+            raise self._not_a_number(at, tok) from None
+
+    def _not_a_number(self, at: int, tok: str) -> _Desync:
+        """The refusal for a token that should be a number, with the mend when it
+        is two numbers that lost the space between them.
+
+        Silmarillion_Total_War's ``baneling_mount`` ends ``0 0-1 0 0 0 0 0 0``
+        where every other entry has ``0 0 -1 ...``: a minus sign cannot sit
+        inside a number, so ``0-1`` is ``0`` and ``-1`` and nothing else. Read
+        as one field it shifts the torch line by one and the next entry's name
+        is eaten as a number.
+        """
+        cut = next((k for k in range(1, len(tok)) if tok[k] == "-"
+                    and _is_number(tok[:k]) and _is_number(tok[k:])), 0)
+        if not cut:
+            return _Desync(at, f"expected a number here and found {tok!r}")
+        e = _Desync(at, f"{tok!r} is two numbers, {tok[:cut]} and {tok[cut:]}, with the "
+                        f"space between them lost - a field short here shifts everything "
+                        f"after it. Put the space back and the file reads", exact=True)
+        line, col = _line_col(self.s, at)
+        e.fix = (at + cut, at + cut, " ",
+                 f"line {line}, column {col}: {tok!r} split back into "
+                 f"{tok[:cut]} and {tok[cut:]}, the space between them lost")
+        return e
+
+    def skip_blank_fields(self, fields: int) -> None:
+        """Read the ``blank`` entry's fields: numbers, plus a name where one sits.
+
+        Nearly every file writes 39 bare numbers. Some put a real name in one of
+        those slots (Divide_and_Conquer_EUR has ``14 MTW2_Swordsman`` where the
+        others have a ``0``), so the slot is a length-prefixed string that happens
+        to be empty elsewhere. A number followed by something that is not a number
+        is that length and its name; the name counts as ONE field.
+        """
+        for _ in range(fields):
+            self._skip_ws()
+            at, tok = self.i, self.token()
+            try:
+                int(tok)
+            except ValueError:
+                raise self._not_a_number(at, tok) from None
+            save = self.i
+            nxt = self.token()
+            self.i = save
+            try:
+                float(nxt)
+                is_name = False
+            except ValueError:
+                is_name = bool(nxt)
+            if is_name:
+                self.i = at
+                self.get_string()
+
+    def get_float(self) -> float:
+        self._skip_ws()
+        at, tok = self.i, self.token()
+        try:
+            return float(tok)
+        except ValueError:
+            raise self._not_a_number(at, tok) from None
+
+    def get_attach_sprite(self) -> str:
+        """The fourth field of an ATTACHMENT texture group: a ``0``, or a sprite.
+
+        Almost every file writes a bare ``0`` here - this format's way of saying
+        *no name follows* - and it is easy to conclude the slot can hold nothing
+        else. It can. Mods fill it: BOTET writes
+        ``44 unit_sprites/france_Elector_count_sprite.spr`` into one and
+        Thera_Redux writes another, and with those names read as names both files
+        run to a clean EOF and round-trip byte-exact. The TWCenter syntax checker
+        walks attachment groups with the same routine it walks body groups, for
+        the same reason.
+
+        What is NOT a length is the stray character a hand edit leaves glued to
+        the ``0`` - a ``slave`` skin deleted by hand and the ``1`` off the removed
+        line left behind, giving ``... .texture 01``. Read 1 as a length and the
+        next field is eaten as a one-character name, and the read dies two lines
+        down on a word that is fine where it sits, which is the worst error this
+        format can produce.
+
+        The two are told apart by looking. A real sprite is a ``.spr`` path that
+        fills exactly the characters its length claims and stops on whitespace; a
+        stray digit's "name" is none of those things. So a name that holds up is
+        read, and anything else is refused AT the stray character with the fix in
+        the sentence - refused rather than assumed away, because half a dozen span
+        walkers further down this file re-walk the same bytes to place an edit,
+        and one of them reading a file differently from the others is how a save
+        writes at the wrong offset.
+        """
+        self._skip_ws()
+        at, tok = self.i, self.token()
+        try:
+            length = int(tok)
+        except ValueError:
+            lead = len(tok) - len(tok.lstrip("0123456789"))
+            if lead and tok[:lead] == "0" * lead:
+                e = _Desync(at + lead, f"a stray {tok[lead:]!r} is glued to the {tok[:lead]} "
+                            f"that says this attachment has no sprite, most likely left by a "
+                            f"hand edit. Delete it and the file reads", exact=True)
+                line, col = _line_col(self.s, at + lead)
+                e.fix = (at + lead, at + len(tok), "",
+                         f"line {line}, column {col}: deleted a stray {tok[lead:]!r} "
+                         f"glued to the 0 after an attachment texture")
+                raise e
+            raise _Desync(
+                at, f"expected the length of a name here and found {tok!r}") from None
+        if length == 0:
+            return ""
+        before = self.i
+        self._skip_ws()
+        val = self.s[self.i:self.i + length]
+        if (len(val) == length
+                and not any(c.isspace() for c in val)
+                and val.lower().endswith(".spr")
+                and (self.i + length >= self.n or self.s[self.i + length].isspace())):
+            self.i += length
+            self.trail.append((at, length, val, self.i))
+            del self.trail[:-6]
+            return val
+        self.i = before
+        e = _Desync(at, f"an attachment texture's sprite length is written as {tok!r} "
+                        f"here, and it is neither the 0 that says this attachment has "
+                        f"no sprite nor the length of a sprite path written after it. "
+                        f"A digit left glued to the 0 by a hand edit reads exactly like "
+                        f"this. Delete what follows the 0 at this spot and the file "
+                        f"reads", exact=True)
+        if len(tok) > 1 and tok[0] == "0":
+            # ``01``: the 0 is there and something is glued to it - certain
+            # enough to mend. A bare ``1`` might be anything, so it is not.
+            line, col = _line_col(self.s, at)
+            e.fix = (at + 1, at + len(tok), "",
+                     f"line {line}, column {col}: deleted a stray {tok[1:]!r} "
+                     f"glued to the 0 after an attachment texture")
+        raise e
+
+    def get_string(self) -> str:
+        self._skip_ws()
+        at, tok = self.i, self.token()
+        try:
+            length = int(tok)
+        except ValueError:
+            raise _Desync(
+                at, f"expected the length of a name here and found {tok!r}") from None
+        if length <= 0:
+            return ""
+        self._skip_ws()
+        if self.i + length > self.n:
+            raise _Desync(at, f"a name is written as {length} characters long, and only "
+                              f"{self.n - self.i} are left in the file")
+        val = self.s[self.i:self.i + length]
+        self.i += length
+        self.trail.append((at, length, val, self.i))
+        del self.trail[:-6]
+        return val
+
+
+@dataclass
+class ModelDb:
+    header_ints: List[int]               # the 8 ints after the archive magic
+    blank_raw: str                       # verbatim "blank" entry (leading padding entry)
+    entries: List[ModelEntry]
+    body_start: int = 0                  # offset in source where the body begins
+    trailing: str = ""                   # bytes after the last entry (usually "\n")
+    header_raw: str = ""                 # verbatim original header (incl trailing whitespace)
+
+    def by_name(self) -> Dict[str, ModelEntry]:
+        return {e.name: e for e in self.entries}
+
+    def get(self, name: str) -> Optional[ModelEntry]:
+        return self.by_name().get(name.lower())
+
+    def all_skeletons(self) -> set:
+        out: set = set()
+        for e in self.entries:
+            out.update(e.skeletons())
+        out.discard("")
+        return out
+
+    def to_text(self) -> str:
+        # +1 for the blank sentinel entry, but only if the source file had one
+        # -- some mods (e.g. those lacking the vanilla "blank" padding entry)
+        # count every entry as real.
+        count = len(self.entries) + (1 if self.blank_raw else 0)
+        if self.header_raw and count == self.header_ints[5]:
+            # No entries added/removed: emit the original header byte-for-byte.
+            header = self.header_raw
+        else:
+            ints = list(self.header_ints)
+            ints[5] = count            # entry-count slot
+            header = (f"{len(ARCHIVE_MAGIC)} {ARCHIVE_MAGIC} "
+                      + " ".join(str(x) for x in ints) + "\n")
+        body = self.blank_raw + "".join(e.raw for e in self.entries) + self.trailing
+        return header + body
+
+    def write(self, path: str | Path) -> None:
+        Path(path).write_text(self.to_text(), encoding=ENCODING)
+
+
+def _whole_name(g: _Reader) -> Optional[Tuple[int, str]]:
+    """The next name and where it starts, if its length ends it on whitespace."""
+    g._skip_ws()
+    at = g.i
+    try:
+        val = g.get_string()
+    except _Desync:
+        return None
+    if not val or (g.i < g.n and not g.s[g.i].isspace()):
+        return None
+    return at, val
+
+
+def _is_word(v: str) -> bool:
+    return bool(v) and all(c.isalnum() or c in "_-" for c in v)
+
+
+def _is_path(v: str) -> bool:
+    return any(c in v for c in "/\\.")
+
+
+def _files_end(g: _Reader, what: str) -> Optional[int]:
+    """Where a skin's texture, normal map and sprite end, if they start here."""
+    tex = _whole_name(g)
+    nrm = _whole_name(g) if tex else None
+    if not (tex and nrm and _is_path(tex[1]) and _is_path(nrm[1])):
+        return None
+    try:
+        g.get_attach_sprite() if what == "attachment" else g.get_string()
+    except _Desync:
+        return None
+    return g.i
+
+
+def _whole_group(text: str, start: int, what: str) -> Optional[Tuple[int, int, str]]:
+    """``(faction end, group end, faction)`` if a sound texture group starts here."""
+    g = _Reader(text)
+    g.i = start
+    fac = _whole_name(g)
+    if not fac or not _is_word(fac[1]):
+        return None
+    fac_end = g.i
+    end = _files_end(g, what)
+    return (fac_end, end, fac[1]) if end is not None else None
+
+
+def _skin_without_files(r: _Reader, g_at: int, clean: List[Tuple[str, int, int]],
+                        what: str, e: _Desync) -> bool:
+    """Name the commonest hand-edit in a texture list exactly, and how to mend it.
+
+    A faction's skin is four lines, and deleting a skin by hand tends to take
+    the three file lines and leave the faction behind - Wars_of_Arda's
+    ``datower_guards5`` names ``aztecs`` in its attachment list and goes straight
+    on to ``denmark``. The reader then takes ``denmark`` as aztecs' texture, and
+    the read dies a line later on a sprite length that is not one, blaming a
+    stray digit that is not there.
+
+    Seen from the faction it is plain: a faction name followed by another name
+    that is not a path. Two hand edits leave that, and they mend differently.
+    In Wars_of_Arda's case nothing was lost: below the ``denmark`` skin sits a
+    second texture and normal map with no faction in front of them, so the
+    ``denmark`` line has only slipped up one skin, and moving it back down
+    gives every faction its own files again. Otherwise the files really are
+    gone, and if the next name opens a whole, sound skin, or there
+    is a skin before this one to copy, ``e`` is rewritten to point at the bare
+    faction and carries the fix - the neighbour's files, given to it. Copied
+    rather than the faction deleted, because the other list in the entry
+    usually still names that faction, and a borrowed look is something to check
+    in game where a faction gone from one list is a change nobody asked for.
+    """
+    g = _Reader(r.s)
+    g.i = g_at
+    fac = _whole_name(g)
+    if not fac or not _is_word(fac[1]):
+        return False
+    fac_end = g.i
+    nxt = _whole_name(g)
+    if not nxt or _is_path(nxt[1]):
+        return False
+    donor = _whole_group(r.s, nxt[0], what)
+    line = _line_col(r.s, g_at)[0]
+    e.at, e.exact, e.note = g_at, True, ""
+    if donor:
+        # the files after that skin: a second set with no faction in front of
+        # them means nothing was lost - the next faction's line has slipped up
+        # above this one's files, and moving it back down mends the list
+        g = _Reader(r.s)
+        g.i = donor[1]
+        stray_end = _files_end(g, what)
+        if stray_end is not None:
+            n_end = donor[0]
+            e.what = (f"the faction lines in this {what} texture list have slipped: "
+                      f"{fac[1]!r} is followed straight by {nxt[1]!r}, and below that a "
+                      f"second texture and normal map stand with no faction in front of "
+                      f"them. Move the {nxt[1]!r} line down one skin, past the first "
+                      f"texture and normal map, and the list reads")
+            e.fix = (fac_end, donor[1], r.s[n_end:donor[1]] + r.s[fac_end:n_end],
+                     f"line {line}: in the {what} textures of {r.entry!r} the {nxt[1]!r} line "
+                     f"had slipped above the files of {fac[1]!r}; moved it back down")
+            return True
+    follows = f"the {nxt[1]!r} skin" if donor else "whatever comes after the list"
+    if donor is None:
+        if not clean:
+            return False
+        d_fac, d_fac_end, d_end = clean[-1]
+        donor = (d_fac_end, d_end, d_fac)
+    d_fac_end, d_end, d_fac = donor
+    e.what = (f"the {what} texture list names the faction {fac[1]!r} and gives it no texture "
+              f"or normal map - straight after it comes {follows}. A skin's three file lines "
+              f"deleted by hand, with its faction line left behind, reads exactly like this. "
+              f"Give {fac[1]!r} its texture and normal map back, or delete its line and lower "
+              f"the count above the list by one")
+    e.fix = (fac_end, fac_end, r.s[d_fac_end:d_end],
+             f"line {line}: in the {what} textures of {r.entry!r}, {fac[1]!r} had no texture or "
+             f"normal map, so it was given the ones {d_fac!r} has")
+    return True
+
+
+def _read_entry(r: _Reader, pad: bool = False) -> ModelEntry:
+    """Read one entry. ``pad`` reproduces a vanilla M2TW quirk: when a
+    modeldb has no leading ``blank`` sentinel entry, the game pads the very
+    first real entry with 8 extra reserved int-pairs threaded through the
+    body (confirmed against the reference C# ModdingTool's ``FirstEntryPad``
+    calls). Every other entry, and every entry in a file that does have a
+    ``blank`` sentinel, is unpadded.
+    """
+    def firstpad() -> None:
+        if pad:
+            r.get_int()
+            r.get_int()
+
+    r.entry = ""                 # whose entry this is, once we know
+    name = r.get_string().lower()
+    r.entry = name
+    scale = r.get_float()
+    firstpad()
+    lod_count = r.get_int()
+    firstpad()
+    lods = [(r.get_string(), r.get_int()) for _ in range(lod_count)]
+    firstpad()
+
+    def read_textures(pad_after_count: bool, what: str) -> List[Texture]:
+        r._skip_ws()
+        cnt_at = r.i
+        cnt = r.get_int()
+        if pad_after_count:
+            firstpad()
+        out = []
+        clean: List[Tuple[str, int, int]] = []      # (faction, faction end, end) per group
+        for k in range(cnt):
+            r._skip_ws()
+            g_at = r.i
+            try:
+                fac = r.get_string().lower()
+                fac_end = r.i
+                tex, nrm = r.get_string(), r.get_string()
+                # the sprite: always a name on a main texture, and on an
+                # attachment usually - not always - the 0 that means there is
+                # none (see get_attach_sprite)
+                spr = (r.get_attach_sprite() if what == "attachment"
+                       else r.get_string())
+            except _Desync as e:
+                if e.fix is None and _skin_without_files(r, g_at, clean, what, e):
+                    raise
+                # A list that says 2 and holds 1 - what deleting a faction's
+                # skin without touching the number above it leaves behind - puts
+                # the reader into the NEXT field entirely, and everything it
+                # says after that is about the wrong place. Say which count.
+                line, col = _line_col(r.s, cnt_at)
+                e.note = (f" This entry's {what} texture list says it holds {cnt}"
+                          f" (line {line}, column {col}) and only {k} read cleanly,"
+                          f" so that count is the first number to check: a texture"
+                          f" removed without lowering it reads exactly like this.")
+                raise
+            out.append(Texture(fac, tex, nrm, spr))
+            clean.append((fac, fac_end, r.i))
+        return out
+
+    main_tex = read_textures(pad_after_count=True, what="main")
+    attach_tex = read_textures(pad_after_count=False,   # no padding around this count
+                               what="attachment")
+    firstpad()
+
+    mount_n = r.get_int()
+    firstpad()
+    anims: List[Animation] = []
+    for _ in range(mount_n):
+        mt = r.get_string().lower()
+        pri = r.get_string()
+        sec = r.get_string()
+        priw = [r.get_string() for _ in range(r.get_int())]
+        secw = [r.get_string() for _ in range(r.get_int())]
+        anims.append(Animation(mt, pri, sec, priw, secw))
+    firstpad()
+
+    torch_idx = r.get_int()
+    torch = [r.get_float() for _ in range(6)]
+    firstpad()
+    return ModelEntry(name, scale, lods, main_tex, attach_tex, anims,
+                      torch_idx, torch, first_entry_pad=pad)
+
+
+#: The mark Notepad writes into anything it saves as UTF-8 (:data:`BOMS`).
+#: A modeldb's very first token is a NUMBER - the length of the magic string -
+#: so the mark lands glued to it and the file used to die on int(). Skipped for
+#: parsing and left in `header_raw`, so a file that arrived with one is written
+#: back with one: this reads the file, it does not quietly repair it.
+_BOM = BOMS[0]
+
+
+def _suspect(text: str, r: "_Reader") -> str:
+    """The wrong number, if the trail shows one.
+
+    A length that does not match its name leaves a mark right where it is: the
+    slice it took ends in the middle of the next token instead of on a space, or
+    it swallowed a line break. Both are things a reader can only see by looking
+    back, and both name the ONE number worth editing - which is the difference
+    between "your modeldb is broken somewhere" and a line to open.
+
+    A name that ran off its own line gets one thing more: how long the rest of
+    that line is. Paths in this file contain spaces (``Final European
+    Light_hre_diff``), so that measurement is where the name PROBABLY ends rather
+    than where it certainly does - but it is the number to try first, and for
+    BOTET's ``Elephant_normal2`` it is exactly the 61 that a 64 was written for.
+    """
+    for at, length, val, end in r.trail:
+        line, col = _line_col(text, at)
+        if "\n" in val:
+            start = end - length
+            rest = text[start:text.index("\n", start)].rstrip()
+            return (f" The name at line {line} column {col} says it is {length} "
+                    f"characters long and so runs off the end of its own line - that "
+                    f"number is the likely culprit, and the rest of that line "
+                    f"measures {len(rest)}.")
+        if end < r.n and not text[end].isspace():
+            return (f" The name at line {line} column {col} says it is {length} "
+                    f"characters long and reads {val!r}, which stops in the middle of "
+                    f"the word after it - that number is the likely culprit.")
+    return ""
+
+
+def _desync_message(text: str, r: "_Reader", e: "_Desync", n: int) -> str:
+    """The failure as a sentence - which entry, which line, which number to doubt.
+
+    Two things can name that number, and they are not equally sure of themselves.
+    :func:`_suspect` reports a length the reader WATCHED overrun its own name;
+    ``e.note`` reports a texture count that disagrees with how far the list got,
+    which is inferred from where the read landed - and a wrong length lands it in
+    exactly the same place. So the sighting outranks the inference: BOTET's
+    ``mount_elephant_rocket`` has an honest count of 2 above a normal-map length
+    written 64 for a 61-character name, and led with the count it sent the reader
+    off to delete a texture group that was never the problem.
+    """
+    line, col = _line_col(text, e.at)
+    who = f" ({r.entry!r})" if r.entry else ""
+    if e.exact:
+        return (f"Reading model entry #{n + 1}{who} it stopped at line {line}, "
+                f"column {col}: {e.what}. Here: {_snippet(text, e.at)}")
+    return (f"Reading model entry #{n + 1}{who} it stopped making sense at line {line}, "
+            f"column {col}: {e.what}. Every name in this file is stored as "
+            f"'<length> <name>', so one length that does not match the name after it "
+            f"shifts every field that follows by one and the read dies further down, "
+            f"on a word that is fine where it is."
+            f"{_suspect(text, r) or e.note} Here: {_snippet(text, e.at)}")
+
+
+def parse_text(text: str) -> ModelDb:
+    r = _Reader(text)
+    for mark in BOMS:
+        if text.startswith(mark):
+            r.i = len(mark)
+            break
+    try:
+        magic = r.get_string()
+    except ValueError:
+        raise ValueError(
+            _i18n.msg("eng.modeldb.this_does_not_start_like_a", "this does not start like a battle_models.modeldb: its first token should be the length of 'serialization::archive', and it is {split}. A file re-saved by a text editor in the wrong encoding usually looks like this.", split=repr(r.s[r.i:r.i + 24].split(chr(10))[0]))) from None
+    if magic != ARCHIVE_MAGIC:
+        raise ValueError(_i18n.msg("eng.modeldb.not_a_modeldb_archive_magic", "not a modeldb archive (magic={magic})", magic=repr(magic)))
+    header_ints = [r.get_int() for _ in range(8)]
+    count = header_ints[5]
+
+    # The body starts at the first token AFTER the header ints. Locating it by
+    # the first newline instead would assume the header is exactly one line -
+    # true for most mods, but some wrap it (`...0 0 \n595 \n0 0 \n5 blank`),
+    # and reading from mid-header makes the next int look like a string length
+    # and swallows the first entry.
+    r._skip_ws()
+    body_start = r.i
+    prev_end = body_start
+
+    blank_raw = ""
+    entries: List[ModelEntry] = []
+    for n in range(count):
+        pad = False
+        try:
+            if n == 0:
+                name = r.get_string().lower()
+                if name == "blank":
+                    r.skip_blank_fields(39)
+                    blank_raw = text[prev_end:r.i]
+                    prev_end = r.i
+                    continue
+                # No blank entry: rewind and treat as a normal first entry.
+                # Vanilla M2TW pads this specific entry with extra reserved
+                # ints (see _read_entry's ``pad`` docstring).
+                r.i = prev_end
+                pad = True
+            entry = _read_entry(r, pad=pad)
+        except _Desync as e:
+            # Re-raised as a plain ValueError carrying the whole story: the
+            # caller (:meth:`unittransfer.mod.Mod.modeldb`) puts the file's name
+            # in front of it and the UI shows the sentence, which is the only
+            # form of this failure anyone can act on.
+            err = ValueError(_desync_message(text, r, e, n))
+            err.at, err.fix = e.at, e.fix      # for repair_text
+            raise err from None
+        entry.raw = text[prev_end:r.i]
+        entries.append(entry)
+        prev_end = r.i
+
+    trailing = text[prev_end:]
+    header_raw = text[:body_start]
+    return ModelDb(header_ints, blank_raw, entries, body_start, trailing, header_raw)
+
+
+def parse_file(path: str | Path) -> ModelDb:
+    return parse_text(Path(path).read_text(encoding=ENCODING))
+
+
+def parse_entry(text: str) -> ModelEntry:
+    """One entry on its own, with no archive header before it.
+
+    The shape a Blender export writes beside its mesh as ``<name>_bmdb.txt``:
+    the entry as it would sit in a modeldb, ready to paste into one.
+    """
+    r = _Reader(text)
+    for mark in BOMS:
+        if text.startswith(mark):
+            r.i = len(mark)
+            break
+    try:
+        entry = _read_entry(r)
+    except _Desync as e:
+        raise ValueError(_desync_message(text, r, e, 0)) from None
+    entry.raw = text[:r.i]
+    return entry
+
+
+#: More mends than any hand-edited file has needed; a file past this is not
+#: damaged in a way this knows, whatever the next error says.
+REPAIR_MAX = 200

@@ -8,6 +8,7 @@ from bpy.props import StringProperty, BoolProperty, BoolVectorProperty, PointerP
 from pathlib import Path
 
 from..directories import saveFolderPaths, saveSettings, readJsonCached
+from ..tasks import battle_import
 from ..tasks.card_renderer import CAMERA_TAG, SUN_TAG, TARGET_TAG, cameraName
 from ..tasks.control_rig import controlRigOf, controlledRigs, isControlRig
 from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport, missingModelPaths, unconvertedModels
@@ -434,13 +435,17 @@ class MED_2_TOOLKIT_OT_Unit_Importer(bpy.types.Operator):
         engineTaskWriter()
         results = []
         for upgrade in upgrades:
-            unitChecker(model_folder, [unit_info], upgrade)
-            # unitChecker only says what it asked IWTE for. Anything still not on
-            # disk after that conversion is a model the import cannot produce,
-            # and it used to come out as nothing happening at all - no object, no
-            # message, a FINISHED operator.
-            missing = unconvertedModels(model_folder, [unit_info], upgrade)
-            offset = unitImporter(model_folder, unit_info, faction, coordinates, upgrade)
+            try:
+                unitChecker(model_folder, [unit_info], upgrade)
+                # unitChecker only says what it asked IWTE for. Anything still not on
+                # disk after that conversion is a model the import cannot produce,
+                # and it used to come out as nothing happening at all - no object, no
+                # message, a FINISHED operator.
+                missing = unconvertedModels(model_folder, [unit_info], upgrade)
+                offset = unitImporter(model_folder, unit_info, faction, coordinates, upgrade)
+            except Exception as error:
+                results.append(('ERROR', "Upgrade %d of %s: %s" % (upgrade, unit_info['ID'], error)))
+                continue
             # an ERROR when the unit came out empty, a WARNING when the rest of
             # it imported around the missing model - unitImporter no longer
             # abandons a unit because its mount or engine would not convert
@@ -497,7 +502,11 @@ class MED_2_TOOLKIT_OT_Officer_Importer(bpy.types.Operator):
                 results.append(('ERROR', "%s is not in battle_models.modeldb - officer skipped" % officer))
                 continue
             existing = set(bpy.data.objects)
-            result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
+            try:
+                result, width, z_offset = modelImporter(model_folder, officer, faction, model_info, officer)
+            except Exception as error:
+                results.append(('ERROR', "%s: %s" % (officer, error)))
+                continue
             if result == 0:
                 results.append(('ERROR', "%s: no %s, and nothing to convert at %s/%s"
                                          % (officer, model_info['Mesh'], model_info['Folder'],
@@ -731,6 +740,9 @@ class BatchImportBase:
 
     def startBatch(self, context, unit_info_list, import_officers, hide_variations):
         global _import_job
+        if self.mode == 'faction' and battle_import.enabled(context):
+            self.report({'ERROR'}, "Built-in faction import is not available yet; choose IWTE")
+            return {'CANCELLED'}
         model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
         saveFolderPaths()
         saveSettings()
@@ -740,8 +752,8 @@ class BatchImportBase:
             return {'CANCELLED'}
         try:
             conversions = prepareConversions(model_folder, unit_info_list, import_officers)
-        except (OSError, KeyError) as error:
-            self.report({'ERROR'}, "Could not write the IWTE task file: %s" % error)
+        except (OSError, KeyError, ValueError) as error:
+            self.report({'ERROR'}, "Could not prepare import: %s" % error)
             return {'CANCELLED'}
         bmdb = None
         if import_officers:

@@ -35,6 +35,12 @@ Read any mod's data folder and pull its content into Blender.
 
 ![Unit Import — BMDB browser](./images/Unit_Import3_Menu_BMDB.png)
 
+### Built-in infantry import
+
+Select **Built-in** under **Battle Import** in Paths to use **Import Unit**, **Import Full Unit**, or the BMDB model importer without IWTE. Reads unpacked meshes and textures from the mod, then vanilla data, and resolves the entry's primary/secondary body and weapon rest skeletons. Parts, optional flags, UVs and skinning retain the IWTE naming/coordinate conventions.
+
+Native imports rebuild the mesh each time and keep content-addressed DDS files in Unit Output/.med2-native/textures, avoiding stale IWTE files and cross-mod texture collisions. Keep that folder with your blend or pack the images. Missing assets or unsupported skeletons are reported. Mounted units, siege engines and faction batches still require IWTE; existing backend preferences are preserved.
+
 ### Unit Export
 
 Take a rigged model from Blender back into the game.

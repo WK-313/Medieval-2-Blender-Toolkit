@@ -2,13 +2,15 @@ import bpy
 import json
 import random
 from pathlib import Path
-from . import recurlayercollection
+from . import recurlayercollection, battle_import
 from ..directories import withTrailingSep
 from .task_writer import unitTaskAppend, unitTaskRun, engineTaskAppend, engineTaskRun
 from .unit_groups import tagGroup
 script_folder = Path(__file__).parent.parent
 
 def postImport(self, context):
+        if bpy.app.background or context.space_data is None or context.space_data.type != 'VIEW_3D':
+            return
         if context.scene.med2_toolkit_units.frame_toggle:
             bpy.ops.view3d.view_all(center=False)
         if context.scene.med2_toolkit_units.textured_toggle and bpy.context.space_data.shading.type == 'SOLID':
@@ -42,6 +44,10 @@ def selectionBoundingBox():
     return(width, z_offset)
 
 def unitChecker(model_folder, unit_list, upgrade, defer=False):
+    if battle_import.enabled():
+        if any(unit['Attachment'] != 'unused' for unit in unit_list):
+            raise ValueError('Built-in import currently supports infantry; choose IWTE for mounts and siege engines')
+        return [], []
     # defer=True appends the missing models to the task files but does NOT hand
     # them to IWTE, and returns (units, engines) so the caller can run one
     # conversion for a whole batch and watch it without freezing Blender. The
@@ -88,6 +94,8 @@ def unconvertedModels(model_folder, unit_list, upgrade):
     Run this AFTER the conversion: whatever is still missing here is something no
     import can produce.
     """
+    if battle_import.enabled():
+        return []
     model_folder = withTrailingSep(model_folder)
     with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
         bmdb_dictionary = json.load(bmdb_input)
@@ -136,6 +144,8 @@ def fileChecker(model_folder, model_list, defer=False):
     # the Unit Output path is joined onto bare file names below, and the
     # Paths field holds it with a trailing separator only when it was
     # browsed to rather than typed
+    if battle_import.enabled():
+        return []
     model_folder = withTrailingSep(model_folder)
     with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
         bmdb_dictionary = json.load(bmdb_input)
@@ -412,6 +422,8 @@ def engineImporter(model_folder, unit_name, faction_id, engine_model):
     return(2, width, z_offset)
 
 def modelImporter(model_folder, unit_name, faction_id, model_info, model_id):
+    if battle_import.enabled():
+        return battle_import.importModel(bpy.context, model_id, unit_name, faction_id, model_folder)
     # the Unit Output path is joined onto bare file names below, and the
     # Paths field holds it with a trailing separator only when it was
     # browsed to rather than typed

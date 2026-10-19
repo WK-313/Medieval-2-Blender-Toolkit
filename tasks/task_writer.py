@@ -74,6 +74,8 @@ def appendToTask(iwte_path, task_name, entry):
 #########################
 
 def unitTaskWriter():
+    if bpy.context.scene.med2_toolkit_reader.backend_battle_import == 'BUILTIN':
+        return
     vanilla_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2))
     mod_path = winePath(modDirectory())
     iwte_path = bpy.context.scene.med2_toolkit_reader.directory_iwte
@@ -102,6 +104,8 @@ def unitTaskRun():
 #########################
 
 def engineTaskWriter():
+    if bpy.context.scene.med2_toolkit_reader.backend_battle_import == 'BUILTIN':
+        return
     vanilla_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2))
     mod_path = winePath(modDirectory())
     iwte_path = bpy.context.scene.med2_toolkit_reader.directory_iwte

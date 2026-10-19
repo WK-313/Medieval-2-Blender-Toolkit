@@ -19,7 +19,7 @@ with zipfile.ZipFile(archive) as package:
             assert name in names, name
             assert package.read(name) == path.read_bytes(), name
     for relative in ("tasks/strat_reader.py", "tasks/strat_importer.py", "tasks/strat_iwte.py", "panels/strat_import_panel.py",
-                     "tasks/strat_cas_export.py", "tasks/animation_engine.py", "tasks/animation_browser.py", "panels/animation_panel.py", "tasks/strat_model.py", "panels/strat_panel.py", "panels/mod_data.py"):
+                     "tasks/strat_cas_export.py", "tasks/animation_engine.py", "tasks/battle_import.py", "tasks/animation_browser.py", "panels/animation_panel.py", "tasks/strat_model.py", "panels/strat_panel.py", "panels/mod_data.py"):
         name = module_name + "/" + relative
         assert package.read(name) == (source / relative).read_bytes(), name
     assert not any("/__pycache__/" in name or "/text/" in name for name in names)
@@ -36,7 +36,7 @@ try:
     directories = importlib.import_module(module_name + ".directories")
     reader = bpy.context.scene.med2_toolkit_reader
     assert all(getattr(reader, key) == directories.DEFAULT_BACKENDS[key] for key in directories.DEFAULT_BACKENDS)
-    for name in ("mesh", "cas", "casanim", "animpack", "modelexport", "skelslots"):
+    for name in ("mesh", "cas", "casanim", "animpack", "modelexport", "skelslots", "modeldb"):
         importlib.import_module(module_name + ".m2formats." + name)
     importlib.import_module(module_name + '.tasks.strat_cas_export')
     importlib.import_module(module_name + '.tasks.animation_engine')
