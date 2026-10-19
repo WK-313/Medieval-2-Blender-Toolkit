@@ -5,10 +5,11 @@ import math
 from pathlib import Path
 import tempfile
 import time
+from types import SimpleNamespace
 
 import bpy
 
-from ..m2formats import animpack, casanim, mesh, modeldb, modelexport
+from ..m2formats import animpack, casanim, engines, mesh, modeldb, modelexport
 from .strat_reader import resolveStratPath
 from .unit_exporter import selectedModFolder
 
@@ -47,8 +48,9 @@ def sources(context, model_id):
 
 def restSkeleton(root, entry, secondary=False):
     candidates = [a for a in entry.animations if a.mount_type.casefold() == 'none']
+    candidates = candidates or list(entry.animations)
     if len(candidates) != 1:
-        raise ValueError('Built-in import currently needs one infantry animation set; use IWTE for mounted models')
+        raise ValueError('Built-in import needs one unambiguous animation set; use IWTE for this model')
     animation = candidates[0]
     name = animation.secondary_skeleton if secondary else animation.primary_skeleton
     weapons = animation.sec_weapons if secondary else animation.pri_weapons
@@ -84,7 +86,7 @@ def restSkeleton(root, entry, secondary=False):
     return casanim.Animation(source=name, tracks=tracks), name
 
 
-def nativeGLB(model, skeleton):
+def nativeGLB(model, skeleton, single_sheet=False):
     """Keep the shared encoder, adapting its viewer axes and merged parts to IWTE.
 
     Shared export mirrors X; Blender maps glTF (x,y,z) to (x,-z,y).
@@ -116,7 +118,7 @@ def nativeGLB(model, skeleton):
     for track in skeleton.tracks:
         x, y, z = track.pivot
         track.pivot = (-x, y, -z)
-    document, binary = modelexport.read_glb(modelexport.export_glb(model, skeleton=skeleton, uscale=1.0))
+    document, binary = modelexport.read_glb(modelexport.export_glb(model, skeleton=skeleton, uscale=0.5 if single_sheet else 1.0))
     merged = document['meshes'][0]
     mesh_node = document['nodes'].pop()
     document['scenes'][0]['nodes'].remove(len(document['nodes']))
@@ -125,10 +127,10 @@ def nativeGLB(model, skeleton):
                               'pbrMetallicRoughness': {'metallicFactor': 0, 'roughnessFactor': .5}}
                              for role in ('main', 'attach')]
     for group, primitive in zip((g for g in model.groups if g.indices), merged['primitives']):
-        if group.sheets == 'both':
+        if group.sheets == 'both' and not single_sheet:
             raise ValueError('A mesh part crosses main and attachment sheets: %s; use IWTE' % group.name)
         name = '%s__%s%s' % (group.name, group.texture_group, '__opt' if group.optional else '')
-        primitive['material'] = 1 if group.sheets == 'attach' else 0
+        primitive['material'] = 1 if group.sheets == 'attach' and not single_sheet else 0
         document['meshes'].append({'name': name, 'primitives': [primitive]})
         node = dict(mesh_node, name=name, mesh=len(document['meshes'])-1)
         document['nodes'].append(node)
@@ -165,19 +167,23 @@ def textureFiles(root, vanilla, entry, faction, folder):
 
 
 def importModel(context, model_id, unit_name, faction, output_folder):
-    from .importer import materialWorkflow, selectionBoundingBox, hideVariations
     started = time.perf_counter()
     root, vanilla, entry, path = sources(context, model_id)
     skeleton, skeleton_name = restSkeleton(root, entry, context.scene.med2_toolkit_units.primary_secondary == 'secondary')
     model = mesh.read_mesh(path)
     if not model.weights or not model.bones:
         raise ValueError('Built-in infantry import needs a skinned mesh; use IWTE for this model')
-    blob = nativeGLB(model, skeleton)
+    blob = nativeGLB(model, skeleton, single_sheet=not entry.attach_textures)
     # Content-addressed texture files keep old imported materials stable and
     # avoid basename collisions across mods. Mesh GLBs are always rebuilt.
     folder = Path(bpy.path.abspath(output_folder)) / '.med2-native' / 'textures'
     folder.mkdir(parents=True, exist_ok=True)
     textures = textureFiles(root, vanilla, entry, faction, folder)
+    return importPrepared(context, unit_name, path, skeleton_name, blob, textures, folder, started)
+
+
+def importPrepared(context, unit_name, path, skeleton_name, blob, textures, folder, started):
+    from .importer import materialWorkflow, selectionBoundingBox, hideVariations
     existing = {kind: set(getattr(bpy.data, kind)) for kind in ('objects', 'meshes', 'armatures', 'materials', 'images')}
     selected, active = list(context.selected_objects), context.view_layer.objects.active
     try:
@@ -208,7 +214,7 @@ def importModel(context, model_id, unit_name, faction, output_folder):
         width, z_offset = selectionBoundingBox()
         if context.scene.med2_toolkit_units.hide_toggle:
             hideVariations()
-        print('Built-in battle import %s: %.3fs' % (model_id, time.perf_counter()-started))
+        print('Built-in battle import %s: %.3fs' % (unit_name, time.perf_counter()-started))
         return 2, width, z_offset
     except Exception:
         for kind in existing:
@@ -219,3 +225,52 @@ def importModel(context, model_id, unit_name, faction, output_folder):
             obj.select_set(True)
         context.view_layer.objects.active = active
         raise
+
+
+def importEngine(context, engine_id, unit_name, output_folder):
+    started = time.perf_counter()
+    value = selectedModFolder(context).strip().strip('"')
+    if not value:
+        raise ValueError('Select a mod data folder in Paths first')
+    root = Path(bpy.path.abspath(value)).resolve()
+    vanilla = Path(bpy.path.abspath(context.scene.med2_toolkit_reader.directory_med2)) / 'data'
+    descriptor = resolveStratPath(root, 'descr_engines.txt', vanilla)
+    if descriptor is None:
+        raise ValueError('No unpacked descr_engines.txt')
+    entries = engines.parse_file(descriptor).get_all(engine_id)
+    if len(entries) != 1:
+        raise ValueError('Engine is missing or has culture/variant alternatives; use IWTE: %s' % engine_id)
+    groups = [g for g in entries[0].groups if g.name.casefold() == 'normal']
+    if len(groups) != 1 or not groups[0].meshes:
+        raise ValueError('Engine has no unambiguous normal model: %s' % engine_id)
+    group = groups[0]
+    path = resolveStratPath(root, group.meshes[0], vanilla)
+    descriptor = resolveStratPath(root, 'descr_engine_skeleton.txt', vanilla)
+    if path is None or descriptor is None:
+        raise ValueError('Engine mesh or skeleton descriptor is not unpacked: %s' % engine_id)
+    skeleton_entry = engines.parse_skeleton_file(descriptor).get(group.skeleton)
+    defaults = [p for key, p in skeleton_entry.anims if key == 'default'] if skeleton_entry else []
+    animation = resolveStratPath(root, defaults[0], vanilla) if len(defaults) == 1 else None
+    if animation is None:
+        raise ValueError('Engine default skeleton CAS is missing or ambiguous: %s' % group.skeleton)
+    skeleton = casanim.read_anim(animation)
+    # IWTE excludes the CAS container root from its exported armature.
+    if skeleton.tracks and skeleton.tracks[0].name.casefold() in ('scene root', 'sceneroot'):
+        container = skeleton.tracks[0]
+        if any(abs(v) > 1e-6 for v in container.pivot):
+            raise ValueError('Engine scene root has a nonzero pivot; use IWTE')
+        skeleton.tracks = skeleton.tracks[1:]
+        for track in skeleton.tracks:
+            track.parent -= 1
+    model = mesh.read_mesh(path)
+    if not model.weights or not model.bones:
+        raise ValueError('Engine mesh has no skin; use IWTE')
+    paths = engines.mesh_textures(path)
+    if len(paths) not in (2, 3) or (len(paths) == 3 and 'overlay' not in paths[2].casefold()):
+        raise ValueError('Engine texture layout is unsupported; use IWTE: %s' % engine_id)
+    entry = SimpleNamespace(main_textures=[SimpleNamespace(faction='all', texture=paths[0], normal=paths[1])], attach_textures=[])
+    folder = Path(bpy.path.abspath(output_folder)) / '.med2-native' / 'textures'
+    folder.mkdir(parents=True, exist_ok=True)
+    textures = textureFiles(root, vanilla, entry, 'all', folder)
+    blob = nativeGLB(model, skeleton, single_sheet=True)
+    return importPrepared(context, unit_name, path, group.skeleton, blob, textures, folder, started)

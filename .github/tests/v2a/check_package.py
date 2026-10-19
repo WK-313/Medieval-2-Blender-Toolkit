@@ -36,7 +36,7 @@ try:
     directories = importlib.import_module(module_name + ".directories")
     reader = bpy.context.scene.med2_toolkit_reader
     assert all(getattr(reader, key) == directories.DEFAULT_BACKENDS[key] for key in directories.DEFAULT_BACKENDS)
-    for name in ("mesh", "cas", "casanim", "animpack", "modelexport", "skelslots", "modeldb"):
+    for name in ("mesh", "cas", "casanim", "animpack", "modelexport", "skelslots", "modeldb", "engines"):
         importlib.import_module(module_name + ".m2formats." + name)
     importlib.import_module(module_name + '.tasks.strat_cas_export')
     importlib.import_module(module_name + '.tasks.animation_engine')

@@ -71,3 +71,10 @@ is copied unchanged. Source checkout: `3cfef41839a34bf0ad59f8912fc3c04622cb8876`
 `parse_entry`; repair and editing workflows are omitted. The two BOM constants are
 inlined from keyblock to avoid application dependencies. Original source SHA-256: `5846a00a99bed32a9a2e0064c0ae0857325a4d0a96e46817e4f76bdd94c92cdd`.
 Source checkout: `3cfef41839a34bf0ad59f8912fc3c04622cb8876`.
+
+## Engine readers (2026-10-19)
+
+`engines.py` retains engine/model-group and engine-skeleton records, parsing and raw
+serialization, plus embedded texture-path lookup. Editing helpers are omitted.
+Raw text is decoded directly as Latin-1 without the keyblock dependency.
+Original source SHA-256: `636498fc0d6797c8bdcaafb6fcef27c92bb5314d2d51c5e26e898a5210bca5ad`.

@@ -588,6 +588,9 @@ def prepareConversions(model_folder, unit_info_list, import_officers):
     """Everything the batch needs and has not got, appended to the IWTE task
     files but NOT handed to IWTE - the caller runs one conversion for the lot
     and watches it. Returns the list of conversions to run."""
+    if battle_import.enabled():
+        # Native models are built per queue entry; errors stay with that entry.
+        return []
     unitTaskWriter()
     engineTaskWriter()
     missing_units, missing_engines = [], []
@@ -740,9 +743,6 @@ class BatchImportBase:
 
     def startBatch(self, context, unit_info_list, import_officers, hide_variations):
         global _import_job
-        if self.mode == 'faction' and battle_import.enabled(context):
-            self.report({'ERROR'}, "Built-in faction import is not available yet; choose IWTE")
-            return {'CANCELLED'}
         model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
         saveFolderPaths()
         saveSettings()

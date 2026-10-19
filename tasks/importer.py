@@ -45,8 +45,6 @@ def selectionBoundingBox():
 
 def unitChecker(model_folder, unit_list, upgrade, defer=False):
     if battle_import.enabled():
-        if any(unit['Attachment'] != 'unused' for unit in unit_list):
-            raise ValueError('Built-in import currently supports infantry; choose IWTE for mounts and siege engines')
         return [], []
     # defer=True appends the missing models to the task files but does NOT hand
     # them to IWTE, and returns (units, engines) so the caller can run one
@@ -240,6 +238,30 @@ def placeMember(member_object, role, member_coordinates, member_width, member_z,
 
 
 def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, apply_offset=True):
+    if not battle_import.enabled():
+        return _unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, apply_offset)
+    # A native mounted/engine unit is one operation. If a later crew member
+    # fails, discard the partial unit rather than leave an unlisted mount.
+    existing = {kind: set(getattr(bpy.data, kind)) for kind in
+                ('objects', 'meshes', 'armatures', 'materials', 'images', 'collections')}
+    selected = list(bpy.context.selected_objects)
+    active = bpy.context.view_layer.objects.active
+    original_coordinates = list(coordinates)
+    try:
+        return _unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, apply_offset)
+    except Exception:
+        for kind, previous in existing.items():
+            collection = getattr(bpy.data, kind)
+            for item in set(collection) - previous:
+                collection.remove(item, do_unlink=True)
+        coordinates[:] = original_coordinates
+        for obj in selected:
+            obj.select_set(True)
+        bpy.context.view_layer.objects.active = active
+        raise
+
+
+def _unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, apply_offset=True):
     # apply_offset=False lets a caller place this exact `coordinates` (e.g.
     # stacking a unit's armour upgrades on Z) without the auto x-spacing below,
     # which otherwise fires on any non-origin `coordinates` regardless of axis.
@@ -296,7 +318,7 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
         mount_info = attachment_dictionary[unit_attachment[1]]
         mount_model = bmdb_dictionary[mount_info['Model']]
         existing = set(bpy.data.objects)
-        result, width, z_offset = modelImporter(model_folder, unit_name, faction_id, mount_model, model_id)
+        result, width, z_offset = modelImporter(model_folder, unit_name, faction_id, mount_model, mount_info['Model'])
         mount_object = importedArmature(existing) if result != 0 else None
         if mount_object:
             if apply_offset and coordinates != [0, 0, 0]:
@@ -392,6 +414,8 @@ def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, appl
 
 
 def engineImporter(model_folder, unit_name, faction_id, engine_model):
+    if battle_import.enabled():
+        return battle_import.importEngine(bpy.context, Path(engine_model).stem, unit_name, model_folder)
     # the Unit Output path is joined onto bare file names below, and the
     # Paths field holds it with a trailing separator only when it was
     # browsed to rather than typed
