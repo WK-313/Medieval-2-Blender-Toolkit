@@ -71,8 +71,21 @@ def restSkeleton(root, entry, secondary=False):
     by_name = {t.name.casefold(): i for i, t in enumerate(tracks)}
     if len(by_name) != len(tracks):
         raise ValueError('Duplicate skeleton bone names')
-    for weapon in weapons:
+    # Unit mesh influences address skeleton slots, not the advisory mesh bone
+    # labels. Humanoid skeletons reserve four weapon slots after 20 body bones.
+    humanoid = len(tracks) == 20 and 'bone_rhand' in by_name and 'bone_lhand' in by_name
+    if humanoid:
+        tracks.extend([
+            casanim.Track('bone_weapon_group01', by_name['bone_rhand'], (0, 0, 0)),
+            casanim.Track('bone_weapon_group02', 20, (0, 0, 0)),
+            casanim.Track('bone_weapon_group03', by_name['bone_lhand'], (0, 0, 0)),
+            casanim.Track('bone_weapon_group04', 20, (0, 0, 0)),
+        ])
+    if len(weapons) > 2:
+        raise ValueError('More than two weapon skeletons; use IWTE')
+    for weapon_index, weapon in enumerate(weapons):
         remap = {}
+        slot = 20 + weapon_index * 2
         for index, (bone, parent, pivot) in enumerate(table(weapon)):
             key = bone.casefold()
             if key in by_name:
@@ -80,13 +93,20 @@ def restSkeleton(root, entry, secondary=False):
                 continue
             if parent not in remap:
                 raise ValueError('Weapon skeleton %s has no matching body anchor: %s' % (weapon, bone))
-            remap[index] = len(tracks)
-            by_name[key] = len(tracks)
-            tracks.append(casanim.Track(bone, remap[parent], tuple(pivot)))
+            if humanoid:
+                if slot >= 22 + weapon_index * 2:
+                    raise ValueError('Weapon skeleton exceeds its two slots; use IWTE: %s' % weapon)
+                remap[index] = slot
+                tracks[slot] = casanim.Track(bone, remap[parent], tuple(pivot))
+                slot += 1
+            else:
+                remap[index] = len(tracks)
+                tracks.append(casanim.Track(bone, remap[parent], tuple(pivot)))
+            by_name[key] = remap[index]
     return casanim.Animation(source=name, tracks=tracks), name
 
 
-def nativeGLB(model, skeleton, single_sheet=False):
+def nativeGLB(model, skeleton, single_sheet=False, indexed_bones=False):
     """Keep the shared encoder, adapting its viewer axes and merged parts to IWTE.
 
     Shared export mirrors X; Blender maps glTF (x,y,z) to (x,-z,y).
@@ -94,6 +114,10 @@ def nativeGLB(model, skeleton, single_sheet=False):
     """
     model = copy.deepcopy(model)
     skeleton = copy.deepcopy(skeleton)
+    for track in skeleton.tracks:
+        track.name = track.name.replace(' ', '__')
+    if indexed_bones:
+        model.bones = [track.name for track in skeleton.tracks]
     weighted = set()
     for vertex in range(model.vertices):
         for weight, bone in ((model.weights[vertex*2], model.bone_ids[vertex*4+2]),
@@ -126,11 +150,21 @@ def nativeGLB(model, skeleton, single_sheet=False):
     document['materials'] = [{'name': 'characterlod0__' + role,
                               'pbrMetallicRoughness': {'metallicFactor': 0, 'roughnessFactor': .5}}
                              for role in ('main', 'attach')]
+    used_names = set()
     for group, primitive in zip((g for g in model.groups if g.indices), merged['primitives']):
-        if group.sheets == 'both' and not single_sheet:
-            raise ValueError('A mesh part crosses main and attachment sheets: %s; use IWTE' % group.name)
-        name = '%s__%s%s' % (group.name, group.texture_group, '__opt' if group.optional else '')
-        primitive['material'] = 1 if group.sheets == 'attach' and not single_sheet else 0
+        base = '%s__%s' % (group.name, group.texture_group.replace(' ', '__'))
+        suffix = '__opt' if group.optional else ''
+        name = base + suffix
+        duplicate = 0
+        while name in used_names:
+            name = base + str(duplicate) + suffix
+            duplicate += 1
+        used_names.add(name)
+        # IWTE assigns one sheet per part: any referenced U beyond the first
+        # tile selects attach, including parts crossing a tile edge. Keep the
+        # original UVs and object boundaries for the existing export workflow.
+        attach = not single_sheet and any(model.uvs[v * 2] > 1.0 for v in group.indices)
+        primitive['material'] = 1 if attach else 0
         document['meshes'].append({'name': name, 'primitives': [primitive]})
         node = dict(mesh_node, name=name, mesh=len(document['meshes'])-1)
         document['nodes'].append(node)
@@ -173,7 +207,7 @@ def importModel(context, model_id, unit_name, faction, output_folder):
     model = mesh.read_mesh(path)
     if not model.weights or not model.bones:
         raise ValueError('Built-in infantry import needs a skinned mesh; use IWTE for this model')
-    blob = nativeGLB(model, skeleton, single_sheet=not entry.attach_textures)
+    blob = nativeGLB(model, skeleton, single_sheet=not entry.attach_textures, indexed_bones=True)
     # Content-addressed texture files keep old imported materials stable and
     # avoid basename collisions across mods. Mesh GLBs are always rebuilt.
     folder = Path(bpy.path.abspath(output_folder)) / '.med2-native' / 'textures'

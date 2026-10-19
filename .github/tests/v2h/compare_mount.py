@@ -32,7 +32,7 @@ def snapshot(file):
  return bones,parts,normals
 ref=snapshot(Path(os.environ['MED2_IWTE_GLB']) if os.environ.get('MED2_IWTE_GLB') else root/'tests/v2g/iwte/du_kn_lod0.glb')
 with tempfile.TemporaryDirectory() as temp:
- path=Path(temp)/'native.glb';path.write_bytes(bridge.nativeGLB(m,skel,single_sheet=not e.attach_textures));actual=snapshot(path)
+ path=Path(temp)/'native.glb';path.write_bytes(bridge.nativeGLB(m,skel,single_sheet=not e.attach_textures,indexed_bones=True));actual=snapshot(path)
 print('BONES extra reference',set(ref[0])-set(actual[0]),'extra native',set(actual[0])-set(ref[0]))
 for name,(parent,pos) in actual[0].items():
  assert name in ref[0],name

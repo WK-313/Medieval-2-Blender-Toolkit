@@ -14,4 +14,10 @@ Use `.github/tests` instead of `tests` in the repository. `check_engines.py` com
 
 `run_faction_corpus.py` is a diagnostic for the real England faction. It reports unsupported/missing assets separately; successful queue completion does not imply every model imported. Full TATR faction and interactive/game validation remain outstanding.
 
-Supported engine input currently requires one type definition, one normal model group, a default loose skeleton CAS and one embedded diffuse/normal texture pair (an optional overlay is ignored, as in the existing Blender material workflow). Culture/variant alternatives, dual-sheet-crossing parts and mismatched weighted bones remain explicit failures. Backend defaults remain IWTE.
+Supported engine input currently requires one type definition, one normal model group, a default loose skeleton CAS and one embedded diffuse/normal texture pair (an optional overlay is ignored, as in the existing Blender material workflow). Culture/variant alternatives and out-of-range skeleton-slot influences remain explicit failures. Backend defaults remain IWTE.
+
+## Boundary sheets and skeleton slots
+
+`compare_sheets.py` uses the same `MED2_MODEL` / `MED2_IWTE_GLB` interface and additionally checks material assignments. Verified references: dunedain_infantry, mount_light_wolf, mount_simple_horse, dismounted_numenorians, morgul_uruks, gundabad_trolls_new, mount_giant_spider and elephant_crew2. It compares oriented corners, weights, UVs, every bone parent/pivot and per-part materials. Imported corner-normal components use a maximum absolute tolerance of 0.0005; the highest observed difference was 0.000423. Repeated corner positions retain all normals in the comparison rather than overwriting one value.
+
+These references establish the battle mesh influence mapping by skeleton slot, including the four humanoid weapon slots. Engine influences retain name mapping, independently verified against the catapult reference. Part names preserve group names, encode spaces within mesh names as IWTE does and append numeric suffixes for duplicate mesh names. Texture-sheet boundary crossings follow the independent IWTE assignments without changing UVs or splitting objects.
