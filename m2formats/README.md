@@ -78,3 +78,27 @@ Source checkout: `3cfef41839a34bf0ad59f8912fc3c04622cb8876`.
 serialization, plus embedded texture-path lookup. Editing helpers are omitted.
 Raw text is decoded directly as Latin-1 without the keyblock dependency.
 Original source SHA-256: `636498fc0d6797c8bdcaafb6fcef27c92bb5314d2d51c5e26e898a5210bca5ad`.
+
+## Mesh writer (2026-10-19)
+
+`meshwrite.py` is adapted from the donor, together with the optional
+layout metadata and byte-reader/writer entry points in `mesh.py`. The addon-only
+`entry_view` implementation remains independent of the donor gamepack application
+integration. The writer preserves archive bookkeeping, raw unchanged streams, bone
+links and the LOD/material trailer; it also writes changed or new models.
+
+- Original `mesh.py` SHA-256: `76aff98619ad3d1623812c1cfe26c3effbe7d42de183615b51820bcc90ae3cf1`.
+- Original `meshwrite.py` SHA-256: `dfc7f5acb4c81e8a3a2684a5bcc5e7f8b4cbc4f77fc1b3fc61bff5cd3a9b38f2`.
+
+The reader now decodes supported archives with the strict grammar before falling
+back to the older stream search for other variants. This avoids false stream
+matches in small meshes. Layout attachment accepts the already parsed archive
+to avoid parsing twice; the strict reader also records the trailer boundary.
+
+Round-trip reads (`layout=True`) reject unsupported archives instead of returning
+partial geometry. The writer also rejects incomplete attribute arrays, triangles
+and bone-link tables before serializing a malformed archive.
+
+The strict-reader and writer-validation changes are shared with Unit Transfer;
+`meshwrite.py` is identical in both projects. The addon keeps its own `entry_view`
+adapter. Small-model regressions cover both copies.
