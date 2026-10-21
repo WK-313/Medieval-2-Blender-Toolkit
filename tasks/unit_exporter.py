@@ -8,6 +8,7 @@ from pathlib import Path
 from .export_checks import (deselectAll, materialImages, activeExportArmature, exportSettings,
                             imageBaseName, textureBaseName)
 from ..directories import loadStoredValue
+from ..m2formats.mesh import MeshError
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
 from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask, usesWine, winePath, wineWrap
 from .iwte_tasks import applySkeletonTask
@@ -688,3 +689,29 @@ def exportToMeshIWTE(context):
 
     mesh_path = os.path.join(unit_folder, unit_name + ".mesh")
     return startIWTETask(iwte_exe, iwte_dir, task_path, mesh_path)
+
+
+def exportToMesh(context):
+    """Dispatch conversion of the last exported GLB using the saved backend."""
+    reader = context.scene.med2_toolkit_reader
+    if getattr(reader, 'backend_battle_export', 'IWTE') != 'BUILTIN':
+        return exportToMeshIWTE(context)
+    settings = exportSettings(context)
+    if settings is None:
+        return 'Select an Armature'
+    glb_path = clean_path(settings.last_exported_glb)
+    if not os.path.isfile(glb_path):
+        return 'No exported GLB found'
+    if not settings.iwte_task_template:
+        applySkeletonTask(activeExportArmature(context))
+    template = settings.iwte_task_template or defaultTaskTemplate(reader)
+    if not template or not os.path.isfile(clean_path(template)):
+        return 'Select a unit task template to define the game bone order'
+    try:
+        from .battle_export import exportGLBToMesh
+        path, model = exportGLBToMesh(glb_path, clean_path(template))
+    except (OSError, ValueError, KeyError, IndexError, struct.error, MeshError) as error:
+        return 'Built-in battle export failed: %s' % error
+    return {'builtin': True, 'output_path': str(path),
+            'message': 'Wrote %s: %d parts, %d vertices, %d triangles' % (path.name, len(model.groups), model.vertices, model.triangles),
+            'warnings': model.notes}

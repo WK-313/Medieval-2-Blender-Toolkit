@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty, FloatProperty
 from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJsonCached
-from ..tasks.unit_exporter import exportArmatureGLB, exportToMeshIWTE, open_folder, selectedModFolder, defaultTaskTemplate, bmdbEntryText, normalFileName
+from ..tasks.unit_exporter import exportArmatureGLB, exportToMesh, open_folder, selectedModFolder, defaultTaskTemplate, bmdbEntryText, normalFileName
 from ..tasks.export_checks import runSelectCleanup, exportMeshes, uniqueMaterials, materialImages, activeExportArmature, exportSettings, forceTextures, baseName, checkUVSpace, deselectAll, autoAssignMaterials, autoAssignUV, CLEANUP_PASSES, imageBaseName, textureBaseName
 from ..tasks.bmdb_writer import parseRelativeUnitPath, parseSpriteAndFooter, bmdbEntryNames
 from ..tasks.iwte_run import (IWTE_OUTPUT_TIMEOUT, abortIWTEJob, finishIWTEJob,
@@ -961,8 +961,8 @@ _iwte_job = None
 
 class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
     bl_idname = "medieval2toolkit.export_unit_iwte_mesh"
-    bl_label = "Export to Mesh (IWTE)"
-    bl_description = "Send the last exported GLB to IWTE to convert it into a .mesh file, showing progress until the conversion finishes."
+    bl_label = "Convert to Mesh"
+    bl_description = "Convert the last exported GLB to a .mesh with the selected conversion backend and task-template bone order"
     bl_options = {"REGISTER"}
 
     _timer = None
@@ -974,10 +974,15 @@ class MED_2_TOOLKIT_OT_Export_Unit_IWTE_Mesh(bpy.types.Operator):
     def execute(self, context):
         global _iwte_job
         saveFolderPaths()
-        result = exportToMeshIWTE(context)
+        result = exportToMesh(context)
         if isinstance(result, str):
             self.report({'ERROR'}, result)
             return {'CANCELLED'}
+        if result.get('builtin'):
+            findings = [('INFO', result['message'])] + [('WARNING', note) for note in result['warnings']]
+            showResultsPopup(context, 'Built-in mesh export', findings)
+            self.report({'INFO'}, result['message'])
+            return {'FINISHED'}
         _iwte_job = result
         if bpy.app.background or context.window is None:
             # Headless: no event loop for timers, wait for IWTE and then poll
@@ -1464,14 +1469,15 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
         if export_data.last_export_dir:
             layout.operator("medieval2toolkit.open_export_folder", icon='FILE_FOLDER')
         layout.separator()
-        layout.label(text="IWTE")
+        builtin = context.scene.med2_toolkit_reader.backend_battle_export == 'BUILTIN'
+        layout.label(text="Built-in mesh conversion" if builtin else "IWTE")
         col = layout.column(align=True)
         row = col.row(align=True)
         row.prop(export_data, "iwte_task_template", text="Task Template")
         row.operator("medieval2toolkit.browse_task_template", icon='FILEBROWSER', text="")
         if export_data.iwte_task_template:
             file_name = os.path.basename(export_data.iwte_task_template.strip('"').strip("'"))
-            col.label(text="IWTE task file selected: %s" % file_name, icon='FILE_TEXT')
+            col.label(text="Task file selected: %s" % file_name, icon='FILE_TEXT')
         else:
             fallback = defaultTaskTemplate(context.scene.med2_toolkit_reader)
             if fallback:
@@ -1484,7 +1490,7 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
             layout.progress(factor=iwteProgress(elapsed), type='BAR',
                             text="%s %s... %ds" % (verb, _iwte_job['output_name'], int(elapsed)))
         else:
-            layout.operator("medieval2toolkit.export_unit_iwte_mesh", icon='MOD_ARMATURE')
+            layout.operator("medieval2toolkit.export_unit_iwte_mesh", icon='MOD_ARMATURE', text="Convert to Mesh (Built-in)" if builtin else "Convert to Mesh (IWTE)")
         if context.mode != 'OBJECT':
             layout.enabled = False
 
