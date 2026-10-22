@@ -58,5 +58,14 @@ with tempfile.TemporaryDirectory(prefix='v2b_test_') as tmp:
     rigs=[o for o in bpy.data.objects if o.type=='ARMATURE' and 'med2_strat_import_metadata' in o]
     check(len(rigs)==4,'saved rig count');check(all(json.loads(o['med2_strat_import_metadata'])['scale']==2.7 for o in rigs),'saved metadata')
     print('PASS blend reload preserves four model provenance records',flush=True)
+    degenerate=DATA/'models_strat'/'grima.cas'
+    raw=cas.read_cas(degenerate)
+    bad=sum(len(set(o.indices[i:i+3]))<3 for o in raw.objects for i in range(0,len(o.indices),3))
+    check(bad>0,'grima.cas no longer has degenerate triangles; pick another fixture')
+    report,rig=imp.importStratCAS(bpy.context,degenerate)
+    check(rig is not None,str(report))
+    check(sum(len(o.data.polygons) for o in rig.children if o.type=='MESH')==raw.triangles-bad,'degenerate triangle count')
+    check(any('%d degenerate' % bad in message for level,message in report),'degenerate triangles not reported')
+    print('PASS degenerate triangles skipped without crashing',bad,flush=True)
     (OUTPUT/'native-results.json').write_text(json.dumps(summary,indent=2))
     addon.unregister()

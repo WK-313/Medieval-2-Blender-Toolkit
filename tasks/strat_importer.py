@@ -202,11 +202,18 @@ def importStratCAS(context, cas_path, *, metadata=None, texture_path=None):
         bpy.ops.object.mode_set(mode='OBJECT')
         loaded_materials = {}
         resolved_texture = str(texture_path or '')
+        dropped = 0
         for source in scene.objects:
             positions = cas.posed_positions(source, world)
             vertices = [casToBlender(positions[i:i + 3]) for i in range(0, len(positions), 3)]
             # Swapping Y/Z reflects handedness, so reverse triangle winding.
             faces = [tuple(reversed(source.indices[i:i + 3])) for i in range(0, len(source.indices), 3)]
+            # Many shipped generals/heroes repeat a vertex within a triangle.
+            # Such a face is invalid in Blender and crashes the custom normal
+            # call below, and it draws nothing in game, so leave it out.
+            kept = [face for face in faces if len(set(face)) == 3]
+            dropped += len(faces) - len(kept)
+            faces = kept
             mesh = bpy.data.meshes.new(source.name)
             mesh.from_pydata(vertices, [], faces)
             mesh.update()
@@ -258,7 +265,9 @@ def importStratCAS(context, cas_path, *, metadata=None, texture_path=None):
         metadata['cas_pivots'] = list(scene.pivots)
         report.extend(finalizeStratImport(context, rig, metadata, str(cas_path), resolved_texture))
         report.append(('INFO', 'Imported %s: %d meshes, %d triangles, %d bones' %
-                       (Path(cas_path).name, len(scene.objects), scene.triangles, len(data.bones))))
+                       (Path(cas_path).name, len(scene.objects), scene.triangles - dropped, len(data.bones))))
+        if dropped:
+            report.append(('INFO', 'Skipped %d degenerate triangles (a vertex used twice); they have no area and do not render' % dropped))
         if metadata.get('scale'):
             report.append(('INFO', 'Campaign scale %s saved as metadata; editable model remains at native scale' % metadata['scale']))
         return report, rig
