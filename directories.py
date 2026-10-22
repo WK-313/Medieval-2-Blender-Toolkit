@@ -72,16 +72,16 @@ def modRoot(data_folder):
     return path[:cut + 1]
 
 # Keep the numeric enum values stable for preferences stored in .blend files.
-# Strat import is integrated; other built-in choices remain saved preferences.
+# Built-in converters are the default; saved backend choices are preserved.
 BACKEND_ITEMS = (
     ('BUILTIN', 'Built-in', 'Use the built-in converter when available for this job', 0),
     ('IWTE', 'IWTE', 'Use IWTE for this job', 1),
 )
 DEFAULT_BACKENDS = {
-    'backend_battle_import': 'IWTE',
-    'backend_battle_export': 'IWTE',
+    'backend_battle_import': 'BUILTIN',
+    'backend_battle_export': 'BUILTIN',
     'backend_strat_import': 'BUILTIN',
-    'backend_strat_export': 'IWTE',
+    'backend_strat_export': 'BUILTIN',
     'backend_settlement_import': 'IWTE',
 }
 

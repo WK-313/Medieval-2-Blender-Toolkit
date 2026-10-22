@@ -29,5 +29,5 @@ New-Item -ItemType Directory -Force $env:BLENDER_USER_SCRIPTS, $env:BLENDER_USER
 ```
 
 The package check verifies the vendored files byte for byte, installs the zip in
-that temporary profile, enables the addon, and checks fresh IWTE defaults.
+that temporary profile, enables the addon, and checks the current fresh-install backend defaults.
 These scripts live under `.github` so they are excluded from the addon package.

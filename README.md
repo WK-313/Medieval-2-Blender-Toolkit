@@ -1,6 +1,6 @@
 # Medieval 2: Total War — Blender Toolkit
 
-A complete asset pipeline for Medieval II: Total War modding, inside Blender. Import a mod's units, models and settlements, work on them, and export them back into the game's formats — textures, normal maps and a ready-made `battle_models.modeldb` entry included. Strat CAS import/export has a built-in backend; IWTE handles battle mesh and settlement conversion and remains available for CAS.
+A complete asset pipeline for Medieval II: Total War modding, inside Blender. Import a mod's units, models and settlements, work on them, and export them back into the game's formats — textures, normal maps and a ready-made `battle_models.modeldb` entry included. Battle mesh and strat CAS import/export have built-in backends. IWTE remains available for compatibility and handles settlement conversion.
 
 [![Latest release](https://img.shields.io/github/v/release/WK-313/Medieval-2-Blender-Toolkit?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases) [![Downloads](https://img.shields.io/github/downloads/WK-313/Medieval-2-Blender-Toolkit/total?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases)
 
@@ -53,7 +53,7 @@ Take a rigged model from Blender back into the game.
 - **BMDB entry generator** — faction ownership toggles, sprite and footer copied from any existing unit, and a duplicate-name warning against the mod's modeldb. The entry goes to a **Text File**, straight **into the mod**, or **Both**
 - **Install to Mod** writes the entry into `battle_models.modeldb`, keeps the header count correct, and copies the `.mesh` and `.texture` files across. Nothing is written before you have seen the full plan: name clashes offer rename / overwrite / skip, an overwrite states its cost, files are byte-compared so identical ones are not recopied, and the modeldb is backed up twice — once in the mod, once beside the exported files
 - **Probe BMDB** answers "what would this do to the mod?" without writing anything, in every mode. **Load Entry From Mod** (F3 search) reads an existing entry back into the panel for editing
-- **GLB → `.mesh` conversion through IWTE**, with a progress bar, an out-of-date IWTE warning, and a prompt to keep waiting, open the console or abort when a conversion runs long
+- **Built-in GLB → `.mesh` conversion** preserves UV/normal seams and optional parts, reduces skinning to the strongest two weights, and writes the game bind space and weapon bone table. Supports double-textured unit task templates at skeleton scale 1. Choose **IWTE** for other templates/scales; its progress and timeout controls remain available.
 - **Sample IWTE task files** for each bundled skeleton (2H, Archer, Crossbow, Jav, Spear, Sword), picked automatically from the skeleton the rig was parented to. Browsing to your own always overrides
 - All export settings are stored per-armature, so several units can share one `.blend`
 
@@ -97,7 +97,7 @@ Turn a finished battle unit into a campaign map model. The nine-step manual proc
 - **Create Strat Model** combines the main and attachment textures into a single `.tga` and remaps the UVs exactly (no Material Combiner needed), folds weights from bones the strat skeleton lacks into their nearest surviving bone, welds anything still loose, joins every mesh, re-rigs onto the strat skeleton at one bone per vertex, and builds on a copy in its own collection
 - Imported models can use the existing GLB/Convert workflow. Export preserves their bone order and stages the current diffuse image without changing scene materials; unchanged compatible DDS files are copied without recompression.
 - **Convert to .cas** uses the **Strat Export** backend in Paths or Convert. **Built-in** exports the selected rig's rest mesh directly to M2 CAS at skeleton scale 1.0, with one bone per vertex and UV/normal seams preserved. It stages the current diffuse texture and checks the CAS texture reference automatically. **Build + Convert** also works without IWTE.
-- **IWTE** remains selectable for other CAS formats or skeleton scales. Existing backend preferences are preserved; the default stays IWTE while campaign-map validation is pending.
+- **IWTE** remains selectable for other CAS formats or skeleton scales. New installations default to Built-in for battle and strat import/export; existing backend preferences are preserved. The exported diplomat has passed campaign rendering, movement and end-turn checks in Heirs of Elendil.
 - **Triangle count** is shown before you build and in the report — the campaign map crashes on load above 10,000 triangles
 - **Check .cas Texture** reads the texture name back out of the converted `.cas`; a mismatch there is what crashes the campaign map, and is otherwise found by opening the binary in a text editor
 - **Open Output Folder** shows the converted `.cas` and its `textures\` folder. Copying them into the mod's `data/models_strat` and writing the `descr_model_strat.txt` entry are still yours to do
@@ -164,9 +164,9 @@ Or install it manually from `Edit → Preferences → Add-ons → ⌄ → Instal
 
 > When **updating** an existing install, restart Blender afterwards.
 
-### 3. Install IWTE
+### 3. Optional IWTE compatibility backend
 
-The toolkit uses **IWTE** for battle `.mesh` and settlement `.world` conversion, and optionally for `.cas`. Download the latest version from [makanyane/IWTE](https://github.com/makanyane/IWTE) and point the toolkit's `IWTE` path at its folder in the Paths panel.
+The toolkit uses **IWTE** for settlement `.world` conversion and as an optional battle `.mesh` / strat `.cas` backend. Built-in battle import requires unpacked mesh and texture files; assets available only inside vanilla `.pack` archives must be extracted first or imported through IWTE. Download the latest version from [makanyane/IWTE](https://github.com/makanyane/IWTE) and point the toolkit's `IWTE` path at its folder in the Paths panel.
 
 **On Linux and macOS**, IWTE and the bundled `texconv` are Windows programs, so the toolkit runs them through **Wine** — the same way Medieval 2 itself is run there. Install Wine and make sure `wine` is on your `PATH`; a native `texconv` on `PATH` is used in preference to the bundled one. The rest of the addon is native.
 

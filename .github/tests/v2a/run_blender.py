@@ -144,6 +144,7 @@ def addon_settings(args, report):
         legacy = {ast.literal_eval(k): ast.literal_eval(v) for k, v in zip(literal_defaults.keys, literal_defaults.values) if k is not None}
         legacy = {k: v for k, v in legacy.items() if not k.startswith("backend_")}
         legacy.update(directory_iwte="C:/sentinel/IWTE/", sentinel="preserved")
+        config.parent.mkdir(parents=True, exist_ok=True)
         config.write_text(json.dumps(legacy))
         spec = importlib.util.spec_from_file_location("v2a_addon", copy / "__init__.py", submodule_search_locations=[str(copy)])
         addon = importlib.util.module_from_spec(spec)
@@ -155,6 +156,7 @@ def addon_settings(args, report):
             reader = bpy.context.scene.med2_toolkit_reader
             for key in directories.DEFAULT_BACKENDS:
                 check(getattr(reader, key) == directories.DEFAULT_BACKENDS[key], "legacy default " + key)
+                setattr(reader, key, "IWTE")
                 setattr(reader, key, "BUILTIN")
                 check(json.loads(config.read_text())[key] == "BUILTIN", "immediate save " + key)
                 check(directories.loadBackend(key) == "BUILTIN", "reload " + key)

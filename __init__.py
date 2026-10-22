@@ -1,10 +1,10 @@
 
 bl_info = {
-    "name" : "Medieval 2 Toolkit V1.5.2",
+    "name" : "Medieval 2 Toolkit V2.0.0",
     "author" : "WK",
     "description" : "Collection of tools and features for modders of Medieval 2: Total War",
     "blender" : (5, 0, 0),
-    "version" : (1, 5, 4),
+    "version" : (2, 0, 0),
     "location" : "",
     "warning" : "",
     "category" : "Generic"
