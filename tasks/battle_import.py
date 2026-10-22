@@ -20,7 +20,7 @@ def enabled(context=None):
     return (context or bpy.context).scene.med2_toolkit_reader.backend_battle_import == 'BUILTIN'
 
 
-def sources(context, model_id):
+def sources(context, model_id, faction=''):
     value = selectedModFolder(context).strip().strip('"')
     if not value:
         raise ValueError('Select a mod data folder in Paths first')
@@ -35,6 +35,12 @@ def sources(context, model_id):
         cached = (stamp, modeldb.parse_file(path))
         _databases[str(path)] = cached
     entries = [e for e in cached[1].entries if e.name.casefold() == model_id.casefold()]
+    # A mod may repeat an entry per faction group (HoE's elephant_crew3: one for
+    # england/hre, one for slave/merc). Same mesh and skeleton, so take the one
+    # listing this faction.
+    if len(entries) > 1 and len({(tuple(e.lods[:1]), tuple((a.primary_skeleton, a.secondary_skeleton) for a in e.animations)) for e in entries}) == 1:
+        owned = [e for e in entries if any(t.faction.casefold() == faction.casefold() for t in e.main_textures)]
+        entries = owned[:1] or entries[:1]
     if len(entries) != 1:
         raise ValueError('Model entry is missing or ambiguous: %s' % model_id)
     entry = entries[0]
@@ -118,6 +124,14 @@ def nativeGLB(model, skeleton, single_sheet=False, indexed_bones=False):
         track.name = track.name.replace(' ', '__')
     if indexed_bones:
         model.bones = [track.name for track in skeleton.tracks]
+    # Bone 255 marks "no bone"; some shipped meshes weight parts to it fully
+    # (HoE family_member_lod0's helmet backface). IWTE binds those to bone 0.
+    ids = bytearray(model.bone_ids)
+    for slot in range(1, len(ids), 4):
+        for offset in (0, 1):
+            if ids[slot + offset] == 255 and model.weights[(slot // 4) * 2 + (1 - offset)] > 0:
+                ids[slot + offset] = 0
+    model.bone_ids = bytes(ids)
     weighted = set()
     for vertex in range(model.vertices):
         for weight, bone in ((model.weights[vertex*2], model.bone_ids[vertex*4+2]),
@@ -202,7 +216,7 @@ def textureFiles(root, vanilla, entry, faction, folder):
 
 def importModel(context, model_id, unit_name, faction, output_folder):
     started = time.perf_counter()
-    root, vanilla, entry, path = sources(context, model_id)
+    root, vanilla, entry, path = sources(context, model_id, faction)
     skeleton, skeleton_name = restSkeleton(root, entry, context.scene.med2_toolkit_units.primary_secondary == 'secondary')
     model = mesh.read_mesh(path)
     if not model.weights or not model.bones:

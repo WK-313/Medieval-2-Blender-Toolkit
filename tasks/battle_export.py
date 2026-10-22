@@ -15,6 +15,50 @@ from mathutils import Matrix, Vector
 from ..m2formats import mesh, modelexport
 
 
+# The game's weapon bones and their skeleton slots after the task's own bones,
+# exactly as IWTE writes them. Tables naming bone_weapon_group01-04 load but
+# crash the game at random (battle load or exit): 2026-10-22, Heirs of Elendil.
+WEAPON_TABLE = (('bone_weapon01', 0), ('bone_weapon', 0), ('bone_weapon02', 1),
+                ('bone_weapon03', 2), ('bone_shield01', 2), ('bone_shield', 2),
+                ('bone_weapon04', 3))
+# Which game name each QOL weapon group skins to, as IWTE maps them.
+WEAPON_GROUPS = {'bone_weapon_group01': 'bone_weapon01', 'bone_weapon_group02': 'bone_weapon',
+                 'bone_weapon_group03': 'bone_weapon02', 'bone_weapon_group04': 'bone_weapon03'}
+
+
+def gameBoneTable(names):
+    """Game bone table, skeleton slots and the table index each joint name skins to."""
+    weapons = dict(WEAPON_TABLE)
+    body = [name for name in names if name not in WEAPON_GROUPS and name not in weapons]
+    table = body + [name for name, _ in WEAPON_TABLE]
+    links = list(range(len(body))) + [len(body) + slot for _, slot in WEAPON_TABLE]
+    if len(table) > 256:
+        raise ValueError('Supply between 1 and 256 game bone slots')
+    index = {name: i for i, name in enumerate(table)}
+    slots = {name: index[name] for name in body + list(weapons)}
+    slots.update({group: index[name] for group, name in WEAPON_GROUPS.items() if group in names})
+    return table, links, slots
+
+
+def pelvisBind(doc, skin, joint_names, accessor):
+    """Bind-space position of the skin's pelvis joint, or the origin without one."""
+    lowered = [name.lower() for name in joint_names]
+    if 'bone_pelvis' not in lowered or 'inverseBindMatrices' not in skin:
+        return Vector((0.0, 0.0, 0.0))
+    spec = doc['accessors'][skin['inverseBindMatrices']] if type(skin['inverseBindMatrices']) is int and 0 <= skin['inverseBindMatrices'] < len(doc.get('accessors', [])) else None
+    if not spec or spec.get('type') != 'MAT4':
+        raise ValueError('Skin inverse bind matrices must be MAT4')
+    rows = accessor(skin['inverseBindMatrices'])
+    if len(rows) != len(joint_names):
+        raise ValueError('Skin inverse bind matrix count differs from its joints')
+    m = rows[lowered.index('bone_pelvis')]
+    # glTF matrices are column-major
+    inverse_bind = Matrix([[m[c * 4 + r] for c in range(4)] for r in range(4)])
+    if abs(inverse_bind.determinant()) < 1e-12:
+        raise ValueError('Pelvis inverse bind matrix is singular')
+    return inverse_bind.inverted().to_translation()
+
+
 def meshFromGLB(path, bone_order):
     """Read static bind geometry, splitting seams and keeping two influences."""
     raw = Path(path).read_bytes()
@@ -40,9 +84,8 @@ def meshFromGLB(path, bone_order):
     names = [name.replace(' ', '__') for name in bone_order]
     if len(set(names)) != len(names):
         raise ValueError('Game bone-slot names must be unique')
-    slots = {name: index for index, name in enumerate(names)}
-    out = mesh.MeshFile(source=str(path), format='mesh', bones=list(bone_order),
-                        bone_links=list(range(len(bone_order))))
+    table, links, slots = gameBoneTable(names)
+    out = mesh.MeshFile(source=str(path), format='mesh', bones=table, bone_links=links)
     ids = bytearray()
     formats = {5120: 'b', 5121: 'B', 5122: 'h', 5123: 'H', 5125: 'I', 5126: 'f'}
     widths = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4, 'MAT4': 16}
@@ -99,7 +142,10 @@ def meshFromGLB(path, bone_order):
         joint_names = [item(nodes, index, 'joint').get('name', '') for index in skin['joints']]
         # glTF skinning ignores the mesh node transform. Positions are in
         # bind space; applying that node transform double-translates IWTE GLBs.
-        transform = reflect
+        # The game's bind space has the pelvis at the origin, but a Blender
+        # GLB puts the rig origin at the feet and bakes the rig's location in,
+        # so move the pelvis bind position (from its inverse bind matrix) to 0.
+        transform = reflect @ Matrix.Translation(-pelvisBind(doc, skin, joint_names, accessor))
         if abs(transform.to_3x3().determinant()) < 1e-12:
             raise ValueError('A battle part has a singular transform')
         normal_transform = transform.to_3x3().inverted().transposed()

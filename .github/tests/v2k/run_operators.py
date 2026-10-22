@@ -81,6 +81,15 @@ with tempfile.TemporaryDirectory(prefix='v2g_ops_') as temporary:
   assert written.triangles==4303 and len(written.groups)==26
   assert not Path(reader.directory_iwte).exists()
   print('PASS real Convert to Mesh operator: Built-in writes 26 parts/4303 triangles without IWTE',flush=True)
+  # 2026-10-22 game gates: an offset bind pose stretched every soldier, and
+  # bone_weapon_group names in the table crashed the game. The source rig was
+  # imported off the origin, so this also covers the baked rig location.
+  source_mesh=bridge.mesh.read_mesh(data/'unit_models/_Units/EN_Lmail_Hmail/du_kn_lod0.mesh')
+  for low,high in zip(written.bounds(),source_mesh.bounds()):
+   assert max(abs(a-b) for a,b in zip(low,high))<1e-3,(written.bounds(),source_mesh.bounds())
+  assert not any('weapon_group' in b for b in written.bones),written.bones
+  assert list(zip(written.bones[20:],written.bone_links[20:]))==[('bone_weapon01',20),('bone_weapon',20),('bone_weapon02',21),('bone_weapon03',22),('bone_shield01',22),('bone_shield',22),('bone_weapon04',23)],list(zip(written.bones,written.bone_links))
+  print('PASS game bind space (pelvis at origin) and IWTE weapon bone table',flush=True)
   if os.environ.get('MED2_GATE_OUTPUT'):
    target=Path(os.environ['MED2_GATE_OUTPUT']);target.parent.mkdir(parents=True,exist_ok=True)
    shutil.copy2(output,target)
