@@ -2,7 +2,7 @@
 
 A complete asset pipeline for Medieval II: Total War modding, inside Blender. Import a mod's units, models and settlements, work on them, and export them back into the game's formats — textures, normal maps and a ready-made `battle_models.modeldb` entry included. Battle mesh and strat CAS import/export have built-in backends. IWTE remains available for compatibility and handles settlement conversion.
 
-[![Latest release](https://img.shields.io/github/v/release/WK-313/Medieval-2-Blender-Toolkit?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases) [![Downloads](https://img.shields.io/github/downloads/WK-313/Medieval-2-Blender-Toolkit/total?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases)
+[![Latest release](https://img.shields.io/github/v/release/WK-313/Medieval-2-Blender-Toolkit?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases) [![Downloads](https://img.shields.io/github/downloads/WK-313/Medieval-2-Blender-Toolkit/total?style=for-the-badge)](https://github.com/WK-313/Medieval-2-Blender-Toolkit/releases) [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/htkpNjk5yq)
 
 > **Blender 5.0 or newer is recommended** — that is what the addon is developed and tested against. Windows, Linux and macOS.
 
