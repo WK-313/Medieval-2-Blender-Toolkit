@@ -46,6 +46,8 @@ Native imports rebuild the mesh each time and keep content-addressed DDS files i
 Take a rigged model from Blender back into the game.
 
 - **Check Model for Export** validates and auto-fixes a rig in one press: part naming (`x__y`), `.001` clashes, duplicate materials and slots, main/attach material detection, vertex weights, UV maps and tile placement, texture sizes and the IWTE task file. Every pass has its own tick box under **Check options**
+- **Transforms** on Check Model: leave, apply or reset each mesh's object transform before export
+- Only texture nodes wired to the material output are exported; **packed images** are written out and converted like files on disk
 - **Per-texture UV checking** — main textures in the first UV tile, attach textures in the tile to the right — with auto-select in the UV editor and an **Attempt to Auto-Assign UV** button
 - **GLB export** with automatic conversion to the game's `.texture` format (DXT5, bundled texconv), mipmaps, and non-DXT `.dds` sources recompressed rather than skipped. Anything that cannot be converted is reported with a reason
 - **Normal maps**: use the material's own, browse to a file on disk, generate a blank one, or **generate one from the diffuse** — a numpy port of the gimp-normalmap workflow, so no GIMP or external process is needed. The generated alpha is the game's specular map, so *Brightness* and *Contrast* set how shiny the unit reads
@@ -75,6 +77,9 @@ Render a faction's unit cards and unit info images without leaving Blender.
 - **Camera Follows Selection** makes the selected unit's camera the scene camera, from the armature, its control rig, any of its meshes, or any part of a mount
 - Presets for the 48x64 unit card, the 68x90 variant and the 180x230 info card, plus custom sizes. **Supersampling** renders a whole multiple and scales it back down
 - The **card compositor** reproduces the original card `.blend` node tree — rescale, colour adjust, sharpen — with the rescale first, so the sharpen bites at final card pixel size. It stays fully tweakable and is only rebuilt when the node chain changes version
+- **Sharpen** slider (default 0.6, the old files used 0.2), applied live to the compositor
+- **Per-unit zoom**: the selected unit's camera can keep its own zoom; the rest follow the default. **Camera Overlay** shows or hides the card frame guide
+- **Preview Card** renders the active card camera through the full pipeline into a temporary folder and opens it, without touching the card output folder
 - **Line Art Outline** — one Grease Pencil Collection Line Art object per unit collection, with thickness set in finished-card pixels
 - **Keep full-size render** and **Keep HD render** write extra passes into `full` and `hd` subfolders, the HD pass at up to 40x
 - **Isolate unit while rendering** switches everything else off for the length of a render. *Visible only* leaves anything you hid by hand off the card; on a mount, **Isolate scope** cards the whole unit or just the ticked parts
@@ -112,14 +117,16 @@ Turn a finished battle unit into a campaign map model. The nine-step manual proc
 ### QOL (rigging & cleanup)
 
 - **Weight transfer** between meshes with selectable vertex mapping and an optional smoothing pass
+- **Cut + Mirror** bisects the selected meshes at local X=0 and mirrors the kept side; **Apply Mirror + Weights** applies it and swaps left/right bone weights on the mirrored half
 - **Skeletons** — parent to a bundled game skeleton, rig with sample body weights, or a full setup including equipment props. The skeleton used is remembered and picks the matching IWTE task file
-- **IK control rigs** — `IK_Infantry`, `IK_Archer` and `IK_Dwarf`, parented over the unit with every non-weapon bone constrained to them, which is what the bundled pose library is written against. **Whole unit** covers a mount or siege engine in one press. **Remove Control Rig** un-parents and un-constrains cleanly
+- **IK control rigs** — `Auto` (archer layout for bow skeletons, infantry otherwise), `IK_Infantry`, `IK_Archer` and `IK_Dwarf`, parented over the unit with every non-weapon bone constrained to them, which is what the bundled pose library is written against. **Whole unit** covers a mount or siege engine in one press. **Remove Control Rig** un-parents and un-constrains cleanly
 - **Rename tools** — clean `.001` suffixes, switch bone case (`_R/_L` ↔ `_r/_l`), apply or swap game part prefixes (`weapon0__`, `shield0__`, …), toggle the `__opt` optional-part suffix
 - **Clean UV Maps** on the selected meshes, and SimpleBake helpers
 
 #### Game animations
 
 - Available in **Import**, **Export**, **Strat**, and **QOL**. Select a rig, open **Game Animations**, choose **Refresh Skeletons**, pick a skeleton, then **Load Actions**. Imported strat models suggest their own skeleton.
+- Imported battle units remember their EDU soldier skeleton and their BMDB entry's skeleton. The soldier one is selected on import, with a button to switch to either.
 - Filter by action family or search, select an action, then **Build & Play**. The browser lists source frames and duration, reads mod/vanilla packs and loose overrides, and plays a Blender Action without IWTE. The timeline preview range changes to fit the animation.
 - Switching keeps previous Actions. Unchanged animations reuse cached Actions, including after saving/reopening the blend. Changed sources, rig rest bones, frame rate, or edited/cleared curves rebuild the cache.
 - Playback requires a local rig without active bone constraints, NLA tracks or drivers that override it. Detach its control rig first; the existing pose-library controls remain available.
