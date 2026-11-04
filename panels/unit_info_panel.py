@@ -16,9 +16,10 @@ from ..tasks.card_renderer import (CAMERA_LENS, CAMERA_ORTHO_SCALE, CAMERA_PROJE
                                    HD_FOLDER, HD_PRESETS, LIGHT_AZIMUTH, LIGHT_DISTANCE, LIGHT_ELEVATION,
                                    LINE_ART_THICKNESS, MERC_FOLDER_NAMES, SOLID_COLOURS, SOLID_LIGHTING,
                                    SUN_STRENGTH, VIEW_TRANSFORMS,
-                                   applyRenderSettings, buildRenderQueue, cardCameras, cardFolders,
+                                   applyRenderSettings, buildRenderQueue, cardCameras, pushCardResolution, setCameraGuidesVisible, cardFolders,
                                    cardOutputParts, cardResolution, cardSuns, createCardCameras, defaultCardFolders,
                                    defaultLightStrength, deleteCardCameras, framingDistance, hdOrthoScale,
+                                   cameraForObject, cameraZoom, setCameraZoom,
                                    hdResolution,
                                    lineArtObjects, mercFolder, normalizeMercFolders, openRendersWindow,
                                    renderCard, renderedPaths, selectionCamera,
@@ -77,9 +78,32 @@ def cardFramingChanged(self, context):
 
 def cardLightPlacementChanged(self, context):
     """Move every card lamp onto the panel's placement without touching the cameras."""
-    distance = framingDistance(self)
     for camera in cardCameras(context.scene):
-        card_renderer.placeCardLight(camera, self, distance)
+        card_renderer.placeCardLight(camera, self, framingDistance(self, cameraZoom(camera, self)))
+
+
+def selectedCardCamera(context):
+    """The card camera of the unit the active object belongs to, or None."""
+    obj = context.object
+    if obj is None:
+        return None
+    if obj.type == 'CAMERA' and card_renderer.CAMERA_TAG in obj:
+        return obj
+    return cameraForObject(context.scene, obj)
+
+
+def getUnitZoom(self):
+    return cameraZoom(selectedCardCamera(bpy.context), self)
+
+
+def setUnitZoom(self, value):
+    camera = selectedCardCamera(bpy.context)
+    if camera is None:
+        # nothing selected has a camera, so this is the default every camera
+        # without a zoom of its own follows
+        self.card_zoom = value
+        return
+    setCameraZoom(camera, self, value)
 
 
 def lightDistanceChanged(self, context):
@@ -121,6 +145,20 @@ def cardLightTypeChanged(self, context):
 
 def cardLightChanged(self, context):
     pushCardLight(context.scene)
+
+
+def cardGuideChanged(self, context):
+    setCameraGuidesVisible(context.scene, self.show_guide)
+
+
+def cardSizeChanged(self, context):
+    """Reshape the card cameras' rectangle as soon as the card size changes,
+    rather than on the next Create Card Cameras or render."""
+    pushCardResolution(context.scene)
+
+
+def cardSharpenChanged(self, context):
+    card_renderer.setSharpen(context.scene, self.sharpen)
 
 
 def cardTargets(context):
@@ -261,14 +299,18 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
     # without the newer keys
     with open(script_folder/('text/menu_settings.json'), 'r') as settings_input:
             bool_settings = json.load(settings_input)
-    card_type: EnumProperty(name = "Card type", description = "Which image the renderer writes, and where", items = CARD_TYPE_ITEMS)
-    custom_size: BoolProperty(name = "Custom size", description = "Use a hand-picked card resolution instead of the card type's standard size", default = False)
-    card_width: IntProperty(name = "Width", description = "Card width in pixels", default = 48, min = 1, soft_max = 512)
-    card_height: IntProperty(name = "Height", description = "Card height in pixels", default = 64, min = 1, soft_max = 512)
+    card_type: EnumProperty(name = "Card type", description = "Which image the renderer writes, and where", items = CARD_TYPE_ITEMS, update = cardSizeChanged)
+    custom_size: BoolProperty(name = "Custom size", description = "Use a hand-picked card resolution instead of the card type's standard size", default = False, update = cardSizeChanged)
+    card_width: IntProperty(name = "Width", description = "Card width in pixels. The card cameras' rectangle follows it as you edit", default = 48, min = 1, soft_max = 512, update = cardSizeChanged)
+    card_height: IntProperty(name = "Height", description = "Card height in pixels. The card cameras' rectangle follows it as you edit", default = 64, min = 1, soft_max = 512, update = cardSizeChanged)
     supersample: IntProperty(name = "Supersampling", description = ("Render this many times the card size. The compositor's rescale Transform takes it "
                                                                     "back down, so everything after it - the sharpen especially - still acts at final "
                                                                     "card pixel size. 10 is the 480x640 render the old card .blend files used"),
-                             default = 10, min = 1, max = 16)
+                             default = 10, min = 1, max = 16, update = cardSizeChanged)
+    sharpen: FloatProperty(name = "Sharpen", description = ("How hard the compositor sharpens the card after taking it down to card size. "
+                                                            "0.2 is what the old card .blend files used and leaves a 48x64 card soft; past "
+                                                            "about 0.8 the mail and fur turn crunchy"),
+                           default = 0.6, min = 0.0, soft_max = 1.5, max = 3.0, update = cardSharpenChanged)
     render_samples: IntProperty(name = "Render samples", description = ("EEVEE render samples used for the cards. In Solid mode it picks the nearest "
                                                                         "Workbench anti-aliasing step instead"), default = 64, min = 1, soft_max = 512)
     render_mode: EnumProperty(name = "Render mode", description = "Which engine draws the cards, and how much of the unit's shading it uses",
@@ -292,9 +334,10 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                     default = True)
     world_ambient: FloatProperty(name = "Fill", description = "Brightness of the grey world. The reference files use 0.05",
                                  default = CARD_WORLD_AMBIENT, min = 0.0, soft_max = 1.0)
-    save_full_size: BoolProperty(name = "Keep full-size render", description = ("Also save the render before the compositor scales it down to card size, as an "
-                                                                                 "uncompressed PNG in a '%s' subfolder beside each card. It costs an extra "
-                                                                                 "render pass per unit, with the rescale switched off" % FULL_SIZE_FOLDER),
+    save_full_size: BoolProperty(name = "Keep full-size render", description = ("Also save a plain full-resolution render of each unit, as an uncompressed PNG "
+                                                                                 "in a '%s' subfolder beside each card. It is an extra render pass per unit with "
+                                                                                 "the compositor off - no rescale, blur or sharpen, like Blender's own camera "
+                                                                                 "render" % FULL_SIZE_FOLDER),
                                  default = False)
     save_hd: BoolProperty(name = "Keep HD render", description = ("Render each unit a second time at HD resolution and save that as a PNG in an '%s' "
                                                                    "subfolder beside its card. The rescale and the smoothing blur are switched off for "
@@ -328,6 +371,9 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                                                                "space, which is why this is not the old modifier's Line Thickness number. The default "
                                                                                "0.30 is the line unit_card_sample.blend draws"),
                                       default = LINE_ART_THICKNESS, min = 0.05, soft_max = 5.0)
+    show_guide: BoolProperty(name = "Camera Overlay", description = ("Show the card framing overlay (the unit card chrome) when looking through the "
+                                                                     "card cameras. Viewport only: it is never in the rendered card"),
+                             default = True, update = cardGuideChanged)
     add_sun: BoolProperty(name = "Add light", description = "Give each card camera its own light, aimed the same way as the camera. Only the light of the unit being rendered is lit", default = True)
     light_type: EnumProperty(name = "Light", description = "Which lamp each card camera carries", items = CARD_LIGHT_TYPES,
                              default = 'SUN', update = cardLightTypeChanged)
@@ -343,7 +389,7 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
                                                   "camera and every other unit looks off to the side. Cameras hidden by hand are never "
                                                   "switched to, and a hidden one that is already the scene camera is replaced by a visible one"),
                                    default = bool_settings.get('auto_card_camera', True))
-    control_rig_type: EnumProperty(name = "Control rig", description = "Which IK layout to build for the units", items = CONTROL_RIG_TYPES, default = 'infantry')
+    control_rig_type: EnumProperty(name = "Control rig", description = "Which IK layout to build for the units", items = CONTROL_RIG_TYPES, default = 'auto')
     lift_sunken: BoolProperty(name = "Lift sunken units", description = ("Set a unit standing in the ground down on it - raised by exactly how far its "
                                                                           "lowest point is below z=0 - so the card camera frames it like every other "
                                                                           "unit. A unit fully above the floor, or one parked below the scene, is left "
@@ -359,6 +405,11 @@ class MED_2_TOOLKIT_Card_Data(bpy.types.PropertyGroup):
     card_zoom: FloatProperty(name = "Card zoom", description = ("Width of the card cameras' frame in world units, measured across the longer side. "
                                                                  "Lower zooms in. It means the same thing in both projections"),
                              default = CAMERA_ORTHO_SCALE, min = 0.01, soft_max = 10.0, update = cardFramingChanged)
+    unit_zoom: FloatProperty(name = "Zoom", description = ("Zoom of the selected unit's own card camera: width of its frame in world units, "
+                                                            "measured across the longer side. Lower zooms in. Every camera keeps its own; with "
+                                                            "no unit selected this sets the default that new cameras, and cameras never "
+                                                            "zoomed on their own, follow"),
+                             min = 0.01, soft_max = 10.0, get = getUnitZoom, set = setUnitZoom)
     light_distance: FloatProperty(name = "Light distance", description = ("How far back the lamp stands from the point the camera is framing. The old rig "
                                                                            "parked it on the camera, which lights a unit dead flat; both reference card "
                                                                            "files stand it about 5.8 units back instead. Moving a point lamp carries its "
@@ -541,6 +592,22 @@ class MED_2_TOOLKIT_OT_Delete_Card_Cameras(bpy.types.Operator):
     def execute(self, context):
         removed = deleteCardCameras(context.scene)
         self.report({'INFO'}, "Removed %d card camera(s)" % removed)
+        return {'FINISHED'}
+
+
+class MED_2_TOOLKIT_OT_Reset_Card_Zoom(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.reset_card_zoom"
+    bl_label = "Use Default Zoom"
+    bl_description = "Drop the selected unit's own zoom so its card camera follows the default zoom again"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return selectedCardCamera(context) is not None
+
+    def execute(self, context):
+        setCameraZoom(selectedCardCamera(context), context.scene.med2_toolkit_cards, None)
+        self.report({'INFO'}, "Back on the default zoom")
         return {'FINISHED'}
 
 
@@ -855,7 +922,7 @@ class MED_2_TOOLKIT_OT_Preview_Card(bpy.types.Operator):
     bl_idname = "medieval2toolkit.preview_card"
     bl_label = "Preview Card"
     bl_description = ("Render the active card camera exactly as Render Cards would - same isolation, compositor "
-                      "and .tga.dds conversion - into a temporary folder and show the result. Nothing is "
+                      "and TGA output - into a temporary folder and show the result. Nothing is "
                       "written into the card output folder")
     bl_options = {"REGISTER"}
 
@@ -977,6 +1044,7 @@ class MED_2_TOOLKIT_PT_Card_Scene(bpy.types.Panel):
             row.prop(settings, "card_height", text="H")
         width, height = cardResolution(settings)
         col.prop(settings, "supersample", text="Supersampling")
+        col.prop(settings, "sharpen", text="Sharpen")
         col.prop(settings, "render_samples", text="Samples")
         col.label(text="Render %dx%d, card %dx%d" % (width*settings.supersample, height*settings.supersample, width, height), icon='RESTRICT_RENDER_OFF')
 
@@ -1008,10 +1076,11 @@ class MED_2_TOOLKIT_PT_Card_Scene(bpy.types.Panel):
             col.prop(settings, "hd_preset", text="")
             col.label(text="A second render per unit, into '%s'" % HD_FOLDER, icon='IMAGE_DATA')
             col.label(text="Rescale and smoothing blur off for this pass")
-            span = hdOrthoScale(settings, hd_width, hd_height)
+            hd_zoom = cameraZoom(selectedCardCamera(context), settings)
+            span = hdOrthoScale(settings, hd_width, hd_height, hd_zoom)
             if settings.camera_projection == 'PERSP':
                 col.label(text="Lens shortens to %.0fmm so the card's framing still fits"
-                               % (settings.camera_lens*settings.card_zoom/span))
+                               % (settings.camera_lens*hd_zoom/span))
             else:
                 col.label(text="Camera widens to %.2f so the card's framing still fits" % span)
         col.prop(settings, "save_full_size",
@@ -1034,12 +1103,21 @@ class MED_2_TOOLKIT_PT_Card_Scene(bpy.types.Panel):
         box = layout.box()
         box.label(text="Cameras, Lighting & Rigs", icon='CAMERA_DATA')
         col = box.column(align=True)
+        col.prop(settings, "show_guide", toggle=1, icon='HIDE_OFF' if settings.show_guide else 'HIDE_ON')
         col.prop(settings, "camera_projection", text="")
         if settings.camera_projection == 'PERSP':
             col.prop(settings, "camera_lens", text="Lens")
-        col.prop(settings, "card_zoom", text="Zoom")
+        zoom_camera = selectedCardCamera(context)
+        zoom = cameraZoom(zoom_camera, settings)
+        row = col.row(align=True)
+        if zoom_camera is None:
+            row.prop(settings, "unit_zoom", text="Default Zoom")
+        else:
+            row.prop(settings, "unit_zoom", text="Zoom (%s)" % zoom_camera.get(card_renderer.TARGET_TAG, zoom_camera.name))
+            if card_renderer.ZOOM_TAG in zoom_camera:
+                row.operator("medieval2toolkit.reset_card_zoom", text="", icon='LOOP_BACK')
         if settings.camera_projection == 'PERSP':
-            col.label(text="Standing %.2f back to frame %.2f" % (framingDistance(settings), settings.card_zoom),
+            col.label(text="Standing %.2f back to frame %.2f" % (framingDistance(settings, zoom), zoom),
                       icon='VIEW_PERSPECTIVE')
         row = col.row(align=True)
         row.prop(settings, "add_sun", text="Light", toggle=1)
@@ -1170,6 +1248,7 @@ classes = [
     MED_2_TOOLKIT_OT_Setup_Card_Scene,
     MED_2_TOOLKIT_OT_Create_Card_Cameras,
     MED_2_TOOLKIT_OT_Delete_Card_Cameras,
+    MED_2_TOOLKIT_OT_Reset_Card_Zoom,
     MED_2_TOOLKIT_OT_Look_Through_Card_Camera,
     MED_2_TOOLKIT_OT_Import_Card_Units,
     MED_2_TOOLKIT_OT_Shuffle_Card_Variations,

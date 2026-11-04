@@ -92,6 +92,8 @@ def cachedAction(rig, root, skeleton, row, fps):
 def suggestedSkeleton(rig):
     if rig is None:
         return ''
+    if rig.get('med2_soldier_skeleton') or rig.get('med2_model_skeleton'):
+        return rig.get('med2_soldier_skeleton') or rig.get('med2_model_skeleton')
     try:
         return json.loads(rig.get('med2_strat_import_metadata', '{}')).get('skeleton', '')
     except (ValueError, TypeError, AttributeError):

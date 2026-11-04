@@ -96,7 +96,8 @@ def eduEntries(cleaned, eop_file=''):
         models = unit_models if unit_models else ([unit_soldier] if unit_soldier else [])
         return {'Type': unit_type, 'ID': unit_id, 'Model': models, 'Officers': unit_officers,
                 'Formation': unit_formation, 'Attachment': unit_attachment, 'Owners': unit_ownership,
-                'Info Card': unit_info_dir, 'Unit Card': unit_card_dir, 'EOP': eop_file}
+                'Info Card': unit_info_dir, 'Unit Card': unit_card_dir, 'EOP': eop_file,
+                'Soldier': unit_soldier}
 
     entries = []
     for line in cleaned:

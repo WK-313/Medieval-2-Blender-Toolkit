@@ -1,6 +1,5 @@
-import os
 import re
-from .text_io import readModLines
+from . import modeldb
 
 def lp(s):
     """Length-prefix a string the way battle_models.modeldb expects."""
@@ -43,63 +42,26 @@ def buildEntry(model_name, relative_path, out_main, out_main_norm, sprite, out_a
     out.append(footer.replace("\\n", "\n"))
     return "\n".join(out)
 
-# An entry starts with "<len> <name>", then "1 <lod count>", then a .mesh line.
-ENTRY_START = re.compile(r"^\d+ (\S+)\s*\n1 \d+\s*\n\d+ \S+\.mesh", re.IGNORECASE | re.MULTILINE)
-
-# Parsed entry names per modeldb file, invalidated when the file's mtime changes,
-# so panel redraws don't re-read a multi-megabyte file.
-_entry_names_cache = {}
-
 def bmdbEntryNames(mod_folder):
     """All entry names (lowercased) in the mod's battle_models.modeldb, or None
-    if the mod has no modeldb file."""
-    modeldb_path = os.path.join(mod_folder, 'unit_models', 'battle_models.modeldb')
-    try:
-        mtime = os.path.getmtime(modeldb_path)
-    except OSError:
+    if the mod has no readable modeldb file.
+
+    Read with the token parser, not by matching lines: a mod's entries can have
+    trailing spaces, a scale other than 1 or LODs on one line, and a line match
+    missed 176 of Third Age Reforged's 1225 entries."""
+    db, _error = modeldb.loadModelDb(mod_folder)
+    if db is None:
         return None
-    cached = _entry_names_cache.get(modeldb_path)
-    if cached is not None and cached[0] == mtime:
-        return cached[1]
-    text = "".join(readModLines(modeldb_path, 'utf-8'))
-    names = {match.group(1).lower() for match in ENTRY_START.finditer(text)}
-    _entry_names_cache[modeldb_path] = (mtime, names)
-    return names
+    return {entry.name for entry in db.entries}
 
 def parseSpriteAndFooter(mod_folder, model_name):
     """Pull the sprite path and footer block of an existing model entry out of
     the mod's battle_models.modeldb. Returns (sprite, footer, error)."""
-    modeldb_path = os.path.join(mod_folder, 'unit_models', 'battle_models.modeldb')
-    if not os.path.isfile(modeldb_path):
-        return None, None, "No battle_models.modeldb found in %s" % mod_folder
-    text = "".join(readModLines(modeldb_path, 'utf-8'))
-
-    starts = [(m.start(), m.group(1)) for m in ENTRY_START.finditer(text)]
-    entry_text = None
-    for index, (offset, name) in enumerate(starts):
-        if name.lower() == model_name.lower():
-            end = starts[index + 1][0] if index + 1 < len(starts) else len(text)
-            entry_text = text[offset:end]
-            break
-    if entry_text is None:
+    db, error = modeldb.loadModelDb(mod_folder)
+    if db is None:
+        return None, None, error
+    entry = db.get(model_name)
+    if entry is None:
         return None, None, "Model '%s' not found in battle_models.modeldb" % model_name
-
-    sprite_match = re.search(r"\d+ (\S+\.spr)", entry_text, re.IGNORECASE)
-    sprite = sprite_match.group(1) if sprite_match else ""
-
-    # The footer starts right after the attachment texture block. Walk the two
-    # faction blocks (main: faction/texture/normal/sprite, attach:
-    # faction/texture/normal/empty-sprite) line-wise to find where it begins.
-    lines = entry_text.splitlines()
-    try:
-        cursor = 3  # name, "1 N", first mesh line
-        while cursor < len(lines) and ".mesh" in lines[cursor].lower():
-            cursor += 1
-        main_count = int(lines[cursor].split()[0]); cursor += 1
-        cursor += main_count * 4
-        attach_count = int(lines[cursor].split()[0]); cursor += 1
-        cursor += attach_count * 3
-        footer = "\n".join(lines[cursor:]).strip("\n")
-    except (ValueError, IndexError):
-        return sprite, None, "Could not parse the footer of '%s' (unusual entry layout)" % model_name
-    return sprite, footer, None
+    sprite = next((t.sprite for t in entry.main_textures if t.sprite and t.sprite != "0"), "")
+    return sprite, entry.footer(), None

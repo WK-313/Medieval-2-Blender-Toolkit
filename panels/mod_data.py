@@ -245,8 +245,9 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
                 col.label(text="Built-in exports M2 CAS at scale 1.0.")
                 col.prop(context.scene.med2_toolkit_reader, 'backend_strat_export')
             else:
-                col.label(text="Built-in conversion is not available yet.")
-                col.label(text="Jobs currently use IWTE.")
+                if mode == 'settlements':
+                    col.label(text="Built-in conversion is not available yet.")
+                    col.label(text="Jobs currently use IWTE.")
                 for key in backends:
                     col.prop(context.scene.med2_toolkit_reader, key)
         if(context.mode != 'OBJECT'):

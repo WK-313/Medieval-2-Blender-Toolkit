@@ -31,10 +31,16 @@ from .recurlayercollection import collectionsOf, linkBeside
 # (identifier, label, description). The identifiers are the old toolkit's, so a
 # user following the old workflow picks the same entry by the same name.
 CONTROL_RIG_TYPES = [
+    ('auto', "Auto", "IK_Archer for bow skeletons (bone_sling / bone_bowoffset), IK_Infantry for everything else. Dwarves still need IK_Dwarf picked by hand"),
     ('infantry', "IK_Infantry", "Standard human skeleton: the 2H/1H/spear/polearm rig"),
     ('archer', "IK_Archer", "Bowman skeleton - the Pole bone is replaced by IK Bow String"),
     ('dwarf', "IK_Dwarf", "Short skeleton used by dwarves and hobbits"),
 ]
+
+# Bones only the bow skeleton has. The archer poses' Switch drives IK Bow String,
+# which only the IK_Archer layout has - on IK_Infantry the same Switch grabs Pole
+# with the left fist and throws the bow arm across the body.
+ARCHER_SKELETON_BONES = ("bone_sling", "bone_bowoffset")
 
 # Marks a controller and records which layout it was built from.
 RIG_TAG = "med2_control_rig"
@@ -58,6 +64,16 @@ def setRigHidden(armature, hidden):
     except RuntimeError:
         return False
     return True
+
+
+def resolveRigType(armature, rig_type):
+    """The layout 'auto' stands for on this skeleton; other types pass through."""
+    if rig_type != 'auto':
+        return rig_type
+    if armature is not None and armature.type == 'ARMATURE' and any(
+            name in armature.data.bones for name in ARCHER_SKELETON_BONES):
+        return 'archer'
+    return 'infantry'
 
 
 def rigTypeLabel(rig_type):
@@ -103,6 +119,7 @@ def controlRigMatchCount(armature, rig_type):
     group pass in unit_groups tells a mount apart from the riders sitting on it
     without having to build a controller first to find out.
     """
+    rig_type = resolveRigType(armature, rig_type)
     if armature is None or armature.type != 'ARMATURE' or rig_type not in RIGS:
         return 0
     layout = {bone[0] for bone in RIGS[rig_type]}
@@ -328,6 +345,7 @@ def createControlRig(context, armature, rig_type):
     existing = controlRigOf(armature)
     if existing is not None:
         return existing, [('WARNING', "'%s' already has the control rig '%s'" % (armature.name, existing.name))]
+    rig_type = resolveRigType(armature, rig_type)
     if rig_type not in RIGS:
         return None, [('ERROR', "Unknown control rig type '%s'" % rig_type)]
 

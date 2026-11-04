@@ -46,6 +46,15 @@ class MED_2_TOOLKIT_QOL_Data(bpy.types.PropertyGroup):
         default='POLYINTERP_NEAREST'
     )
     clear_groups: BoolProperty(name = "Clear Existing Groups", default = True)
+    mirror_keep: EnumProperty(
+        name="Keep Side",
+        description="Which side of local X=0 Cut + Mirror keeps; the other side is deleted and rebuilt from it",
+        items=[
+            ('NEGATIVE', "Keep -X", "Delete everything at X>0 and mirror the -X half onto it"),
+            ('POSITIVE', "Keep +X", "Delete everything at X<0 and mirror the +X half onto it"),
+        ],
+        default='NEGATIVE'
+    )
     smooth_weights: BoolProperty(name = "Smooth Weights", description = "After the transfer, run Blender's vertex group smooth over every target mesh. The mapping leaves hard edges where it jumps from one source vertex to the next, and the smoothing softens them. Untick to keep the transferred weights exactly as they came across", default = True)
     smooth_repeat: IntProperty(name = "Smoothing", description = "How many smoothing passes to run on each target mesh. More passes spread the weights further; 5 is what the transfer used to do unconditionally", default = 5, min = 1, max = 100)
     smooth_factor: FloatProperty(name = "Strength", description = "How far each smoothing pass moves a weight towards its neighbours' average. 0.5 is Blender's own default", default = 0.5, min = 0.0, max = 1.0)
@@ -122,6 +131,61 @@ class MED_2_TOOLKIT_OT_Weight_Transfer(bpy.types.Operator):
         self.report({'INFO'}, "Transferred weights to %d object(s) (%s): %s"
                     % (len(selected_objs), smoothed, ", ".join(obj.name for obj in selected_objs)))
         return {'FINISHED'}
+
+
+class MirrorOperation:
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return (context.mode in {'OBJECT', 'EDIT_MESH'}
+                and any(o.type == 'MESH' for o in context.selected_objects))
+
+    def execute(self, context):
+        from ..tasks.mesh_mirror import cutMirror, applyMirror
+        from .unit_export_panel import showResultsPopup
+        meshes = [o for o in context.selected_objects if o.type == 'MESH']
+        keep_positive = context.scene.med2_toolkit_qol.mirror_keep == 'POSITIVE'
+        # Meshes can be selected with no active object.
+        original_mode = context.object.mode if context.object else 'OBJECT'
+        reports = []
+        completed = 0
+        if original_mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
+        try:
+            for obj in meshes:
+                try:
+                    if self.apply_mirror:
+                        lines = applyMirror(context, obj)
+                    else:
+                        lines = cutMirror(obj, keep_positive=keep_positive)
+                    reports.extend(('INFO', line) for line in lines)
+                    completed += 1
+                except (ValueError, RuntimeError) as exc:
+                    reports.append(('ERROR', f'{obj.name}: {exc}'))
+        finally:
+            # Stay in Object mode after a change: finishing in Edit mode records
+            # only an Edit-mode undo step, so Ctrl+Z would keep the modifier.
+            if original_mode != 'OBJECT' and not completed:
+                bpy.ops.object.mode_set(mode=original_mode)
+        reports.sort(key=lambda item: item[0] != 'ERROR')
+        showResultsPopup(context, self.bl_label, reports)
+        self.report({'INFO'} if completed else {'WARNING'}, '; '.join(line for _, line in reports))
+        return {'FINISHED'} if completed else {'CANCELLED'}
+
+
+class MED_2_TOOLKIT_OT_Cut_Mirror(MirrorOperation, bpy.types.Operator):
+    bl_idname = "medieval2toolkit.cut_mirror"
+    bl_label = "Cut + Mirror"
+    bl_description = "Bisect selected meshes at local X=0, remove the side not chosen in Keep Side and add an X Mirror with clipping; keep the center seam"
+    apply_mirror = False
+
+
+class MED_2_TOOLKIT_OT_Apply_Mirror(MirrorOperation, bpy.types.Operator):
+    bl_idname = "medieval2toolkit.apply_mirror_weights"
+    bl_label = "Apply Mirror + Weights"
+    bl_description = "Apply the Cut + Mirror modifier and swap left/right bone weights on the mirrored half, including melee and ranged skeleton names"
+    apply_mirror = True
 
 
 class MED_2_TOOLKIT_OT_Clean_Suffix(bpy.types.Operator):
@@ -440,7 +504,7 @@ class MED_2_TOOLKIT_OT_Create_Control_Rig(bpy.types.Operator):
                       "Most of the bundled pose library is written against this controller's bones")
     bl_options = {'REGISTER', 'UNDO'}
 
-    rig_type: EnumProperty(name = "Control rig", description = "Which of the three IK layouts to build", items = CONTROL_RIG_TYPES, default = 'infantry')
+    rig_type: EnumProperty(name = "Control rig", description = "Which IK layout to build. Auto picks IK_Archer for bow skeletons and IK_Infantry otherwise", items = CONTROL_RIG_TYPES, default = 'auto')
     whole_unit: BoolProperty(
         name = "Whole unit",
         description = ("Build a controller for every rider or crew member of a mount or siege engine, not just the "
@@ -557,6 +621,12 @@ class MED_2_TOOLKIT_PT_Weight_Transfer(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         settings = context.scene.med2_toolkit_qol
+        box = layout.box()
+        box.label(text="Mirror (local X=0)")
+        box.row().prop(settings, "mirror_keep", expand=True)
+        col = box.column(align=True)
+        col.operator("medieval2toolkit.cut_mirror", icon='MOD_MIRROR')
+        col.operator("medieval2toolkit.apply_mirror_weights", icon='CHECKMARK')
         layout.operator("medieval2toolkit.weight_transfer", icon='MOD_DATA_TRANSFER')
         layout.prop(settings, "vert_mapping")
         layout.prop(settings, "clear_groups")
@@ -689,6 +759,8 @@ class MED_2_TOOLKIT_PT_Interface(bpy.types.Panel):
 
 classes = [
     MED_2_TOOLKIT_QOL_Data,
+    MED_2_TOOLKIT_OT_Cut_Mirror,
+    MED_2_TOOLKIT_OT_Apply_Mirror,
     MED_2_TOOLKIT_OT_Weight_Transfer,
     MED_2_TOOLKIT_OT_Clean_Suffix,
     MED_2_TOOLKIT_OT_Rename_Bones_Upper_To_Lower,

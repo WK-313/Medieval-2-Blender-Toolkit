@@ -515,7 +515,6 @@ class MED_2_TOOLKIT_OT_Officer_Importer(bpy.types.Operator):
             imported = importedArmature(existing)
             if imported:
                 imported.location = coordinates
-                imported.location[2] += z_offset
             coordinates[1] -= 2
         postImport(self, context)
         if results:
@@ -692,7 +691,6 @@ def runImportEntry(job, entry):
         imported = importedArmature(existing)
         if imported:
             imported.location = list(job['officer_at'])
-            imported.location[2] += z_offset
         job['imported'] += 1
     job['officer_at'][1] -= job['officer_step']
 

@@ -3,6 +3,7 @@ import json
 import math
 import os
 import time
+import zlib
 from pathlib import Path
 from bpy.props import BoolProperty, StringProperty, PointerProperty, CollectionProperty, EnumProperty, IntProperty, FloatProperty
 from ..directories import saveFolderPaths, loadStoredValue, storeValue, readJsonCached
@@ -29,19 +30,26 @@ def exportSetMaterials(context):
         return []
     return uniqueMaterials(exportMeshes(context, armature))
 
+def materialItem(material):
+    # A dynamic enum stores the picked item's NUMBER, which defaults to its place
+    # in the list - so when Check Model for Export merged or reordered materials,
+    # the pick slid onto whichever material now sat in that place. A number
+    # taken from the name keeps the pick on the material itself.
+    return (material.name, material.name, '', (zlib.crc32(material.name.encode()) & 0x3fffffff) + 1)
+
 def materialItems(self, context):
     global _material_items
     # 'None' first so an untouched rig has no main material rather than
     # silently adopting whichever material happens to come first
-    items = [('none', 'None', 'No main material picked yet - run Check Model for Export or choose one')]
-    items += [(m.name, m.name, '') for m in exportSetMaterials(context)]
+    items = [('none', 'None', 'No main material picked yet - run Check Model for Export or choose one', 0)]
+    items += [materialItem(m) for m in exportSetMaterials(context)]
     _material_items = items
     return _material_items
 
 def materialItemsNone(self, context):
     global _material_items_none
-    items = [('none', 'None', 'No attach material')]
-    items += [(m.name, m.name, '') for m in exportSetMaterials(context)]
+    items = [('none', 'None', 'No attach material', 0)]
+    items += [materialItem(m) for m in exportSetMaterials(context)]
     _material_items_none = items
     return _material_items_none
 

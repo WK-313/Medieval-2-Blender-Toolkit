@@ -12,7 +12,7 @@ from ..m2formats.mesh import MeshError
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
 from .iwte_run import NO_WINE, canRunWindowsExe, findIWTEExe, startIWTETask, usesWine, winePath, wineWrap
 from .iwte_tasks import applySkeletonTask
-from . import normalmap
+from . import modeldb, normalmap
 
 addon_folder = Path(__file__).parent.parent
 
@@ -470,6 +470,9 @@ def bmdbEntryText(context, plan=None):
         return None, "", "", "no factions selected for ownership"
     if not export_data.bmdb_unit_path:
         return None, "", "", "no unit path set"
+    if not export_data.bmdb_footer.strip():
+        return None, "", "", ("the Footer is empty - press Copy Sprite and Footer or Load Entry "
+                              "From Mod to fill in the mounts, skeletons and weapons")
     if plan is None:
         plan = texturePlan(context)
     relative = parseRelativeUnitPath(export_data.bmdb_unit_path)
@@ -493,6 +496,15 @@ def bmdbEntryText(context, plan=None):
         factions=factions,
         mesh_name=export_data.export_glb_name,
     )
+    # Everything above the footer is generated, so an entry that does not parse
+    # is a footer that is cut short or mistyped. Pasting a multi-line footer
+    # into the one-line field keeps only its first line.
+    try:
+        modeldb.parse_entry_text(entry)
+    except ValueError:
+        return None, "", "", ("the Footer is incomplete - it must hold the whole mounts/skeletons/weapons "
+                              "block down to the torch line. Pasting a multi-line footer into the field keeps "
+                              "only its first line; press Copy Sprite and Footer or Load Entry From Mod instead")
     return entry, entry_name, relative, None
 
 def writeBMDBEntry(context, out_dir, plan):

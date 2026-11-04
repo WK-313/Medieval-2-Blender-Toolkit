@@ -67,25 +67,55 @@ class MED_2_TOOLKIT_OT_Animation_Refresh(bpy.types.Operator):
 
     def execute(self, context):
         try:
-            root = dataRoot(context)
-            if root is None:
-                raise ValueError('Select a mod data folder in Paths first')
-            names = browser.skeletonNames(root)
-            if not names:
-                raise ValueError('No animation skeletons found in the selected mod or vanilla data')
+            names = loadSkeletons(context, browser.suggestedSkeleton(activeArmature(context)))
         except (OSError, ValueError, engine.casanim.AnimError) as error:
             reportResults(self, context, 'Animations', [('ERROR', str(error))])
             return {'CANCELLED'}
-        settings = context.scene.med2_toolkit_animations
-        settings.skeletons.clear()
-        for name in names:
-            settings.skeletons.add().name = name
-        settings.actions.clear()
-        settings.loaded_skeleton = ''
-        settings.data_root = str(root)
-        desired = browser.suggestedSkeleton(activeArmature(context)) or settings.skeleton
-        settings.skeleton = next((name for name in names if name.casefold() == desired.casefold()), names[0])
         self.report({'INFO'}, 'Loaded %d skeletons' % len(names))
+        return {'FINISHED'}
+
+
+def loadSkeletons(context, desired=''):
+    """Fill the skeleton list from the selected mod and select `desired` (or keep
+    the current pick). Shared by Refresh Skeletons and unit import."""
+    root = dataRoot(context)
+    if root is None:
+        raise ValueError('Select a mod data folder in Paths first')
+    names = browser.skeletonNames(root)
+    if not names:
+        raise ValueError('No animation skeletons found in the selected mod or vanilla data')
+    settings = context.scene.med2_toolkit_animations
+    settings.skeletons.clear()
+    for name in names:
+        settings.skeletons.add().name = name
+    settings.actions.clear()
+    settings.loaded_skeleton = ''
+    settings.data_root = str(root)
+    desired = desired or settings.skeleton
+    settings.skeleton = next((name for name in names if name.casefold() == desired.casefold()), names[0])
+    return names
+
+
+class MED_2_TOOLKIT_OT_Animation_Use_Skeleton(bpy.types.Operator):
+    bl_idname = 'medieval2toolkit.animation_use_skeleton'
+    bl_label = 'Use Skeleton'
+    bl_description = 'Select the skeleton this rig was imported with'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    skeleton: StringProperty()
+
+    @classmethod
+    def description(cls, context, properties):
+        return 'Select %s, the skeleton this rig was imported with' % properties.skeleton
+
+    def execute(self, context):
+        settings = context.scene.med2_toolkit_animations
+        name = next((n.name for n in settings.skeletons if n.name.casefold() == self.skeleton.casefold()), '')
+        if not name:
+            reportResults(self, context, 'Animations',
+                          [('ERROR', "%s is not among the selected mod's animation skeletons" % self.skeleton)])
+            return {'CANCELLED'}
+        settings.skeleton = name
         return {'FINISHED'}
 
 
@@ -199,6 +229,19 @@ class MED_2_TOOLKIT_PT_Animations(bpy.types.Panel):
             layout.label(text='Refresh skeletons for the selected mod', icon='INFO')
             return
         layout.prop_search(settings, 'skeleton', settings, 'skeletons')
+        rig = activeArmature(context)
+        soldier = rig.get('med2_soldier_skeleton', '') if rig else ''
+        model = rig.get('med2_model_skeleton', '') if rig else ''
+        if soldier or model:
+            row = layout.row(align=True)
+            if soldier:
+                row.operator('medieval2toolkit.animation_use_skeleton', text='Soldier: %s' % soldier,
+                             icon='ARMATURE_DATA', depress=settings.skeleton.casefold() == soldier.casefold()
+                             ).skeleton = soldier
+            if model and model.casefold() != soldier.casefold():
+                row.operator('medieval2toolkit.animation_use_skeleton', text='BMDB: %s' % model,
+                             icon='OUTLINER_DATA_ARMATURE', depress=settings.skeleton.casefold() == model.casefold()
+                             ).skeleton = model
         layout.operator('medieval2toolkit.animation_load', icon='ACTION')
         if settings.loaded_skeleton != settings.skeleton:
             return
@@ -211,7 +254,6 @@ class MED_2_TOOLKIT_PT_Animations(bpy.types.Panel):
             layout.label(text='%s / %d source frames / %.2f s' % (item.source_kind or 'Unavailable', item.frames, item.duration))
             if item.error:
                 layout.label(text=item.error, icon='ERROR')
-        rig = activeArmature(context)
         layout.label(text='Rig: %s' % rig.name if rig else 'Select a battle or strat rig', icon='ARMATURE_DATA')
         layout.operator('medieval2toolkit.animation_play', icon='PLAY')
         if context.screen and context.screen.is_animation_playing:
@@ -219,7 +261,7 @@ class MED_2_TOOLKIT_PT_Animations(bpy.types.Panel):
 
 
 classes = [MED_2_TOOLKIT_Animation_Name, MED_2_TOOLKIT_Animation_Item, MED_2_TOOLKIT_Animation_Browser,
-           MED_2_TOOLKIT_UL_Animations, MED_2_TOOLKIT_OT_Animation_Refresh, MED_2_TOOLKIT_OT_Animation_Load,
+           MED_2_TOOLKIT_UL_Animations, MED_2_TOOLKIT_OT_Animation_Refresh, MED_2_TOOLKIT_OT_Animation_Use_Skeleton, MED_2_TOOLKIT_OT_Animation_Load,
            MED_2_TOOLKIT_OT_Animation_Play]
 
 

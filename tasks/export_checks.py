@@ -693,14 +693,19 @@ def autoAssignMaterials(context):
     # An attachment material sitting in the main slot is treated as unset so
     # detection can redo it: without this the _main material was folded into
     # the _attach one and the attach slot was left empty.
+    # Likewise a _main material in the attach slot - the two picks swapped -
+    # which used to keep _main as attach, detect it as main too, and then fold
+    # the real _attach material into it on every mesh.
+    if attach_mat is not None and looksLikeMain(attach_mat.name):
+        attach_mat = None
     if main_mat is not None and looksLikeAttach(main_mat.name) and any(looksLikeMain(m.name) for m in materials):
         if attach_mat is None:
             attach_mat = main_mat
-            try:
-                export_data.material_attach = main_mat.name
-            except TypeError:
-                pass
         main_mat = None
+    try:
+        export_data.material_attach = attach_mat.name if attach_mat is not None else 'none'
+    except TypeError:
+        pass
     if main_mat is not None and main_mat is attach_mat:
         main_mat = None
 

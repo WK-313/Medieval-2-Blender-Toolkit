@@ -20,7 +20,7 @@ def enabled(context=None):
     return (context or bpy.context).scene.med2_toolkit_reader.backend_battle_import == 'BUILTIN'
 
 
-def sources(context, model_id, faction=''):
+def modelEntry(context, model_id, faction=''):
     value = selectedModFolder(context).strip().strip('"')
     if not value:
         raise ValueError('Select a mod data folder in Paths first')
@@ -43,7 +43,29 @@ def sources(context, model_id, faction=''):
         entries = owned[:1] or entries[:1]
     if len(entries) != 1:
         raise ValueError('Model entry is missing or ambiguous: %s' % model_id)
-    entry = entries[0]
+    return root, vanilla, entries[0]
+
+
+def entrySkeleton(context, model_id, faction='', mounted=False):
+    """The skeleton a battle_models.modeldb entry animates with, or '' when the
+    entry cannot be read. Primary or secondary follows the import setting. A
+    rider prefers its first mounted animation set, anything else the 'none' set."""
+    try:
+        _, _, entry = modelEntry(context, model_id, faction)
+    except (OSError, ValueError):
+        return ''
+    sets = list(entry.animations)
+    preferred = [a for a in sets if (a.mount_type.casefold() != 'none') == mounted]
+    secondary = context.scene.med2_toolkit_units.primary_secondary == 'secondary'
+    for animation in preferred + sets:
+        name = animation.secondary_skeleton if secondary else animation.primary_skeleton
+        if name:
+            return name
+    return ''
+
+
+def sources(context, model_id, faction=''):
+    root, vanilla, entry = modelEntry(context, model_id, faction)
     if not entry.lods:
         raise ValueError('No mesh LOD for %s' % model_id)
     mesh_path = resolveStratPath(root, entry.lods[0][0], vanilla)

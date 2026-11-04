@@ -7,7 +7,8 @@ from ..tasks.pose_library import (DEFAULT_CATALOG, LIBRARY_NAME, activeArmature,
                                   actionBoneNames, applyPoseAction, candidateArmatures, clearAnimation,
                                   closePoseBrowser, ensureAssetLibrary, libraryAvailable, openPoseBrowser,
                                   poseBrowserArea, poseCatalogs, poseTarget, refreshPoseBrowser,
-                                  registeredLibrary, selectPoseTarget, withAssetAction)
+                                  registeredLibrary, releaseSwitch, selectPoseTarget, switchConflict,
+                                  withAssetAction)
 from ..tasks.texture_assets import texturesToAssets
 from .unit_export_panel import SEVERITY_ORDER, showResultsPopup
 
@@ -145,7 +146,7 @@ class MED_2_TOOLKIT_OT_Toggle_Pose_Browser(bpy.types.Operator):
             if closePoseBrowser(context):
                 self.report({'INFO'}, "Closed the pose library")
             else:
-                self.report({'WARNING'}, "That asset browser was not opened by the toolkit - close it yourself")
+                self.report({'WARNING'}, "Blender would not close the pose library browser - close it yourself")
             return {'FINISHED'}
         if registeredLibrary() is None:
             ensureAssetLibrary()
@@ -319,6 +320,16 @@ class MED_2_TOOLKIT_OT_Apply_Pose_Asset(bpy.types.Operator):
             applyPoseAction(target, action)
             outcome['target'] = target
             results.append(('INFO', "Applied '%s' to '%s' (%d bone(s))" % (asset.name, target.name, len(matched))))
+            conflict = switchConflict(target, bone_names)
+            if conflict == 'archer_on_pole' and releaseSwitch(target):
+                results.append(('WARNING', "'%s' is an archer pose but '%s' is not the IK_Archer control rig: "
+                                "Switch -> off, so the bow arm stays put but the string is not drawn. "
+                                "Remove and re-add the control rig as IK_Archer for the full pose"
+                                % (asset.name, target.name)))
+            elif conflict == 'pole_on_archer':
+                results.append(('WARNING', "'%s' is an infantry pose but '%s' is the IK_Archer control rig, "
+                                "which has no Pole: the two-handed grip is not applied"
+                                % (asset.name, target.name)))
             if context.scene.med2_toolkit_poses.select_pose_target and selectPoseTarget(context, target):
                 results.append(('INFO', "Selected '%s'" % target.name))
             if missing:
@@ -336,8 +347,12 @@ class MED_2_TOOLKIT_OT_Apply_Pose_Asset(bpy.types.Operator):
         if 'target' not in outcome:
             self.report({'ERROR'}, "Could not read '%s' out of the asset library" % asset.name)
             return {'CANCELLED'}
-        for level, message in results:
-            self.report({level}, message)
+        if any(level == 'WARNING' for level, _message in results):
+            # a double-click normally stays quiet; warnings get the popup
+            reportResults(self, context, "Pose applied", results)
+        else:
+            for level, message in results:
+                self.report({level}, message)
         return {'FINISHED'}
 
 

@@ -201,7 +201,6 @@ class MED_2_TOOLKIT_OT_Model_Importer(bpy.types.Operator):
             imported = importedArmature(existing)
             if imported:
                 imported.location = coordinates
-                imported.location[2] += z_offset
         postImport(self, context)
         return{"FINISHED"}
 

@@ -190,16 +190,21 @@ def openPoseBrowser(context, catalog_path=DEFAULT_CATALOG, factor=0.3):
 
 
 def closePoseBrowser(context):
-    """Close the pose browser, but only one this addon opened."""
+    """Close the asset browser showing the pose library.
+
+    _opened_areas only lives in memory, so a browser saved into the .blend comes
+    back untracked on reopen - one pointed at the pose library is still ours to
+    close."""
     area = poseBrowserArea(context)
     if area is None:
         return False
-    if area.as_pointer() not in _opened_areas:
-        # the user opened this one themselves; leave their layout alone
-        return False
     _opened_areas.discard(area.as_pointer())
-    with context.temp_override(window=context.window, screen=context.window.screen, area=area):
-        bpy.ops.screen.area_close()
+    try:
+        with context.temp_override(window=context.window, screen=context.window.screen, area=area):
+            bpy.ops.screen.area_close()
+    except RuntimeError as error:
+        print("Medieval 2 Toolkit: could not close the pose browser:", error)
+        return False
     return True
 
 
@@ -439,6 +444,35 @@ def applyPoseAction(armature, action):
     mode, which is what makes double-clicking a pose useful without a mode
     switch first."""
     armature.pose.apply_pose_from_action(action)
+
+
+def switchConflict(armature, bone_names):
+    """Which way a pose and a controller disagree about the Switch bone, or None.
+
+    Switch means something different per layout: on the archer controller,
+    pushing it forward pins IK Bow String to the drawing hand; on the infantry
+    and dwarf ones it snaps the left fist onto Pole for a two-handed grip. An
+    archer pose with Switch forward on an infantry controller therefore throws
+    the bow arm across the body ('archer_on_pole'); the reverse just loses the
+    grip ('pole_on_archer')."""
+    bones = armature.pose.bones
+    if 'Switch' not in bones or 'Switch' not in bone_names:
+        return None
+    if 'IK Bow String' in bone_names and 'IK Bow String' not in bones and 'Pole' in bones:
+        return 'archer_on_pole'
+    if 'Pole' in bone_names and 'Pole' not in bones and 'IK Bow String' in bones:
+        return 'pole_on_archer'
+    return None
+
+
+def releaseSwitch(armature):
+    """Pull the Switch bone back to rest so its drivers turn the constraints
+    off. Returns True when it had been pushed forward."""
+    switch = armature.pose.bones['Switch']
+    if switch.location.y <= 0:
+        return False
+    switch.location.y = 0
+    return True
 
 
 def selectPoseTarget(context, armature):

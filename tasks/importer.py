@@ -229,12 +229,38 @@ def placeMember(member_object, role, member_coordinates, member_width, member_z,
     if apply_offset and coordinates != [0, 0, 0]:
         coordinates[0] = coordinates[0] + round(member_width*0.5, 1) + 0.25
     member_object.location = list(coordinates)
-    member_object.location[2] += member_z
     unit['root'] = member_object
     unit['role'] = "Unit"
     unit['offset'] = list(member_coordinates)
     unit['width'] = member_width
     unit['grounded'] = True
+
+
+def tagSkeletons(rig, unit_info, model_id, faction_id, soldier=True, mounted=False):
+    """Record on the rig the skeleton its own battle_models.modeldb entry uses
+    and, for a soldier (not a mount), the one the EDU `soldier` line's entry
+    uses, so Game Animations can select them. The soldier's is selected now."""
+    context = bpy.context
+    rig['med2_model_skeleton'] = battle_import.entrySkeleton(context, model_id, faction_id, mounted)
+    if not soldier:
+        return
+    soldier_id = unit_info.get('Soldier') or (unit_info['Model'] or [model_id])[0]
+    soldier_skeleton = (rig['med2_model_skeleton'] if soldier_id.casefold() == model_id.casefold()
+                        else battle_import.entrySkeleton(context, soldier_id, faction_id, mounted))
+    rig['med2_soldier_skeleton'] = soldier_skeleton
+    from ..m2formats.casanim import AnimError
+    from ..panels.animation_panel import catalogueCurrent, loadSkeletons
+    if not catalogueCurrent(context):
+        # the skeleton list is a convenience; an unreadable one must not fail the import
+        try:
+            loadSkeletons(context, soldier_skeleton)
+        except (OSError, ValueError, AnimError) as error:
+            print('Game Animations skeletons not refreshed: %s' % error)
+            return
+    settings = context.scene.med2_toolkit_animations
+    name = next((n.name for n in settings.skeletons if n.name.casefold() == soldier_skeleton.casefold()), '')
+    if soldier_skeleton and name:
+        settings.skeleton = name
 
 
 def unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, apply_offset=True):
@@ -299,8 +325,9 @@ def _unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, app
     # bpy.data.objects[unit_name]: each armour upgrade of a unit is named after
     # the same unit ID, so Blender hands the later ones a ".001" suffix and a
     # name lookup returns the FIRST rig instead. That moved upgrade 0 out to the
-    # right and left the newest rig unpositioned at the origin, sunk below the
-    # ground because its z_offset was never applied.
+    # right and left the newest rig unpositioned at the origin.
+    # No rig is lifted onto the ground plane: it keeps the game's own origin, so
+    # the armature exports at the height the skeleton expects.
     if unit_attachment == 'unused':
         existing = set(bpy.data.objects)
         result, width, z_offset = modelImporter(model_folder, unit_name, faction_id, model_info, model_id)
@@ -310,8 +337,8 @@ def _unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, app
             coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
         root_object = importedArmature(existing)
         if root_object:
+            tagSkeletons(root_object, unit_info, model_id, faction_id)
             root_object.location = coordinates
-            root_object.location[2] += z_offset
             unit['root'] = root_object
             unit['width'] = width
     elif unit_attachment[0] == 'mount':
@@ -321,10 +348,10 @@ def _unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, app
         result, width, z_offset = modelImporter(model_folder, unit_name, faction_id, mount_model, mount_info['Model'])
         mount_object = importedArmature(existing) if result != 0 else None
         if mount_object:
+            tagSkeletons(mount_object, unit_info, mount_info['Model'], faction_id, soldier=False)
             if apply_offset and coordinates != [0, 0, 0]:
                 coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
             mount_object.location = coordinates
-            mount_object.location[2] += z_offset
             unit['root'] = mount_object
             unit['role'] = "Mount"
             unit['width'] = width
@@ -339,6 +366,7 @@ def _unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, app
             result, rider_width, rider_z = modelImporter(model_folder, unit_name+' Rider '+str(n), faction_id, model_info, model_id)
             rider_object = importedArmature(existing) if result != 0 else None
             if rider_object:
+                tagSkeletons(rider_object, unit_info, model_id, faction_id, mounted=True)
                 placeMember(rider_object, 'Rider %d' % n, rider_coordinates,
                             rider_width, rider_z, unit, coordinates, apply_offset)
             n += 1
@@ -352,7 +380,6 @@ def _unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, app
             if apply_offset and coordinates != [0, 0, 0]:
                 coordinates[0] = coordinates[0] + round(width*0.5, 1) + 0.25
             engine_object.location = coordinates
-            engine_object.location[2] += z_offset
             unit['root'] = engine_object
             unit['role'] = "Engine"
             unit['width'] = width
@@ -367,9 +394,7 @@ def _unitImporter(model_folder, unit_info, faction_id, coordinates, upgrade, app
             result, crew_width, crew_z = modelImporter(model_folder, unit_name+' Crew '+str(n), faction_id, model_info, model_id)
             crew_object = importedArmature(existing) if result != 0 else None
             if crew_object:
-                # unlike a rider, a crew member stands on the ground beside its
-                # engine, so its own z_offset goes into the offset itself
-                rider_coordinates[2] += crew_z
+                tagSkeletons(crew_object, unit_info, model_id, faction_id)
                 placeMember(crew_object, 'Crew %d' % n, rider_coordinates,
                             crew_width, crew_z, unit, coordinates, apply_offset)
             n += 1

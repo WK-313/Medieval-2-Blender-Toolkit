@@ -32,7 +32,7 @@ from mathutils import Euler, Vector
 from ..directories import readJsonCached
 from .control_rig import controlRigOf, controlledRigs, isControlRig
 from .recurlayercollection import linkBeside, recurLayerCollection
-from .tga_dds import gameTexturePath, viewablePath, writeTgaDds
+from .tga_dds import gameTexturePath, uncompressTGA
 from .unit_groups import createGroupControlRigs, groupParts, groupRoot
 
 script_folder = Path(__file__).parent.parent
@@ -60,6 +60,8 @@ LEGACY_GUIDE_SIZE = (48, 64)
 RESCALE_NODE = "Card Rescale"
 # The smoothing Bilateral Blur, likewise - the HD pass switches it off.
 BLUR_NODE = "Card Smoothing"
+# The sharpen, named so the panel's Sharpen slider can find it.
+SHARPEN_NODE = "Card Sharpen"
 
 # Camera pose the old card setup used, kept unchanged: an orthographic camera
 # looking at the unit from +Y at roughly chest height, framed the way a Medieval 2
@@ -160,7 +162,7 @@ def hdResolution(settings):
     return HD_BASE[0]*multiple, HD_BASE[1]*multiple
 
 
-def hdOrthoScale(settings, width, height):
+def hdOrthoScale(settings, width, height, zoom=None):
     """Ortho scale that keeps everything the card frames inside the HD frame.
 
     The card cameras are orthographic and Blender's ortho scale always spans the
@@ -174,11 +176,13 @@ def hdOrthoScale(settings, width, height):
     unit is then never smaller in frame than it is on the card - only more of the
     scene around it shows.
     """
+    if zoom is None:
+        zoom = settings.card_zoom
     card_width, card_height = cardResolution(settings)
     card_long = max(card_width, card_height)
     # what the card actually sees, in world units
-    frame_w = settings.card_zoom * card_width / float(card_long)
-    frame_h = settings.card_zoom * card_height / float(card_long)
+    frame_w = zoom * card_width / float(card_long)
+    frame_h = zoom * card_height / float(card_long)
     hd_long = float(max(width, height))
     return max(frame_h * hd_long / height, frame_w * hd_long / width)
 
@@ -262,6 +266,13 @@ CAMERA_TAG = "med2_card_unit"
 # The world point a camera's framing turns about, stored so the projection and the
 # zoom can be changed later without having to find the unit again.
 PIVOT_TAG = "med2_card_pivot"
+# How far in front of the camera that pivot was when it was last placed, so a
+# camera moved or turned by hand can still be re-framed about the point it now
+# looks at.
+DISTANCE_TAG = "med2_card_distance"
+# A zoom of the camera's own, set from the panel while its unit is selected. A
+# camera without one follows the panel's default zoom.
+ZOOM_TAG = "med2_card_zoom"
 FACTION_TAG = "med2_card_faction"
 SUN_TAG = "med2_card_sun"
 # The rig the camera was made for, by name. The renderer needs it to hide every
@@ -413,7 +424,16 @@ def cameraAxes(rotation=CAMERA_ROTATION):
     return -matrix.col[2].normalized(), matrix.col[0].normalized(), matrix.col[1].normalized()
 
 
-def framingDistance(settings):
+def cameraZoom(camera, settings):
+    """The zoom a card camera frames at: its own if it has one, else the panel's."""
+    if camera is not None:
+        zoom = camera.get(ZOOM_TAG)
+        if zoom is not None and zoom > 0:
+            return float(zoom)
+    return settings.card_zoom
+
+
+def framingDistance(settings, zoom=None):
     """How far a card camera stands from the point it is framing.
 
     Fixed for an orthographic camera - it frames the same box wherever it sits, so it
@@ -422,7 +442,9 @@ def framingDistance(settings):
     """
     if settings.camera_projection != 'PERSP':
         return CAMERA_PIVOT_DISTANCE
-    return settings.card_zoom*max(settings.camera_lens, 0.1)/CAMERA_SENSOR
+    if zoom is None:
+        zoom = settings.card_zoom
+    return zoom*max(settings.camera_lens, 0.1)/CAMERA_SENSOR
 
 
 def cameraPivot(target_x):
@@ -443,16 +465,19 @@ def storedPivot(camera):
     return camera.matrix_world.translation + forward*CAMERA_PIVOT_DISTANCE
 
 
-def placeCardCamera(camera, settings, pivot):
-    """Put a card camera on `pivot` with the projection and zoom `settings` ask for.
+def placeCardCamera(camera, settings, pivot, rotation=CAMERA_ROTATION):
+    """Put a card camera on `pivot`, looking along `rotation`, with the projection
+    `settings` ask for and the camera's own zoom (see cameraZoom).
 
     Returns how far from the pivot it ended up, which is what the lamp is then placed
     against.
     """
-    distance = framingDistance(settings)
-    camera.rotation_euler = CAMERA_ROTATION
-    camera.location = pivot - cameraAxes()[0]*distance
+    zoom = cameraZoom(camera, settings)
+    distance = framingDistance(settings, zoom)
+    camera.rotation_euler = rotation
+    camera.location = pivot - cameraAxes(rotation)[0]*distance
     camera[PIVOT_TAG] = tuple(pivot)
+    camera[DISTANCE_TAG] = distance
     data = camera.data
     if settings.camera_projection == 'PERSP':
         data.type = 'PERSP'
@@ -461,7 +486,7 @@ def placeCardCamera(camera, settings, pivot):
         data.lens = max(settings.camera_lens, 0.1)
     else:
         data.type = 'ORTHO'
-        data.ortho_scale = settings.card_zoom
+        data.ortho_scale = zoom
     return distance
 
 
@@ -516,13 +541,46 @@ def placeCardLight(camera, settings, distance=None):
     return light
 
 
+def currentPivot(camera):
+    """The point a card camera is framing where it stands NOW.
+
+    The stored pivot is where the camera was last put; a camera moved or turned by
+    hand since looks at somewhere else, and re-framing about the stored one is what
+    snapped such a camera back to its unit on every Zoom change.
+    """
+    forward = cameraAxes(camera.rotation_euler)[0]
+    distance = camera.get(DISTANCE_TAG)
+    if distance is None:
+        # a camera from before the distance was stored: how far its pivot lies
+        # down its own view axis, which a move across the view leaves alone
+        distance = (storedPivot(camera) - camera.location).dot(forward)
+        if distance <= 0:
+            distance = CAMERA_PIVOT_DISTANCE
+    return camera.location + forward*distance
+
+
 def refreshCardCameras(scene, settings):
     """Re-place every card camera and its lamp from the panel's framing and light
-    settings. This is what the live sliders drive - nothing is rebuilt, so a camera
-    moved off its unit by hand keeps the pivot it was moved to."""
+    settings. This is what the live sliders drive - nothing is rebuilt, and a camera
+    moved or turned by hand keeps its place and its aim: it is re-framed about the
+    point it currently looks at, with its own rotation."""
     for camera in cardCameras(scene):
-        distance = placeCardCamera(camera, settings, storedPivot(camera))
+        rotation = tuple(camera.rotation_euler)
+        distance = placeCardCamera(camera, settings, currentPivot(camera), rotation)
         placeCardLight(camera, settings, distance)
+
+
+def setCameraZoom(camera, settings, zoom):
+    """Give one card camera its own zoom (None hands it back to the panel's
+    default) and re-frame it and its lamp about the point it looks at."""
+    if zoom is None:
+        if ZOOM_TAG in camera:
+            del camera[ZOOM_TAG]
+    else:
+        camera[ZOOM_TAG] = max(float(zoom), 0.01)
+    rotation = tuple(camera.rotation_euler)
+    distance = placeCardCamera(camera, settings, currentPivot(camera), rotation)
+    placeCardLight(camera, settings, distance)
 
 
 #   ------------------  #
@@ -693,6 +751,18 @@ def cardCameras(scene):
     cameras = [obj for obj in scene.objects if obj.type == 'CAMERA' and CAMERA_TAG in obj]
     cameras.sort(key=lambda obj: obj.matrix_world.translation.x)
     return cameras
+
+
+def setCameraGuidesVisible(scene, visible):
+    """Show or hide the framing overlay on every card camera. It is a camera
+    background image, so it only ever shows in the viewport, never in a render.
+    Returns how many cameras changed."""
+    changed = 0
+    for camera in cardCameras(scene):
+        if camera.data.show_background_images != visible:
+            camera.data.show_background_images = visible
+            changed += 1
+    return changed
 
 
 def cardSuns(scene):
@@ -882,7 +952,7 @@ def createCardCamera(context, unit_id, faction, target, settings, add_sun=True):
     # earlier card size is still carrying that size's guide alignment, and a
     # Refresh is how the user is expected to repair it
     applyCameraGuide(camera.data, cardResolution(context.scene.med2_toolkit_cards))
-    camera.data.show_background_images = True
+    camera.data.show_background_images = getattr(settings, 'show_guide', True)
 
     sun = cardLightOf(camera)
     if add_sun:
@@ -1016,10 +1086,11 @@ def buildCompositor(group, scene, scale=1.0):
 
     # Sharpen
     sharpen = nodes.new(type="CompositorNodeFilter")
+    sharpen.name = SHARPEN_NODE
     sharpen.location = (550, 342)
     # filter_type is a menu socket now, and its identifiers are the UI names
     sharpen.inputs['Type'].default_value = 'Diamond Sharpen'
-    sharpen.inputs['Factor'].default_value = 0.2
+    sharpen.inputs['Factor'].default_value = scene.med2_toolkit_cards.sharpen
     hue = nodes.new(type="CompositorNodeHueSat")
     hue.location = (750, 342)
     new_link(sharpen.inputs['Image'], rgb_curve.outputs['Image'])
@@ -1159,14 +1230,16 @@ def targetCollections(targets, scene):
     return collections
 
 
-def lineArtRadiusFor(scene, thickness=None):
+def lineArtRadiusFor(scene, thickness=None, zoom=None):
     settings = scene.med2_toolkit_cards
     card_width, card_height = cardResolution(settings)
     if thickness is None:
         thickness = settings.line_art_thickness
+    if zoom is None:
+        zoom = settings.card_zoom
     # the ortho scale frames the longer side, so that is the side a card pixel
     # is measured against
-    return lineArtRadius(thickness, settings.card_zoom, max(card_width, card_height))
+    return lineArtRadius(thickness, zoom, max(card_width, card_height))
 
 
 def setupLineArtFor(context, collection, radius, camera=None):
@@ -1265,7 +1338,7 @@ def setupLineArt(context, targets, thickness=None):
     ]
 
 
-def refreshLineArt(context):
+def refreshLineArt(context, zoom=None):
     """Re-derive every outline's radius from the current card size and zoom.
 
     Also unpins any outline left pinned to a card camera by an older toolkit.
@@ -1273,7 +1346,7 @@ def refreshLineArt(context):
     saved before the fix would keep rendering blank outlines until it was set up
     again from scratch - repairing them here means a Refresh is enough.
     """
-    radius = lineArtRadiusFor(context.scene)
+    radius = lineArtRadiusFor(context.scene, zoom=zoom)
     for gpencil in lineArtObjects(context.scene):
         gpencil.show_in_front = False
         for modifier in gpencil.modifiers:
@@ -1344,6 +1417,25 @@ def setBlur(scene, enabled):
     return previous
 
 
+def sharpenNode(group):
+    """The Diamond Sharpen of a card compositor group, or None."""
+    if group is None:
+        return None
+    node = group.nodes.get(SHARPEN_NODE)
+    if node is not None and node.bl_idname == 'CompositorNodeFilter':
+        return node
+    return next((node for node in group.nodes if node.bl_idname == 'CompositorNodeFilter'), None)
+
+
+def setSharpen(scene, factor):
+    """Put the panel's Sharpen on the card compositor. Pushed rather than built
+    in, so a group made by an earlier version - sharpening at 0.2, which left
+    the 48x64 card soft - picks it up without a rebuild throwing its tweaks away."""
+    node = sharpenNode(scene.compositing_node_group)
+    if node is not None:
+        node.inputs['Factor'].default_value = factor
+
+
 def setupCompositor(context, rebuild=False):
     scene = context.scene
     results = []
@@ -1371,6 +1463,25 @@ def setupCompositor(context, rebuild=False):
     return group, results
 
 
+def pushCardResolution(scene):
+    """Put the card size on the scene's render resolution, which is the shape of
+    the rectangle a card camera shows. Run whenever the size changes, so that
+    rectangle follows the panel as it is edited. The overlay guide is aligned to
+    the card size, so it is re-aligned too. Returns (width, height, supersample)."""
+    settings = scene.med2_toolkit_cards
+    width, height = cardResolution(settings)
+    supersample = max(1, settings.supersample)
+    scene.render.resolution_x = width * supersample
+    scene.render.resolution_y = height * supersample
+    scene.render.resolution_percentage = 100
+    # the compositor does the downscale, so it has to follow the supersampling
+    setRescale(scene, 1.0/supersample)
+    for camera in cardCameras(scene):
+        if camera.data.background_images:
+            applyCameraGuide(camera.data, (width, height))
+    return width, height, supersample
+
+
 def applyRenderSettings(context, results=None):
     """Push the card settings onto the scene. Returns (width, height, supersample).
 
@@ -1380,13 +1491,8 @@ def applyRenderSettings(context, results=None):
     """
     scene = context.scene
     settings = scene.med2_toolkit_cards
-    width, height = cardResolution(settings)
-    supersample = max(1, settings.supersample)
-    scene.render.resolution_x = width * supersample
-    scene.render.resolution_y = height * supersample
-    scene.render.resolution_percentage = 100
-    # the compositor does the downscale, so it has to follow the supersampling
-    setRescale(scene, 1.0/supersample)
+    width, height, supersample = pushCardResolution(scene)
+    setSharpen(scene, settings.sharpen)
     scene.render.film_transparent = True
     scene.render.use_stamp = False
     scene.render.image_settings.file_format = 'TARGA'
@@ -1578,6 +1684,40 @@ def unitCardIndex():
     return index
 
 
+def currentCardId(scene, camera, target, index):
+    """The id a camera's card should be filed under right now.
+
+    The camera's tag is written once, when the camera is made, so a rig renamed
+    afterwards - Armature_Spear.001 into angmar_halberd_host, say - kept writing
+    its card under the old armature name. An EDU unit's id is its EDU type and
+    is left alone; anything else is a hand-built rig, filed under its own name,
+    so it follows the rig the camera frames. The camera, and its sun, are moved
+    onto the new id so the scene stops showing the stale name too.
+    """
+    unit_id = camera.get(CAMERA_TAG, "")
+    if target is None or unit_id in index:
+        return unit_id
+    entry = next((item for item, model in listedEntries(scene)
+                  if model == target and not item.is_part), None)
+    if entry is not None and entry.icon != 'custom':
+        # imported from the EDU: its id is the unit's type, whatever the rig is called
+        new_id = entry.id or entry.name
+    else:
+        new_id = target.name
+    if not new_id or new_id == unit_id:
+        return unit_id
+    old_name = cameraName(unit_id)
+    camera[CAMERA_TAG] = new_id
+    if camera.name == old_name:
+        camera.name = cameraName(new_id)
+    sun = cardLightOf(camera)
+    if sun is not None and sun.get(SUN_TAG, "") == unit_id:
+        sun[SUN_TAG] = new_id
+        if sun.name == old_name + " Sun":
+            sun.name = cameraName(new_id) + " Sun"
+    return new_id
+
+
 def buildRenderQueue(context):
     """One entry per card camera in the scene, plus notes about anything skipped."""
     scene = context.scene
@@ -1594,17 +1734,17 @@ def buildRenderQueue(context):
     allowed = tickedFamilies(scene)
     unticked = 0
     for camera in cardCameras(scene):
-        unit_id = camera.get(CAMERA_TAG, "")
-        if not unit_id:
+        if not camera.get(CAMERA_TAG, ""):
             continue
-        if unit_id in seen:
-            results.append(('INFO', "Skipped a second camera for '%s'" % unit_id))
-            continue
-        faction = camera.get(FACTION_TAG, "") or settings.card_faction
         target = cameraTarget(scene, camera)
         if allowed is not None and target is not None and target not in allowed:
             unticked += 1
             continue
+        unit_id = currentCardId(scene, camera, target, index)
+        if unit_id in seen:
+            results.append(('INFO', "Skipped a second camera for '%s'" % unit_id))
+            continue
+        faction = camera.get(FACTION_TAG, "") or settings.card_faction
         if target is None and settings.isolate_unit:
             results.append(('WARNING', "Could not tell which rig '%s' belongs to - there is nothing to "
                                        "isolate, so its card may come out empty" % unit_id))
@@ -1677,15 +1817,16 @@ def saveFullSize(context, render_result, full_path):
 
 
 def saveFullSizePass(context, full_path):
-    """Render the current camera once more with the rescale off, and save that.
+    """Render the current camera once more with the compositor off, and save that.
 
     The camera, the lighting and the visibility are whatever renderCard has
-    already set up - this only borrows the scene for one extra render. The blur
-    stays on, unlike the HD pass: this is meant to be the card render before it
-    was scaled down, not a cleaner picture of the unit.
+    already set up - this only borrows the scene for one extra render. With the
+    compositor off there is no rescale, blur or sharpen either: it is the plain
+    full-resolution render Blender's own camera gives, as asked for.
     """
     scene = context.scene
-    previous_rescale = setRescale(scene, 1.0)
+    previous_compositing = scene.render.use_compositing
+    scene.render.use_compositing = False
     try:
         bpy.ops.render.render(write_still=False)
         render_result = bpy.data.images.get('Render Result')
@@ -1693,8 +1834,7 @@ def saveFullSizePass(context, full_path):
             return "Blender produced no full-size render"
         return saveFullSize(context, render_result, full_path)
     finally:
-        if previous_rescale is not None:
-            setRescale(scene, previous_rescale)
+        scene.render.use_compositing = previous_compositing
 
 
 def saveCard(context, target_path, width, height, supersample, full_path=None):
@@ -2130,16 +2270,20 @@ def restoreVisibility(context, state):
 
 def copyCard(source_path, paths):
     """Drop the finished card into the other folders it was pinned to. Returns
-    None or a reason string."""
-    dds = gameTexturePath(source_path)
-    for path in paths or ():
+    None or a reason string.
+
+    Every card written - the first one included - loses any .tga.dds left
+    beside it by an older version: the game reads <card>.tga.dds over the .tga
+    whenever it is there, so a stale one would hide the new card."""
+    for path in [source_path] + list(paths or ()):
         try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            shutil.copyfile(source_path, path)
-            if os.path.isfile(dds):
-                shutil.copyfile(dds, gameTexturePath(path))
+            if path != source_path:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                shutil.copyfile(source_path, path)
+            if os.path.isfile(gameTexturePath(path)):
+                os.remove(gameTexturePath(path))
         except OSError as error:
-            return "Could not copy the card to %s: %s" % (os.path.dirname(path), error)
+            return "Could not write the card to %s: %s" % (os.path.dirname(path), error)
     return None
 
 
@@ -2187,7 +2331,7 @@ def saveHDRender(context, camera, hd_path, width, height, frame_span):
     scene = context.scene
     render = scene.render
     previous = (render.resolution_x, render.resolution_y)
-    previous_framing = widenCamera(camera, frame_span, scene.med2_toolkit_cards.card_zoom)
+    previous_framing = widenCamera(camera, frame_span, cameraZoom(camera, scene.med2_toolkit_cards))
     previous_rescale = setRescale(scene, 1.0)
     previous_blur = setBlur(scene, False)
     render.resolution_x = width
@@ -2231,14 +2375,21 @@ def renderCard(context, entry, width, height, supersample):
     isolated = isolateUnit(context, camera, target, settings.isolate_visible_only,
                            family) if settings.isolate_unit else None
     scene.camera = camera
+    # every camera can have a zoom of its own, and the outline is measured in card
+    # pixels, so its radius has to follow the camera being rendered
+    zoom = cameraZoom(camera, settings)
+    if settings.add_line_art:
+        refreshLineArt(context, zoom)
     try:
         context.view_layer.update()
         # The full-size image needs a pass of its own now that the compositor
         # does the downscale: the card render no longer holds a full-size picture
         # to pull out of, only a card-sized one in a full-size frame. Only when
         # there is no supersampling are the two the same render.
+        # Always its own pass, even unsupersampled: the card render has been
+        # through the blur and sharpen, and the full-size one is meant to be clean
         full_path = entry.get('full_path')
-        if full_path and supersample > 1:
+        if full_path:
             reason = saveFullSizePass(context, full_path)
             if reason is not None:
                 return reason
@@ -2247,10 +2398,9 @@ def renderCard(context, entry, width, height, supersample):
         reason = saveCard(context, entry['path'], width, height, supersample, full_path)
         if reason is not None:
             return reason
-        # the game reads <card>.tga.dds whenever it is there, so the card goes
-        # out as that plus an empty .tga - the TGA Optimizer's layout. A failed
-        # conversion leaves a full .tga, which the game reads just as well
-        _dds, warning = writeTgaDds(entry['path'])
+        # cards go out as a plain uncompressed .tga - DXT5 gains nothing on a
+        # 48x64 image. Blender writes TARGA as RLE, hence the rewrite
+        warning = uncompressTGA(entry['path'])
         if warning is not None:
             entry['warning'] = warning
         reason = copyCard(entry['path'], entry.get('extra_paths'))
@@ -2259,7 +2409,7 @@ def renderCard(context, entry, width, height, supersample):
         if entry.get('hd_path'):
             hd_width, hd_height = hdResolution(settings)
             return saveHDRender(context, camera, entry['hd_path'], hd_width, hd_height,
-                                hdOrthoScale(settings, hd_width, hd_height))
+                                hdOrthoScale(settings, hd_width, hd_height, zoom))
         return None
     finally:
         scene.camera = previous_camera
@@ -2272,8 +2422,7 @@ def renderedPaths(entry):
     """Every file one card render writes, most interesting first. The extra
     copies in other faction folders are the same picture again, so they are left
     out - showing them would just pad the image list."""
-    # the card's .tga is the empty placeholder once its .tga.dds is written
-    paths = [viewablePath(entry['path']) if entry.get('path') else None, entry.get('hd_path'), entry.get('full_path')]
+    paths = [entry.get('path'), entry.get('hd_path'), entry.get('full_path')]
     return [path for path in paths if path]
 
 
