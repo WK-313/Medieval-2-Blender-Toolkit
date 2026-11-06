@@ -1,5 +1,5 @@
 import bpy
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty
+from bpy.props import BoolProperty, BoolVectorProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty
 from ..tasks.armature_tools import skeletonItems, parentToSkeleton
 from ..tasks.control_rig import (CONTROL_RIG_TYPES, controlRigOf, controlledRigs, createControlRig,
                                  deleteControlRig, isControlRig)
@@ -46,6 +46,21 @@ class MED_2_TOOLKIT_QOL_Data(bpy.types.PropertyGroup):
         default='POLYINTERP_NEAREST'
     )
     clear_groups: BoolProperty(name = "Clear Existing Groups", default = True)
+    mirror_axes: BoolVectorProperty(
+        name="Mirror Axes", description="Local axes to cut and mirror; select one or more",
+        size=3, subtype='XYZ', default=(True, False, False))
+    mirror_weights: BoolProperty(
+        name="Mirror Weights", default=True,
+        description="Swap left/right bone groups on mirrored copies; disable to apply geometry with the source weights unchanged")
+    mirror_ignore_items: BoolProperty(
+        name="Ignore Primary/Secondary Weights", default=False,
+        description="Preserve source weights on objects whose names start with primary or secondary; their geometry still mirrors")
+    mirror_keep_y: EnumProperty(
+        name="Y Side", items=[('NEGATIVE', "Keep -Y", "Rebuild +Y from -Y"),
+                               ('POSITIVE', "Keep +Y", "Rebuild -Y from +Y")], default='NEGATIVE')
+    mirror_keep_z: EnumProperty(
+        name="Z Side", items=[('NEGATIVE', "Keep -Z", "Rebuild +Z from -Z"),
+                               ('POSITIVE', "Keep +Z", "Rebuild -Z from +Z")], default='NEGATIVE')
     mirror_keep: EnumProperty(
         name="Keep Side",
         description="Which side of local X=0 Cut + Mirror keeps; the other side is deleted and rebuilt from it",
@@ -145,7 +160,10 @@ class MirrorOperation:
         from ..tasks.mesh_mirror import cutMirror, applyMirror
         from .unit_export_panel import showResultsPopup
         meshes = [o for o in context.selected_objects if o.type == 'MESH']
-        keep_positive = context.scene.med2_toolkit_qol.mirror_keep == 'POSITIVE'
+        settings = context.scene.med2_toolkit_qol
+        axes = tuple(settings.mirror_axes)
+        sides = tuple(getattr(settings, prop) == 'POSITIVE'
+                      for prop in ('mirror_keep', 'mirror_keep_y', 'mirror_keep_z'))
         # Meshes can be selected with no active object.
         original_mode = context.object.mode if context.object else 'OBJECT'
         reports = []
@@ -156,9 +174,10 @@ class MirrorOperation:
             for obj in meshes:
                 try:
                     if self.apply_mirror:
-                        lines = applyMirror(context, obj)
+                        lines = applyMirror(context, obj, mirror_weights=settings.mirror_weights,
+                                            ignore_primary_secondary=settings.mirror_ignore_items)
                     else:
-                        lines = cutMirror(obj, keep_positive=keep_positive)
+                        lines = cutMirror(obj, axes=axes, keep_sides=sides)
                     reports.extend(('INFO', line) for line in lines)
                     completed += 1
                 except (ValueError, RuntimeError) as exc:
@@ -177,14 +196,14 @@ class MirrorOperation:
 class MED_2_TOOLKIT_OT_Cut_Mirror(MirrorOperation, bpy.types.Operator):
     bl_idname = "medieval2toolkit.cut_mirror"
     bl_label = "Cut + Mirror"
-    bl_description = "Bisect selected meshes at local X=0, remove the side not chosen in Keep Side and add an X Mirror with clipping; keep the center seam"
+    bl_description = "Bisect selected meshes on the selected local axes, keep the chosen sides and add a Mirror with clipping"
     apply_mirror = False
 
 
 class MED_2_TOOLKIT_OT_Apply_Mirror(MirrorOperation, bpy.types.Operator):
     bl_idname = "medieval2toolkit.apply_mirror_weights"
     bl_label = "Apply Mirror + Weights"
-    bl_description = "Apply the Cut + Mirror modifier and swap left/right bone weights on the mirrored half, including melee and ranged skeleton names"
+    bl_description = "Apply the Cut + Mirror modifier; optionally swap left/right bone weights on mirrored copies"
     apply_mirror = True
 
 
@@ -622,11 +641,22 @@ class MED_2_TOOLKIT_PT_Weight_Transfer(bpy.types.Panel):
         layout = self.layout
         settings = context.scene.med2_toolkit_qol
         box = layout.box()
-        box.label(text="Mirror (local X=0)")
-        box.row().prop(settings, "mirror_keep", expand=True)
+        box.label(text="Mirror (local axes)")
+        row = box.row(align=True)
+        for index, axis in enumerate('XYZ'):
+            row.prop(settings, "mirror_axes", index=index, text=axis, toggle=True)
+        for index, prop in enumerate(('mirror_keep', 'mirror_keep_y', 'mirror_keep_z')):
+            if settings.mirror_axes[index]:
+                box.row().prop(settings, prop, expand=True)
+        box.prop(settings, "mirror_weights")
+        row = box.row()
+        row.enabled = settings.mirror_weights
+        row.prop(settings, "mirror_ignore_items")
         col = box.column(align=True)
         col.operator("medieval2toolkit.cut_mirror", icon='MOD_MIRROR')
-        col.operator("medieval2toolkit.apply_mirror_weights", icon='CHECKMARK')
+        col.operator("medieval2toolkit.apply_mirror_weights",
+                     text="Apply Mirror + Weights" if settings.mirror_weights else "Apply Mirror Only",
+                     icon='CHECKMARK')
         layout.operator("medieval2toolkit.weight_transfer", icon='MOD_DATA_TRANSFER')
         layout.prop(settings, "vert_mapping")
         layout.prop(settings, "clear_groups")

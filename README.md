@@ -117,7 +117,7 @@ Turn a finished battle unit into a campaign map model. The nine-step manual proc
 ### QOL (rigging & cleanup)
 
 - **Weight transfer** between meshes with selectable vertex mapping and an optional smoothing pass
-- **Cut + Mirror** bisects the selected meshes at local X=0 and mirrors the kept side; **Apply Mirror + Weights** applies it and swaps left/right bone weights on the mirrored half
+- **Cut + Mirror** bisects the selected meshes on any combination of local X/Y/Z and mirrors the kept sides; **Apply Mirror + Weights** applies it and swaps left/right bone weights on the mirrored copies (or **Apply Mirror Only** for geometry alone)
 - **Skeletons** — parent to a bundled game skeleton, rig with sample body weights, or a full setup including equipment props. The skeleton used is remembered and picks the matching IWTE task file
 - **IK control rigs** — `Auto` (archer layout for bow skeletons, infantry otherwise), `IK_Infantry`, `IK_Archer` and `IK_Dwarf`, parented over the unit with every non-weapon bone constrained to them, which is what the bundled pose library is written against. **Whole unit** covers a mount or siege engine in one press. **Remove Control Rig** un-parents and un-constrains cleanly
 - **Rename tools** — clean `.001` suffixes, switch bone case (`_R/_L` ↔ `_r/_l`), apply or swap game part prefixes (`weapon0__`, `shield0__`, …), toggle the `__opt` optional-part suffix
