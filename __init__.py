@@ -16,6 +16,7 @@ from .directories import ensureDataFiles
 ensureDataFiles()
 from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel, unit_export_panel, unit_info_panel, qol_panel, pose_panel, strat_panel, animation_panel
 from .panels import multi_panel
+from .tasks import variation_stats
 from bpy.props import EnumProperty, PointerProperty
 
 
@@ -41,6 +42,9 @@ class MED_2_TOOLKIT_PT_Main_Panel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Medieval 2 Toolkit"
+
+    def draw_header_preset(self, context):
+        updater.draw_header(self.layout)
 
     def draw(self, context):
         multi_panel.drawMainPanel(context, self.layout)
@@ -68,9 +72,11 @@ def register():
     animation_panel.register()
     # last: it imports the panel classes the modules above define
     multi_panel.register()
+    variation_stats.register()
 
 def unregister():
     updater.unregister()
+    variation_stats.unregister()
     multi_panel.unregister()
     for item in classes:
         bpy.utils.unregister_class(item)

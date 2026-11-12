@@ -120,10 +120,37 @@ def draw(layout):
         row.operator('medieval2toolkit.install_update', icon='IMPORT')
 
 
+def draw_header(layout):
+    """The sidebar's quiet version of draw(): one icon in the main panel's header,
+    with the status in its tooltip. Words only appear when something needs the
+    user - a newer release, a failure, or a restart after installing."""
+    row = layout.row(align=True)
+    if _restart:
+        row.alert = True
+        row.label(text='Restart Blender', icon='FILE_REFRESH')
+        return
+    if _release and _release['version'] > current_version() and not _busy:
+        row.operator('medieval2toolkit.install_update', icon='IMPORT',
+                     text='Update to v' + '.'.join(map(str, _release['version'])))
+        return
+    sub = row.row(align=True)
+    sub.enabled = not _busy and online()
+    sub.alert = _error
+    sub.operator('medieval2toolkit.check_update', text='',
+                 icon='SORTTIME' if _busy else 'ERROR' if _error else 'FILE_REFRESH')
+
+
 class MED2_OT_Check_Update(bpy.types.Operator):
     bl_idname = 'medieval2toolkit.check_update'
     bl_label = 'Check for Updates'
     bl_description = 'Check the latest published stable toolkit release on GitHub'
+
+    @classmethod
+    def description(cls, context, properties):
+        # The header shows only an icon, so the tooltip carries the status.
+        message = _message if online() else 'Enable Online Access in Preferences > System'
+        return 'Toolkit v%s - %s.\nCheck the latest published stable toolkit release on GitHub' % (
+            '.'.join(map(str, current_version())), message.rstrip('.'))
 
     def execute(self, context):
         start()

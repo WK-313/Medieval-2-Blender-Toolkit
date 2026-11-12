@@ -238,7 +238,6 @@ def drawWorkmodeGrid(context, layout):
 
 
 def drawMainPanel(context, layout):
-    updater.draw(layout)
     if usingClassicPanels(context):
         drawWorkmodeGrid(context, layout)
     else:
