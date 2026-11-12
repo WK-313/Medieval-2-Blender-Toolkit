@@ -4,6 +4,8 @@ from ..tasks.armature_tools import skeletonItems, parentToSkeleton
 from ..tasks.control_rig import (CONTROL_RIG_TYPES, controlRigOf, controlledRigs, createControlRig,
                                  deleteControlRig, isControlRig)
 from ..tasks.unit_groups import createGroupControlRigs, groupParts, groupRoot
+from ..tasks.mesh_mirror import M2_SIDE_NAME, applyMirror, cutMirror, flipMirror
+from ..tasks.paint_symmetry import PAINT_NAMES, paintRig, togglePaintSymmetry
 from ..tasks.export_checks import (
     OPT_SUFFIX, DEFAULT_UV_NAME, cleanUVLayers, splitNumberSuffix, hasOptSuffix, addOptSuffix,
     removeOptSuffix, splitOptSuffix,
@@ -157,13 +159,8 @@ class MirrorOperation:
                 and any(o.type == 'MESH' for o in context.selected_objects))
 
     def execute(self, context):
-        from ..tasks.mesh_mirror import cutMirror, applyMirror
         from .unit_export_panel import showResultsPopup
         meshes = [o for o in context.selected_objects if o.type == 'MESH']
-        settings = context.scene.med2_toolkit_qol
-        axes = tuple(settings.mirror_axes)
-        sides = tuple(getattr(settings, prop) == 'POSITIVE'
-                      for prop in ('mirror_keep', 'mirror_keep_y', 'mirror_keep_z'))
         # Meshes can be selected with no active object.
         original_mode = context.object.mode if context.object else 'OBJECT'
         reports = []
@@ -173,11 +170,7 @@ class MirrorOperation:
         try:
             for obj in meshes:
                 try:
-                    if self.apply_mirror:
-                        lines = applyMirror(context, obj, mirror_weights=settings.mirror_weights,
-                                            ignore_primary_secondary=settings.mirror_ignore_items)
-                    else:
-                        lines = cutMirror(obj, axes=axes, keep_sides=sides)
+                    lines = self.mirrorMesh(context, obj)
                     reports.extend(('INFO', line) for line in lines)
                     completed += 1
                 except (ValueError, RuntimeError) as exc:
@@ -197,14 +190,69 @@ class MED_2_TOOLKIT_OT_Cut_Mirror(MirrorOperation, bpy.types.Operator):
     bl_idname = "medieval2toolkit.cut_mirror"
     bl_label = "Cut + Mirror"
     bl_description = "Bisect selected meshes on the selected local axes, keep the chosen sides and add a Mirror with clipping"
-    apply_mirror = False
+
+    def mirrorMesh(self, context, obj):
+        settings = context.scene.med2_toolkit_qol
+        sides = tuple(getattr(settings, prop) == 'POSITIVE'
+                      for prop in ('mirror_keep', 'mirror_keep_y', 'mirror_keep_z'))
+        return cutMirror(obj, axes=settings.mirror_axes, keep_sides=sides)
 
 
 class MED_2_TOOLKIT_OT_Apply_Mirror(MirrorOperation, bpy.types.Operator):
     bl_idname = "medieval2toolkit.apply_mirror_weights"
     bl_label = "Apply Mirror + Weights"
     bl_description = "Apply the Cut + Mirror modifier; optionally swap left/right bone weights on mirrored copies"
-    apply_mirror = True
+
+    def mirrorMesh(self, context, obj):
+        settings = context.scene.med2_toolkit_qol
+        return applyMirror(context, obj, mirror_weights=settings.mirror_weights,
+                           ignore_primary_secondary=settings.mirror_ignore_items)
+
+
+class MED_2_TOOLKIT_OT_Flip_Mirror(MirrorOperation, bpy.types.Operator):
+    bl_idname = "medieval2toolkit.flip_mirror"
+    bl_label = "Mirror + Flip Weights"
+    bl_description = "Reflect the whole mesh across local X=0 and swap left/right bone weights"
+
+    def mirrorMesh(self, context, obj):
+        return flipMirror(obj)
+
+
+class MED_2_TOOLKIT_OT_Paint_Symmetry(bpy.types.Operator):
+    bl_idname = "medieval2toolkit.paint_symmetry"
+    bl_label = "Medieval II Paint Symmetry"
+    bl_description = "Use Blender-compatible left/right names while painting and restore the game names before export"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        rig = paintRig(context.object)
+        return (context.mode in {'OBJECT', 'PAINT_WEIGHT', 'POSE'} and rig is not None
+                and (context.object.type == 'MESH' or PAINT_NAMES in rig.data))
+
+    def execute(self, context):
+        from .unit_export_panel import showResultsPopup
+        rig = paintRig(context.object)
+        restoring = PAINT_NAMES in rig.data
+        try:
+            lines = togglePaintSymmetry(rig, context.object)
+        except ValueError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        title = "Restore Medieval II Bone Names" if restoring else "Medieval II Paint Symmetry Enabled"
+        showResultsPopup(context, title, [('INFO', line) for line in lines])
+        self.report({'INFO'}, title)
+        return {'FINISHED'}
+
+
+def drawPaintSymmetry(self, context):
+    rig = paintRig(context.object)
+    if rig is None:
+        return
+    if PAINT_NAMES in rig.data:
+        self.layout.operator("medieval2toolkit.paint_symmetry", text="Restore Medieval II Bone Names")
+    elif context.object.type == 'MESH' and any(M2_SIDE_NAME.fullmatch(b.name) for b in rig.data.bones):
+        self.layout.operator("medieval2toolkit.paint_symmetry", text="Enable Medieval II Paint Symmetry")
 
 
 class MED_2_TOOLKIT_OT_Clean_Suffix(bpy.types.Operator):
@@ -657,6 +705,8 @@ class MED_2_TOOLKIT_PT_Weight_Transfer(bpy.types.Panel):
         col.operator("medieval2toolkit.apply_mirror_weights",
                      text="Apply Mirror + Weights" if settings.mirror_weights else "Apply Mirror Only",
                      icon='CHECKMARK')
+        box.operator("medieval2toolkit.flip_mirror", icon='MOD_MIRROR')
+        drawPaintSymmetry(self, context)
         layout.operator("medieval2toolkit.weight_transfer", icon='MOD_DATA_TRANSFER')
         layout.prop(settings, "vert_mapping")
         layout.prop(settings, "clear_groups")
@@ -791,6 +841,8 @@ classes = [
     MED_2_TOOLKIT_QOL_Data,
     MED_2_TOOLKIT_OT_Cut_Mirror,
     MED_2_TOOLKIT_OT_Apply_Mirror,
+    MED_2_TOOLKIT_OT_Flip_Mirror,
+    MED_2_TOOLKIT_OT_Paint_Symmetry,
     MED_2_TOOLKIT_OT_Weight_Transfer,
     MED_2_TOOLKIT_OT_Clean_Suffix,
     MED_2_TOOLKIT_OT_Rename_Bones_Upper_To_Lower,
@@ -807,12 +859,26 @@ classes = [
     MED_2_TOOLKIT_OT_Delete_Control_Rig,
     ]
 
+PAINT_SYMMETRY_PANELS = (
+    'VIEW3D_PT_tools_weightpaint_symmetry',
+    'VIEW3D_PT_tools_weightpaint_symmetry_for_topbar',
+)
+
+
 def register():
     for item in classes:
         bpy.utils.register_class(item)
     bpy.types.Scene.med2_toolkit_qol = PointerProperty(type=MED_2_TOOLKIT_QOL_Data)
+    for name in PAINT_SYMMETRY_PANELS:
+        panel = getattr(bpy.types, name, None)
+        if panel is not None:
+            panel.append(drawPaintSymmetry)
 
 def unregister():
+    for name in PAINT_SYMMETRY_PANELS:
+        panel = getattr(bpy.types, name, None)
+        if panel is not None:
+            panel.remove(drawPaintSymmetry)
     for item in classes:
         bpy.utils.unregister_class(item)
     del bpy.types.Scene.med2_toolkit_qol
