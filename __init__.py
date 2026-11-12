@@ -11,6 +11,7 @@ bl_info = {
 }
 
 import bpy
+from . import updater
 from .directories import ensureDataFiles
 ensureDataFiles()
 from .panels import mod_data, edu_panel, bmdb_panel, settlements_panel, unit_export_panel, unit_info_panel, qol_panel, pose_panel, strat_panel, animation_panel
@@ -51,6 +52,7 @@ classes = [
     ]
 
 def register():
+    updater.register()
     for item in classes:
         bpy.utils.register_class(item)
     bpy.types.Scene.med2_toolkit_mode = PointerProperty(type=MED_2_TOOLKIT_Mode_Selection)
@@ -68,6 +70,7 @@ def register():
     multi_panel.register()
 
 def unregister():
+    updater.unregister()
     multi_panel.unregister()
     for item in classes:
         bpy.utils.unregister_class(item)

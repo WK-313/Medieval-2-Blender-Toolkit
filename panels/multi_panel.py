@@ -23,6 +23,7 @@ Two things worth knowing:
 """
 
 import bpy
+from .. import updater
 from bpy.props import EnumProperty, StringProperty
 
 from .animation_panel import MED_2_TOOLKIT_PT_Animations
@@ -172,6 +173,7 @@ class MED_2_TOOLKIT_Preferences(bpy.types.AddonPreferences):
         update = panelLayoutChanged)
 
     def draw(self, context):
+        updater.draw(self.layout)
         self.layout.prop(self, "panel_layout", expand=True)
 
 
@@ -236,6 +238,7 @@ def drawWorkmodeGrid(context, layout):
 
 
 def drawMainPanel(context, layout):
+    updater.draw(layout)
     if usingClassicPanels(context):
         drawWorkmodeGrid(context, layout)
     else:
