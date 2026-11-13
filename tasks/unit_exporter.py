@@ -572,7 +572,20 @@ def exportArmatureGLB(context):
     # The GLB references textures by image name, so temporarily rename the
     # images to their output names for the duration of the export.
     image_name_backup = []
+    # glTF writes one primitive per material a mesh uses, and IWTE turns every
+    # primitive into its own part, so a hood using a hood and a helmet texture
+    # came out as two parts. For the export, point every face at the mesh's
+    # most-used material; the face materials are restored after.
+    material_index_backup = []
     try:
+        for data in {obj.data for obj in meshes}:
+            indices = [poly.material_index for poly in data.polygons]
+            if len(set(indices)) > 1:
+                material_index_backup.append((data, indices))
+                dominant = max(set(indices), key=indices.count)
+                data.polygons.foreach_set("material_index", [dominant] * len(indices))
+                data.update()
+
         for obj, was_hidden in visibility_backup:
             if was_hidden:
                 obj.hide_set(False)
@@ -610,6 +623,9 @@ def exportArmatureGLB(context):
             export_animations=export_data.export_animations
         )
     finally:
+        for data, indices in material_index_backup:
+            data.polygons.foreach_set("material_index", indices)
+            data.update()
         for image, original_name in image_name_backup:
             image.name = original_name
         for modifier, show_viewport, show_render in modifier_backup:
