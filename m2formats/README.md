@@ -102,3 +102,5 @@ and bone-link tables before serializing a malformed archive.
 The strict-reader and writer-validation changes are shared with Unit Transfer;
 `meshwrite.py` is identical in both projects. The addon keeps its own `entry_view`
 adapter. Small-model regressions cover both copies.
+
+- `gamepack.py`: copied 2026-11-16 from Unit Transfer `unittransfer/gamepack.py` (base-game `packs/*.pack` reader, LZO1X). Its two `config` uses are replaced: `game_root_of` has no saved-install fallback, and `extract` writes to `CACHE_DIR` (system temp `med2-toolkit-gamepack`).

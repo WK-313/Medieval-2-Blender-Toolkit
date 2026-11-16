@@ -9,11 +9,23 @@ from types import SimpleNamespace
 
 import bpy
 
-from ..m2formats import animpack, casanim, engines, mesh, modeldb, modelexport
+from ..m2formats import animpack, casanim, engines, gamepack, mesh, modeldb, modelexport
 from .strat_reader import resolveStratPath
 from .unit_exporter import selectedModFolder
 
 _databases = {}
+
+
+def findDataFile(root, relative, vanilla=None):
+    """A data file the way the game finds it: the mod, the game's loose data/,
+    then the base game's packs/*.pack (read out once into a temp cache). Mods
+    ship only what they change, so e.g. DaC's mount_heavy_horse mesh exists
+    only inside data_*.pack."""
+    path = resolveStratPath(root, relative, vanilla)
+    if path is None and vanilla is not None:
+        packed = gamepack.extract(relative, Path(vanilla).parent)
+        path = Path(packed) if packed else None
+    return path
 
 
 def enabled(context=None):
@@ -26,7 +38,7 @@ def modelEntry(context, model_id, faction=''):
         raise ValueError('Select a mod data folder in Paths first')
     root = Path(bpy.path.abspath(value)).resolve()
     vanilla = Path(bpy.path.abspath(context.scene.med2_toolkit_reader.directory_med2)) / 'data'
-    path = resolveStratPath(root, 'unit_models/battle_models.modeldb')
+    path = findDataFile(root,'unit_models/battle_models.modeldb')
     if path is None:
         raise ValueError('No battle_models.modeldb in the selected mod')
     stamp = (path.stat().st_mtime_ns, path.stat().st_size)
@@ -68,9 +80,9 @@ def sources(context, model_id, faction=''):
     root, vanilla, entry = modelEntry(context, model_id, faction)
     if not entry.lods:
         raise ValueError('No mesh LOD for %s' % model_id)
-    mesh_path = resolveStratPath(root, entry.lods[0][0], vanilla)
+    mesh_path = findDataFile(root,entry.lods[0][0], vanilla)
     if mesh_path is None:
-        raise ValueError('Unpacked mesh not found: %s' % entry.lods[0][0])
+        raise ValueError('Mesh not found in the mod, game data or packs: %s' % entry.lods[0][0])
     return root, vanilla, entry, mesh_path
 
 
@@ -217,9 +229,9 @@ def textureFiles(root, vanilla, entry, faction, folder):
         selected = selected or next((t for t in textures if t.faction.casefold() == 'all'), textures[0])
         files = []
         for relative in (selected.texture, selected.normal):
-            path = resolveStratPath(root, relative, vanilla)
+            path = findDataFile(root,relative, vanilla)
             if path is None:
-                raise ValueError('Unpacked texture not found: %s' % relative)
+                raise ValueError('Texture not found in the mod, game data or packs: %s' % relative)
             content = path.read_bytes()
             # Game .texture wraps the DDS in 48 bytes; some mods store bare DDS.
             if not content.startswith(b'DDS '):
@@ -304,9 +316,9 @@ def importEngine(context, engine_id, unit_name, output_folder):
         raise ValueError('Select a mod data folder in Paths first')
     root = Path(bpy.path.abspath(value)).resolve()
     vanilla = Path(bpy.path.abspath(context.scene.med2_toolkit_reader.directory_med2)) / 'data'
-    descriptor = resolveStratPath(root, 'descr_engines.txt', vanilla)
+    descriptor = findDataFile(root,'descr_engines.txt', vanilla)
     if descriptor is None:
-        raise ValueError('No unpacked descr_engines.txt')
+        raise ValueError('descr_engines.txt not found in the mod, game data or packs')
     entries = engines.parse_file(descriptor).get_all(engine_id)
     if len(entries) != 1:
         raise ValueError('Engine is missing or has culture/variant alternatives; use IWTE: %s' % engine_id)
@@ -314,13 +326,13 @@ def importEngine(context, engine_id, unit_name, output_folder):
     if len(groups) != 1 or not groups[0].meshes:
         raise ValueError('Engine has no unambiguous normal model: %s' % engine_id)
     group = groups[0]
-    path = resolveStratPath(root, group.meshes[0], vanilla)
-    descriptor = resolveStratPath(root, 'descr_engine_skeleton.txt', vanilla)
+    path = findDataFile(root,group.meshes[0], vanilla)
+    descriptor = findDataFile(root,'descr_engine_skeleton.txt', vanilla)
     if path is None or descriptor is None:
-        raise ValueError('Engine mesh or skeleton descriptor is not unpacked: %s' % engine_id)
+        raise ValueError('Engine mesh or skeleton descriptor not found in the mod, game data or packs: %s' % engine_id)
     skeleton_entry = engines.parse_skeleton_file(descriptor).get(group.skeleton)
     defaults = [p for key, p in skeleton_entry.anims if key == 'default'] if skeleton_entry else []
-    animation = resolveStratPath(root, defaults[0], vanilla) if len(defaults) == 1 else None
+    animation = findDataFile(root,defaults[0], vanilla) if len(defaults) == 1 else None
     if animation is None:
         raise ValueError('Engine default skeleton CAS is missing or ambiguous: %s' % group.skeleton)
     skeleton = casanim.read_anim(animation)
