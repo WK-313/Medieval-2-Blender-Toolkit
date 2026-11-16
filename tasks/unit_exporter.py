@@ -218,6 +218,9 @@ def runTexconv(texconv, source, tex_dir, out_base, opaque_alpha=False):
         "-m", "0",
         "-nologo",
         "-y",
+        # the game header (writeTexture) only takes power-of-two sides; -pow2
+        # rounds each side to one and leaves a power-of-two source untouched
+        "-pow2",
         # -srgb is -srgbi AND -srgbo: decode sRGB on the way in, re-encode it on
         # the way out, so the bytes come through unchanged. Without it, anything
         # texconv reads as an _SRGB format - a Blender png, which always carries
@@ -302,6 +305,28 @@ def writeTexture(savefiletexture, ddsdata):
 
 SUPPORTED_TEXTURE_EXTS = ('.png', '.jpg', '.jpeg', '.tga', '.dds')
 
+def imageSize(path):
+    """(width, height) of an image on disk, or None when it can't be read. A
+    .dds is read from its header; anything else through Blender's loader."""
+    try:
+        with open(path, "rb") as f:
+            header = f.read(20)
+    except OSError:
+        return None
+    if header[0:4] == b'DDS ':
+        height, width = struct.unpack("<2I", header[12:20])
+        return (width, height)
+    try:
+        image = bpy.data.images.load(path, check_existing=False)
+    except RuntimeError:
+        return None
+    size = tuple(image.size)
+    bpy.data.images.remove(image)
+    return size if size[0] and size[1] else None
+
+def isPowerOfTwoImage(size):
+    return bool(size) and all(n > 0 and n & (n - 1) == 0 for n in size)
+
 def textureFromFile(texconv, source, tex_dir, out_base, diffuse=False, opaque_alpha=False):
     """Copy an image into tex_dir under out_base, convert it to mipped DXT5 and
     wrap that .dds as out_base.texture.
@@ -320,6 +345,7 @@ def textureFromFile(texconv, source, tex_dir, out_base, diffuse=False, opaque_al
     dst = os.path.join(tex_dir, out_base + ext)
     if not (os.path.exists(dst) and os.path.samefile(source, dst)):
         shutil.copy2(source, dst)
+    source_size = imageSize(dst)
 
     force_opaque = diffuse and opaque_alpha
     if force_opaque:
@@ -334,7 +360,8 @@ def textureFromFile(texconv, source, tex_dir, out_base, diffuse=False, opaque_al
         # A flat DXT file is recompressed too - the game picks a mip level
         # by distance, so one without a chain shimmers and stays at full
         # resolution at every range. Everything texconv writes is mipped.
-        if ddsFourcc(dst) not in DXT_FOURCCS or ddsMipCount(dst) <= 1:
+        # A non-power-of-two one is recompressed so -pow2 can resize it.
+        if ddsFourcc(dst) not in DXT_FOURCCS or ddsMipCount(dst) <= 1 or not isPowerOfTwoImage(source_size):
             dds = runTexconv(texconv, dst, tex_dir, out_base)
     else:
         dds = runTexconv(texconv, dst, tex_dir, out_base)
@@ -346,6 +373,11 @@ def textureFromFile(texconv, source, tex_dir, out_base, diffuse=False, opaque_al
         error = writeTexture(os.path.join(tex_dir, out_base + ".texture"), f.read())
     if error:
         return error, None
+
+    resized = imageSize(dds)
+    if source_size and resized and resized != source_size:
+        return None, "%s.texture resized from %dx%d to %dx%d (the game needs power-of-two sides)" % (
+            (out_base,) + tuple(source_size) + tuple(resized))
 
     # every branch above either ran texconv (-m 0, a full chain) or passed
     # through a .dds that already had one, so a flat result means the conversion
