@@ -2,12 +2,12 @@ import os
 import re
 import json
 from pathlib import Path
-from .text_io import readModLines
+from .text_io import readModLines, dataPath
 
 def bmdbReader(mod_folder):
     # read bmdb into list and clear unnecessary info.
     try:
-        lines = readModLines(os.path.join(mod_folder, 'unit_models', 'battle_models.modeldb'), 'utf-8')
+        lines = readModLines(dataPath(mod_folder, 'unit_models', 'battle_models.modeldb'), 'utf-8')
         bmdb_text = ' '.join(''.join(lines).splitlines())
         bmdb_text = bmdb_text.lower().strip()
     except FileNotFoundError as error:

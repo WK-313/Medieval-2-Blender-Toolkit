@@ -3,7 +3,7 @@ import re
 import json
 import unicodedata
 from pathlib import Path
-from .text_io import readModLines
+from .text_io import readModLines, dataPath
 
 # Lines of an EDU entry the toolkit cares about. Everything else - the stats,
 # the costs, the attributes - is left to the game and to a text editor.
@@ -144,12 +144,12 @@ def eduEntries(cleaned, eop_file=''):
 
 def eduReader(mod_folder, eop_directory=''):
     try:
-        lines = readModLines(os.path.join(mod_folder, 'descr_sm_factions.txt'), 'utf-8')
+        lines = readModLines(dataPath(mod_folder, 'descr_sm_factions.txt'), 'utf-8')
         available_factions_list = [re.sub(";.*", " ", line).lower().rstrip().split()[1] for line in lines if line[:7].lower() == 'faction']
     except FileNotFoundError as error:
         return('No descr_sm_factions.txt found in the specified directory.\n%s' % error)
     try:
-        lines = readModLines(os.path.join(mod_folder, 'text', 'expanded.txt'), 'utf-16')
+        lines = readModLines(dataPath(mod_folder, 'text', 'expanded.txt'), 'utf-16')
         skips = ['_descr}', '_descr_short}']
         expanded_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
     except FileNotFoundError as error:
@@ -163,13 +163,13 @@ def eduReader(mod_folder, eop_directory=''):
                 normalized_faction_name = unicodedata.normalize('NFKD', faction_name).encode('ascii', 'ignore')
                 faction_database[normalized_faction_name.decode('ascii')] = faction
     try:
-        lines = readModLines(os.path.join(mod_folder, 'export_descr_unit.txt'), 'utf-8')
+        lines = readModLines(dataPath(mod_folder, 'export_descr_unit.txt'), 'utf-8')
         edu_cleaned = eduKeywordLines(lines)
     except FileNotFoundError as error:
         return('No export_descr_unit.txt found in the specified directory.\n%s' % error)
 
     try:
-        lines = readModLines(os.path.join(mod_folder, 'text', 'export_units.txt'), 'utf-16')
+        lines = readModLines(dataPath(mod_folder, 'text', 'export_units.txt'), 'utf-16')
         skips = ['_descr}', '_descr_short}']
         eu_lines = [line.lower().rstrip() for line in lines if line[0] == '{' and not any (x in line for x in skips)]
     except FileNotFoundError as error:
@@ -235,7 +235,7 @@ def eduReader(mod_folder, eop_directory=''):
         unit_database[label] = unit
 
     try:
-        m_lines = readModLines(os.path.join(mod_folder, 'descr_mount.txt'), 'utf-8')
+        m_lines = readModLines(dataPath(mod_folder, 'descr_mount.txt'), 'utf-8')
         save = ['type', 'model', 'root_node_height', 'rider_offset']
         mount_lines = [re.sub("(;.*)|(,)", " ", line).lower().rstrip().split() for line in m_lines if line[0] != ';' and any (x in line for x in save)]
     except FileNotFoundError as error:
@@ -265,7 +265,7 @@ def eduReader(mod_folder, eop_directory=''):
     #   -------------  #
 
     try:
-        e_lines = readModLines(os.path.join(mod_folder, 'descr_engines.txt'), 'utf-8')
+        e_lines = readModLines(dataPath(mod_folder, 'descr_engines.txt'), 'utf-8')
         save = ['type', 'engine_mesh', 'engine_dock_dist', 'obstacle_x_radius']
         engine_lines = [re.sub(";.*", " ", line).lower().rstrip().split() for line in e_lines if line[0] != ';' and any (x in line for x in save)]
     except FileNotFoundError as error:

@@ -9,6 +9,7 @@ import bpy
 
 from ..m2formats import animpack, casanim, engines, gamepack, mesh, modeldb, modelexport
 from .strat_reader import resolveStratPath
+from .text_io import dataPath
 from .unit_exporter import selectedModFolder
 
 _databases = {}
@@ -20,6 +21,11 @@ def findDataFile(root, relative, vanilla=None):
     ship only what they change, so e.g. DaC's mount_heavy_horse mesh exists
     only inside data_*.pack."""
     path = resolveStratPath(root, relative, vanilla)
+    if path is None:
+        # the selected folder's own packs: a Kingdoms campaign (mods/crusades)
+        # or the base game itself, which ships everything packed
+        packed = Path(dataPath(root, relative))
+        path = packed if packed.is_file() else None
     if path is None and vanilla is not None:
         packed = gamepack.extract(relative, Path(vanilla).parent)
         path = Path(packed) if packed else None

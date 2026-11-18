@@ -6,7 +6,7 @@ from pathlib import Path
 from .bmdb_panel import sortModels
 from .settlements_panel import sortSettlements
 from ..tasks import edu_reader, bmdb_reader, settlements_reader
-from ..directories import (modFolderName, readJsonCached, saveFolderPaths, saveSettings,
+from ..directories import (modFolderName, pathParts, readJsonCached, saveFolderPaths, saveSettings,
                            BACKEND_ITEMS, loadBackend, storeValue)
 
 script_folder = Path(__file__).parent.parent
@@ -65,14 +65,35 @@ def modFolders(master_directory):
                 mods.append(os.path.join(mod_path, subdir))
     return mods
 
+# The Kingdoms expansion's four campaigns, which install as mods/<name> and
+# keep their files in their own packs/ - labelled as DLC in the Mod dropdown.
+KINGDOMS_CAMPAIGNS = {'americas': 'Americas', 'british_isles': 'Britannia',
+                      'crusades': 'Crusades', 'teutonic': 'Teutonic'}
+
 def refreshMods(self, context):
-    master_directory = os.path.join(bpy.path.abspath(context.scene.med2_toolkit_reader.directory_med2), "mods")
+    game = bpy.path.abspath(context.scene.med2_toolkit_reader.directory_med2)
+    master_directory = os.path.join(game, "mods")
     mods = modFolders(master_directory)
+    # the base game itself, first: its data/ is nearly empty, and the reads
+    # go through text_io.dataPath into packs/data_*.pack
+    if os.path.isdir(os.path.join(game, "packs")):
+        mods.insert(0, os.path.join(game, "data"))
     with open(script_folder/('text/directories.json'), 'r') as directories_list:
         file_paths = json.load(directories_list)
     file_paths["directory_mod_list"] = ','.join(mods)
     with open(script_folder/('text/directories.json'), 'w') as directories_output:
         json.dump(file_paths, directories_output, indent=2)
+
+def modLabel(data_folder):
+    """The Mod dropdown's name for a data folder: the mod folder, or Base game
+    for the game's own data/, or the campaign name for Kingdoms DLC."""
+    parts = [part.lower() for part in pathParts(data_folder)]
+    if len(parts) >= 3 and parts[-3] == 'mods' and parts[-2] in KINGDOMS_CAMPAIGNS:
+        return 'DLC: Kingdoms - %s' % KINGDOMS_CAMPAIGNS[parts[-2]]
+    if len(parts) < 3 or parts[-3] != 'mods':
+        if os.path.isdir(os.path.join(os.path.dirname(os.path.normpath(data_folder)), 'packs')):
+            return 'Base game'
+    return modFolderName(data_folder)
 
 def modList(self, context):
     mod_string = context.scene.med2_toolkit_reader.list_holder
@@ -87,7 +108,7 @@ def modList(self, context):
         # written on Windows still labels its entries when read on Linux - the
         # old split on a literal backslash raised IndexError there, and a failing
         # items callback leaves the dropdown with no items at all
-        enum_list.append((mod, modFolderName(mod), mod))
+        enum_list.append((mod, modLabel(mod), mod))
     entry = ("custom", "Custom", "")
     enum_list.append(entry)
     return enum_list
@@ -221,6 +242,12 @@ class MED2_TOOLKIT_PT_Mod_Data(bpy.types.Panel):
         row.operator("medieval2toolkit.refresh_mods", icon = "FILE_REFRESH", text = "")
         if context.scene.med2_toolkit_reader.mods_filtered == "custom":
             col.prop (context.scene.med2_toolkit_reader, "directory_mod_data", text="Manual Path")
+        elif (mode in ('unit_import', 'unit_info')
+              and context.scene.med2_toolkit_reader.backend_battle_import == 'IWTE'
+              and (modLabel(context.scene.med2_toolkit_reader.mods_filtered) == 'Base game'
+                   or modLabel(context.scene.med2_toolkit_reader.mods_filtered).startswith('DLC:'))):
+            # IWTE reads loose files only, and these keep their models packed
+            col.label(text="Base game/DLC models need the Built-in importer", icon='ERROR')
         # the EOP folder only carries units, so it is drawn in the modes that
         # read them and left out of the settlement ones
         if mode in ('unit_import', 'unit_export', 'unit_info'):
