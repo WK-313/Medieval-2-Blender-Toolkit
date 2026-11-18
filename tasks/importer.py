@@ -1,6 +1,7 @@
 import bpy
 import json
 import random
+import re
 from pathlib import Path
 from . import recurlayercollection, battle_import
 from ..directories import withTrailingSep
@@ -28,6 +29,14 @@ def importedArmature(existing_objects):
         if obj not in existing_objects and obj.type == 'ARMATURE':
             return obj
     return None
+
+def unitFolder(model_folder, unit_id):
+    """<Unit Output>/<unit id>/ - where one unit's meshes and its textures/
+    folder live, for IWTE and the built-in converter alike. One flat folder for
+    every unit let two units with a same-named texture overwrite each other.
+    Characters Windows refuses in a file name become '_'."""
+    name = re.sub(r'[<>:"/\\|?*]', '_', unit_id).strip(' .') or 'unit'
+    return withTrailingSep(withTrailingSep(model_folder) + name)
 
 def selectionBoundingBox():
     selection_bounding_box = []

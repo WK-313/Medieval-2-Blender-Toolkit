@@ -11,9 +11,9 @@ from..directories import saveFolderPaths, saveSettings, readJsonCached
 from ..tasks import battle_import
 from ..tasks.card_renderer import CAMERA_TAG, SUN_TAG, TARGET_TAG, cameraName
 from ..tasks.control_rig import controlRigOf, controlledRigs, isControlRig
-from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport, missingModelPaths, unconvertedModels
+from ..tasks.importer import unitChecker, fileChecker, unitImporter, modelImporter, importedArmature, hideVariations, postImport, missingModelPaths, unconvertedModels, unitFolder
 from ..tasks.iwte_run import IWTE_STALL_SECONDS, abortIWTEJob, iwteStalled, redrawView3D
-from ..tasks.task_writer import unitTaskWriter, engineTaskWriter, startTask
+from ..tasks.task_writer import unitTaskWriter, engineTaskWriter, startTask, unitTaskAppend, engineTaskAppend
 from ..tasks.unit_groups import adoptGroup, deriveRole, groupId, groupParts, groupRoot, unitRole
 from .unit_export_panel import SEVERITY_ORDER, askAboutStall, showResultsPopup
 
@@ -419,20 +419,20 @@ class MED_2_TOOLKIT_OT_Unit_Importer(bpy.types.Operator):
         return _import_job is None
 
     def execute(self, context):
-        model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
         faction = context.scene.med2_toolkit_units.import_faction
         upgrades = selectedUpgrades(context)
         if not upgrades:
             self.report({'ERROR'}, "Tick at least one upgrade level to import")
             return{"CANCELLED"}
         unit_info = json.loads(context.scene.med2_toolkit_units.import_unit)
+        model_folder = unitFolder(bpy.context.scene.med2_toolkit_reader.directory_models, unit_info['ID'])
         # first ticked upgrade sits at the origin, the rest march out along +X
         # using the same half-width spacing as Import Full Unit
         coordinates = [0, 0, 0]
         saveFolderPaths()
         saveSettings()
-        unitTaskWriter()
-        engineTaskWriter()
+        unitTaskWriter(model_folder)
+        engineTaskWriter(model_folder)
         results = []
         for upgrade in upgrades:
             try:
@@ -482,15 +482,15 @@ class MED_2_TOOLKIT_OT_Officer_Importer(bpy.types.Operator):
         with open(script_folder/('text/model_dictionary.json'), 'r') as bmdb_input:
             bmdb_dictionary = json.load(bmdb_input)
 
-        model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
         faction = context.scene.med2_toolkit_units.import_faction
         unit_info = json.loads(context.scene.med2_toolkit_units.import_unit)
+        model_folder = unitFolder(bpy.context.scene.med2_toolkit_reader.directory_models, unit_info['ID'])
         officers = unit_info['Officers']
         coordinates = [0, 0, 0]
         saveFolderPaths()
         saveSettings()
-        unitTaskWriter()
-        engineTaskWriter()
+        unitTaskWriter(model_folder)
+        engineTaskWriter(model_folder)
         fileChecker(model_folder, officers)
         results = []
         for officer in officers:
@@ -584,37 +584,54 @@ def buildImportQueue(unit_info_list, import_officers):
 
 
 def prepareConversions(model_folder, unit_info_list, import_officers):
-    """Everything the batch needs and has not got, appended to the IWTE task
-    files but NOT handed to IWTE - the caller runs one conversion for the lot
-    and watches it. Returns the list of conversions to run."""
+    """Everything the batch needs and has not got, as IWTE conversions the
+    caller runs one after another and watches. Each unit converts into its own
+    folder (unitFolder) and IWTE takes one output folder per task, so there is
+    one conversion per unit and per task type; its task file is written just
+    before it starts (writeConversionTask). Returns the list."""
     if battle_import.enabled():
         # Native models are built per queue entry; errors stay with that entry.
         return []
-    unitTaskWriter()
-    engineTaskWriter()
-    missing_units, missing_engines = [], []
+    conversions = []
     for unit_info in unit_info_list:
+        folder = unitFolder(model_folder, unit_info['ID'])
+        # the checkers append to the task files as they go, so they have to
+        # exist; each is written again when its conversion starts
+        unitTaskWriter(folder)
+        engineTaskWriter(folder)
+        missing_units, missing_engines = [], []
         for level in range(len(unit_info['Model'])):
-            units, engines = unitChecker(model_folder, [unit_info], level, defer=True)
+            units, engines = unitChecker(folder, [unit_info], level, defer=True)
             missing_units += units
             missing_engines += engines
         if import_officers:
-            missing_units += fileChecker(model_folder, unit_info['Officers'], defer=True)
-    # a model shared by several units is in the task file once, so count it once
-    missing_units = list(dict.fromkeys(missing_units))
-    missing_engines = list(dict.fromkeys(missing_engines))
-    conversions = []
-    if missing_units:
-        conversions.append({'task': 'toolkit_bmdb_task.txt',
-                            'expected': missingModelPaths(model_folder, missing_units, []),
-                            'what': "Converting %d unit mesh%s with IWTE"
-                                    % (len(missing_units), "" if len(missing_units) == 1 else "es")})
-    if missing_engines:
-        conversions.append({'task': 'toolkit_engine_task.txt',
-                            'expected': missingModelPaths(model_folder, [], missing_engines),
-                            'what': "Converting %d siege engine%s with IWTE"
-                                    % (len(missing_engines), "" if len(missing_engines) == 1 else "s")})
+            missing_units += fileChecker(folder, unit_info['Officers'], defer=True)
+        missing_units = list(dict.fromkeys(missing_units))
+        missing_engines = list(dict.fromkeys(missing_engines))
+        if missing_units:
+            conversions.append({'task': 'toolkit_bmdb_task.txt', 'folder': folder, 'models': missing_units,
+                                'expected': missingModelPaths(folder, missing_units, []),
+                                'what': "%s: converting %d unit mesh%s with IWTE"
+                                        % (unit_info['ID'], len(missing_units), "" if len(missing_units) == 1 else "es")})
+        if missing_engines:
+            conversions.append({'task': 'toolkit_engine_task.txt', 'folder': folder, 'models': missing_engines,
+                                'expected': missingModelPaths(folder, [], missing_engines),
+                                'what': "%s: converting %d siege engine%s with IWTE"
+                                        % (unit_info['ID'], len(missing_engines), "" if len(missing_engines) == 1 else "s")})
     return conversions
+
+
+def writeConversionTask(conversion):
+    """The task file for one conversion from prepareConversions: that unit's
+    folder as the output, and only that unit's missing models."""
+    if conversion['task'] == 'toolkit_engine_task.txt':
+        engineTaskWriter(conversion['folder'])
+        append = engineTaskAppend
+    else:
+        unitTaskWriter(conversion['folder'])
+        append = unitTaskAppend
+    for model in conversion['models']:
+        append(model)
 
 
 def importStep(context, job):
@@ -632,7 +649,7 @@ def importStep(context, job):
 
 def runImportEntry(job, entry):
     unit_info = entry['unit_info']
-    model_folder = job['model_folder']
+    model_folder = unitFolder(job['model_folder'], unit_info['ID'])
     faction = job['faction']
 
     if entry['unit'] != job['current_unit']:
@@ -807,6 +824,7 @@ class BatchImportBase:
             conversion = job['conversions'][job['convert_index']]
             job['convert_what'] = conversion['what']
             try:
+                writeConversionTask(conversion)
                 job['process'] = startTask(context.scene.med2_toolkit_reader.directory_iwte,
                                            conversion['task'])
             except (OSError, RuntimeError) as error:

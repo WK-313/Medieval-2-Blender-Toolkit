@@ -5,7 +5,7 @@ from bpy.app.handlers import persistent
 from pathlib import Path
 from..directories import saveFolderPaths, saveSettings, readJsonCached
 from ..tasks.task_writer import unitTaskWriter
-from ..tasks.importer import fileChecker, modelImporter, importedArmature, postImport
+from ..tasks.importer import fileChecker, modelImporter, importedArmature, postImport, unitFolder
 from ..tasks.unit_exporter import reveal_file
 from bpy.props import StringProperty, CollectionProperty, IntProperty, EnumProperty, PointerProperty
 
@@ -182,14 +182,15 @@ class MED_2_TOOLKIT_OT_Model_Importer(bpy.types.Operator):
     bl_description = "Import the selected model with the chosen textures."
     bl_options = {"REGISTER", "UNDO"}
     def execute(self, context):
-        model_folder = bpy.context.scene.med2_toolkit_reader.directory_models
         faction = context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].factions
         model = context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].name
+        # no EDU unit here, so the model entry gets the unit-sized folder
+        model_folder = unitFolder(bpy.context.scene.med2_toolkit_reader.directory_models, model)
         model_info = json.loads(context.scene.med2_toolkit_bmdb_list[context.scene.med2_toolkit_bmdb_list_index].bmdb_info)
         coordinates = [0, 0, 0]
         saveFolderPaths()
         saveSettings()
-        unitTaskWriter()
+        unitTaskWriter(model_folder)
         fileChecker(model_folder, [model])
         existing = set(bpy.data.objects)
         try:

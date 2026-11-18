@@ -73,13 +73,17 @@ def appendToTask(iwte_path, task_name, entry):
 ######### Units #########
 #########################
 
-def unitTaskWriter():
+def unitTaskWriter(output_folder=None):
+    # output_folder: the unit's own folder (importer.unitFolder); Unit Output
+    # itself when None
     if bpy.context.scene.med2_toolkit_reader.backend_battle_import == 'BUILTIN':
         return
     vanilla_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2))
     mod_path = winePath(modDirectory())
     iwte_path = bpy.context.scene.med2_toolkit_reader.directory_iwte
-    output_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_models))
+    if output_folder:
+        os.makedirs(bpy.path.abspath(output_folder), exist_ok=True)
+    output_path = winePath(withTrailingSep(output_folder or bpy.context.scene.med2_toolkit_reader.directory_models))
     primary_secondary = bpy.context.scene.med2_toolkit_units.primary_secondary
     with open(taskPath(iwte_path, 'toolkit_bmdb_task.txt'), 'w') as task_file:
         task_file.writelines([
@@ -103,13 +107,15 @@ def unitTaskRun():
 ######## Engines ########
 #########################
 
-def engineTaskWriter():
+def engineTaskWriter(output_folder=None):
     if bpy.context.scene.med2_toolkit_reader.backend_battle_import == 'BUILTIN':
         return
     vanilla_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_med2))
     mod_path = winePath(modDirectory())
     iwte_path = bpy.context.scene.med2_toolkit_reader.directory_iwte
-    output_path = winePath(withTrailingSep(bpy.context.scene.med2_toolkit_reader.directory_models))
+    if output_folder:
+        os.makedirs(bpy.path.abspath(output_folder), exist_ok=True)
+    output_path = winePath(withTrailingSep(output_folder or bpy.context.scene.med2_toolkit_reader.directory_models))
     with open(taskPath(iwte_path, 'toolkit_engine_task.txt'), 'w') as task_file:
         task_file.writelines([
             '<task_id>                                  m2_engines_to_extract''\n'

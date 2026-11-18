@@ -1,9 +1,7 @@
 """Native battle model bridge using the shared readers and GLB encoder."""
 import copy
-import hashlib
 import math
 from pathlib import Path
-import tempfile
 import time
 from types import SimpleNamespace
 
@@ -222,6 +220,7 @@ def nativeGLB(model, skeleton, single_sheet=False, indexed_bones=False):
 
 def textureFiles(root, vanilla, entry, faction, folder):
     result = {}
+    written = {}
     for role, textures in (('main', entry.main_textures), ('attach', entry.attach_textures)):
         if not textures:
             continue
@@ -238,9 +237,13 @@ def textureFiles(root, vanilla, entry, faction, folder):
                 content = content[48:]
             if len(content) < 128 or not content.startswith(b'DDS '):
                 raise ValueError('Texture contains no DDS image: %s' % path)
-            digest = hashlib.sha256(content).hexdigest()
-            target = folder / digest / (path.stem + '.dds')
-            target.parent.mkdir(exist_ok=True)
+            # One folder per unit, so only this entry's own textures can
+            # share a name; a second, different one gets _2, _3...
+            target, number = folder / (path.stem + '.dds'), 1
+            while written.get(target, content) != content:
+                number += 1
+                target = folder / ('%s_%d.dds' % (path.stem, number))
+            written[target] = content
             if not target.exists() or target.read_bytes() != content:
                 target.write_bytes(content)
             files.append((str(path), target.relative_to(folder).as_posix()))
@@ -256,9 +259,9 @@ def importModel(context, model_id, unit_name, faction, output_folder):
     if not model.weights or not model.bones:
         raise ValueError('Built-in infantry import needs a skinned mesh; use IWTE for this model')
     blob = nativeGLB(model, skeleton, single_sheet=not entry.attach_textures, indexed_bones=True)
-    # Content-addressed texture files keep old imported materials stable and
-    # avoid basename collisions across mods. Mesh GLBs are always rebuilt.
-    folder = Path(bpy.path.abspath(output_folder)) / '.med2-native' / 'textures'
+    # output_folder is the unit's own folder (importer.unitFolder), laid out
+    # the way IWTE writes one: the mesh .glb beside a textures/ folder.
+    folder = Path(bpy.path.abspath(output_folder)) / 'textures'
     folder.mkdir(parents=True, exist_ok=True)
     textures = textureFiles(root, vanilla, entry, faction, folder)
     return importPrepared(context, unit_name, path, skeleton_name, blob, textures, folder, started)
@@ -269,10 +272,10 @@ def importPrepared(context, unit_name, path, skeleton_name, blob, textures, fold
     existing = {kind: set(getattr(bpy.data, kind)) for kind in ('objects', 'meshes', 'armatures', 'materials', 'images')}
     selected, active = list(context.selected_objects), context.view_layer.objects.active
     try:
-        with tempfile.TemporaryDirectory(prefix='med2_battle_') as temporary:
-            glb = Path(temporary) / 'model.glb'
-            glb.write_bytes(blob)
-            bpy.ops.import_scene.gltf(filepath=str(glb), disable_bone_shape=True)
+        # Saved beside textures/ like an IWTE conversion; rebuilt every import.
+        glb = folder.parent / (Path(path).stem + '.glb')
+        glb.write_bytes(blob)
+        bpy.ops.import_scene.gltf(filepath=str(glb), disable_bone_shape=True)
         rigs = [o for o in bpy.data.objects if o not in existing['objects'] and o.type == 'ARMATURE']
         if len(rigs) != 1:
             raise ValueError('Native conversion did not produce one armature')
@@ -351,7 +354,7 @@ def importEngine(context, engine_id, unit_name, output_folder):
     if len(paths) not in (2, 3) or (len(paths) == 3 and 'overlay' not in paths[2].casefold()):
         raise ValueError('Engine texture layout is unsupported; use IWTE: %s' % engine_id)
     entry = SimpleNamespace(main_textures=[SimpleNamespace(faction='all', texture=paths[0], normal=paths[1])], attach_textures=[])
-    folder = Path(bpy.path.abspath(output_folder)) / '.med2-native' / 'textures'
+    folder = Path(bpy.path.abspath(output_folder)) / 'textures'
     folder.mkdir(parents=True, exist_ok=True)
     textures = textureFiles(root, vanilla, entry, 'all', folder)
     blob = nativeGLB(model, skeleton, single_sheet=True)

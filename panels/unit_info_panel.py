@@ -25,7 +25,7 @@ from ..tasks.card_renderer import (CAMERA_LENS, CAMERA_ORTHO_SCALE, CAMERA_PROJE
                                    renderCard, renderedPaths, selectionCamera,
                                    setCardFolders, setupCardScene, shuffleImportedVariations,
                                    unitCardIndex)
-from ..tasks.importer import hideVariations, postImport, unitChecker, unitImporter
+from ..tasks.importer import hideVariations, postImport, unitChecker, unitImporter, unitFolder
 from ..tasks.task_writer import engineTaskWriter, unitTaskWriter
 from ..tasks.unit_groups import groupParts, groupRoot
 from ..tasks.unit_exporter import open_folder
@@ -659,18 +659,20 @@ class MED_2_TOOLKIT_OT_Import_Card_Units(bpy.types.Operator):
         if not unit_list:
             self.report({'ERROR'}, "No units found for that faction and ownership filter")
             return {'CANCELLED'}
-        unitTaskWriter()
-        engineTaskWriter()
         results = []
         imported = 0
         coordinates_x = 0.0
         broken = 0
         for unit_info in unit_list:
             try:
-                unitChecker(model_folder, [unit_info], upgrade)
+                # each unit converts into its own folder, so its own task files
+                folder = unitFolder(model_folder, unit_info['ID'])
+                unitTaskWriter(folder)
+                engineTaskWriter(folder)
+                unitChecker(folder, [unit_info], upgrade)
                 # apply_offset=False: the units are laid out on a fixed grid here,
                 # so the importer's own half-width spacing must stay out of the way
-                offset = unitImporter(model_folder, unit_info, faction, [coordinates_x, 0, 0], upgrade, apply_offset=False)
+                offset = unitImporter(folder, unit_info, faction, [coordinates_x, 0, 0], upgrade, apply_offset=False)
             except (KeyError, IndexError) as error:
                 # a whole faction is a much wider net than importing one unit at a
                 # time, and big mods do carry units whose armour_ug_models or mount
