@@ -1499,7 +1499,10 @@ class MED_2_TOOLKIT_PT_Export_Run(bpy.types.Panel):
             col.label(text="Task file selected: %s" % file_name, icon='FILE_TEXT')
         else:
             fallback = defaultTaskTemplate(context.scene.med2_toolkit_reader)
-            if fallback:
+            skeleton = activeExportArmature(context).get('med2_battle_skeleton')
+            if builtin and skeleton:
+                col.label(text="Bones from skeleton %s" % skeleton, icon='ARMATURE_DATA')
+            elif fallback:
                 file_name = os.path.basename(fallback.strip('"').strip("'"))
                 col.label(text="If blank, uses recent task file: %s" % file_name, icon='FILE_TEXT')
         drawSampleTasks(layout, context, export_data)
