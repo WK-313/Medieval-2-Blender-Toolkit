@@ -6,7 +6,7 @@ import sys
 import bpy
 from pathlib import Path
 from .export_checks import (deselectAll, materialImages, materialImageNodes, activeExportArmature,
-                            exportSettings, imageBaseName, textureBaseName)
+                            exportMeshes, exportSettings, imageBaseName, textureBaseName)
 from ..directories import loadStoredValue
 from ..m2formats.mesh import MeshError
 from .bmdb_writer import buildEntry, parseRelativeUnitPath, bmdbEntryNames
@@ -577,11 +577,7 @@ def exportArmatureGLB(context):
     glb_path = os.path.join(out_dir, export_name + ".glb")
     export_data.last_exported_glb = glb_path
 
-    meshes = [
-        obj for obj in arm.children_recursive
-        if obj.type == 'MESH'
-        and (not export_data.export_visible_only or obj.visible_get())
-    ]
+    meshes = exportMeshes(context, arm)
 
     if not meshes:
         return "No mesh objects found under the armature (check the Visible Only toggle)"
@@ -817,16 +813,76 @@ def exportToMesh(context):
     glb_path = clean_path(settings.last_exported_glb)
     if not os.path.isfile(glb_path):
         return 'No exported GLB found'
-    if not settings.iwte_task_template:
-        applySkeletonTask(activeExportArmature(context))
-    template = settings.iwte_task_template or defaultTaskTemplate(reader)
-    if not template or not os.path.isfile(clean_path(template)):
-        return 'Select a unit task template to define the game bone order'
+    armature = activeExportArmature(context)
+    source = skeletonSource(context, armature)
+    template = None
+    if source is None:
+        if not settings.iwte_task_template:
+            applySkeletonTask(armature)
+        template = settings.iwte_task_template or defaultTaskTemplate(reader)
+        if not template or not os.path.isfile(clean_path(template)):
+            return 'Select a unit task template to define the game bone order'
     try:
         from .battle_export import exportGLBToMesh
-        path, model = exportGLBToMesh(glb_path, clean_path(template))
+        if source is None:
+            path, model = exportGLBToMesh(glb_path, clean_path(template))
+        else:
+            path, model = exportGLBToMesh(glb_path, bone_order=source['order'], weapons=source['weapons'],
+                                          single_sheet=source['single_sheet'])
     except (OSError, ValueError, KeyError, IndexError, struct.error, MeshError) as error:
-        return 'Built-in battle export failed: %s' % error
-    return {'builtin': True, 'output_path': str(path),
-            'message': 'Wrote %s: %d parts, %d vertices, %d triangles' % (path.name, len(model.groups), model.vertices, model.triangles),
-            'warnings': model.notes}
+        message = 'Built-in battle export failed: %s' % error
+        named = armature.get('med2_battle_skeleton') if armature else None
+        if source is None and named:
+            message += (" (the rig's skeleton %s is not in the selected mod's animations: "
+                        "select the mod it came from in Paths)" % named)
+        return message
+    message = 'Wrote %s: %d parts, %d vertices, %d triangles' % (path.name, len(model.groups), model.vertices, model.triangles)
+    if source is not None:
+        message += '; bone order from skeleton %s, %s' % (source['skeleton'], source['how'])
+    return {'builtin': True, 'output_path': str(path), 'message': message,
+            'warnings': model.notes + (source['notes'] if source else [])}
+
+
+def skeletonSource(context, armature):
+    """The game bone order for the built-in export, read off the skeleton in
+    the selected mod's animation packs instead of an IWTE task file.
+
+    The packs hold every skeleton the mod animates, creatures included, while
+    the bundled task files only cover the human QOL skeletons. A task file the
+    user picked for this rig still wins. Otherwise the skeleton is the one the
+    rig was imported on (built-in import records it), or the one whose bones
+    are exactly the rig's when no bundled task fits. None means use a task file.
+    """
+    if armature is None:
+        return None
+    from .iwte_tasks import autoSampleTask, isMovedSample, isSampleTask
+    from . import battle_export, battle_import
+    own = armature.med2_toolkit_unit_export.iwte_task_template
+    if own and not isSampleTask(own) and not isMovedSample(own):
+        return None
+    try:
+        root = battle_import.modRoot(context)
+    except ValueError:
+        return None
+    skeleton, how = armature.get('med2_battle_skeleton'), 'the skeleton the rig was imported on'
+    names = battle_export.skeletonBones(root, skeleton) if skeleton else None
+    if names is None:
+        if skeleton or autoSampleTask(armature)[0]:
+            return None
+        skeleton, how = battle_export.detectSkeleton(root, [bone.name for bone in armature.data.bones]), 'matched by bone names'
+        names = battle_export.skeletonBones(root, skeleton) if skeleton else None
+        if names is None:
+            return None
+    order, weapons = battle_export.skeletonBoneOrder(names)
+    notes = []
+    single = armature.get('med2_single_sheet')
+    if single is None and armature.get('med2_battle_source'):
+        try:
+            single = battle_import.sourceSingleSheet(root, armature['med2_battle_source'])
+        except (OSError, ValueError):
+            single = None
+    if single is None:
+        single = False
+        notes.append('Could not tell whether this model has an attach texture; UVs were written for main + attach')
+    return {'order': order, 'weapons': weapons, 'single_sheet': bool(single),
+            'skeleton': skeleton, 'how': how, 'notes': notes}

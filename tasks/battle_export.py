@@ -26,16 +26,23 @@ WEAPON_GROUPS = {'bone_weapon_group01': 'bone_weapon01', 'bone_weapon_group02': 
                  'bone_weapon_group03': 'bone_weapon02', 'bone_weapon_group04': 'bone_weapon03'}
 
 
-def gameBoneTable(names):
-    """Game bone table, skeleton slots and the table index each joint name skins to."""
-    weapons = dict(WEAPON_TABLE)
-    body = [name for name in names if name not in WEAPON_GROUPS and name not in weapons]
+def gameBoneTable(names, weapons=True):
+    """Game bone table, skeleton slots and the table index each joint name skins to.
+
+    Slots are keyed by casefolded name: the packs spell bones in lower case
+    (bone_rthigh) where IWTE's task files say bone_RThigh. Creature skeletons
+    (weapons=False) get only their own bones, like the game's mount meshes."""
+    if not weapons:
+        table = list(names)
+        return table, list(range(len(table))), {name.casefold(): i for i, name in enumerate(table)}
+    weapon_names = dict(WEAPON_TABLE)
+    body = [name for name in names if name not in WEAPON_GROUPS and name not in weapon_names]
     table = body + [name for name, _ in WEAPON_TABLE]
     links = list(range(len(body))) + [len(body) + slot for _, slot in WEAPON_TABLE]
     if len(table) > 256:
         raise ValueError('Supply between 1 and 256 game bone slots')
     index = {name: i for i, name in enumerate(table)}
-    slots = {name: index[name] for name in body + list(weapons)}
+    slots = {name.casefold(): index[name] for name in body + list(weapon_names)}
     slots.update({group: index[name] for group, name in WEAPON_GROUPS.items() if group in names})
     return table, links, slots
 
@@ -59,8 +66,12 @@ def pelvisBind(doc, skin, joint_names, accessor):
     return inverse_bind.inverted().to_translation()
 
 
-def meshFromGLB(path, bone_order):
-    """Read static bind geometry, splitting seams and keeping two influences."""
+def meshFromGLB(path, bone_order, weapons=True, single_sheet=False):
+    """Read static bind geometry, splitting seams and keeping two influences.
+
+    single_sheet: the model has no attach texture, so Blender's u 0..1 is the
+    file's u as it is (built-in import shows it that way), not the doubled
+    main/attach coordinate the mesh writer halves."""
     raw = Path(path).read_bytes()
     if len(raw) < 28 or raw[:4] != b'glTF':
         raise ValueError('Expected an exported GLB')
@@ -84,7 +95,8 @@ def meshFromGLB(path, bone_order):
     names = [name.replace(' ', '__') for name in bone_order]
     if len(set(names)) != len(names):
         raise ValueError('Game bone-slot names must be unique')
-    table, links, slots = gameBoneTable(names)
+    table, links, slots = gameBoneTable(names, weapons)
+    uscale = 2.0 if single_sheet else 1.0
     out = mesh.MeshFile(source=str(path), format='mesh', bones=table, bone_links=links)
     ids = bytearray()
     formats = {5120: 'b', 5121: 'B', 5122: 'h', 5123: 'H', 5125: 'I', 5126: 'f'}
@@ -189,9 +201,11 @@ def meshFromGLB(path, bone_order):
                         raise ValueError('Negative skin weight')
                     if weight == 0:
                         continue
-                    if not isinstance(joint, int) or not 0 <= joint < len(joint_names) or joint_names[joint] not in slots:
+                    if not isinstance(joint, int) or not 0 <= joint < len(joint_names):
                         raise ValueError('Weighted joint is absent from the game bone slots')
-                    slot = slots[joint_names[joint]]
+                    slot = slots.get(joint_names[joint].casefold())
+                    if slot is None:
+                        raise ValueError('Weighted joint %s is absent from the game bone slots' % joint_names[joint])
                     influence[slot] = influence.get(slot, 0) + weight
                 strongest = sorted(influence.items(), key=lambda pair: (-pair[1], pair[0]))
                 if not strongest:
@@ -206,13 +220,14 @@ def meshFromGLB(path, bone_order):
                 if normal.length < 1e-12:
                     raise ValueError('A battle vertex has a zero normal')
                 normal.normalize()
-                key = (*point, *normal, *uvs[index], j0, j1, w0, w1)
+                uv = (uvs[index][0] * uscale, uvs[index][1])
+                key = (*point, *normal, *uv, j0, j1, w0, w1)
                 if key not in vertices:
                     vertex = len(vertices)
                     if vertex >= 65536:
                         raise ValueError('Battle mesh exceeds 65,536 vertices after seam splitting')
                     vertices[key] = vertex
-                    out.positions.extend(point);out.normals.extend(normal);out.uvs.extend(uvs[index])
+                    out.positions.extend(point);out.normals.extend(normal);out.uvs.extend(uv)
                     out.weights.extend((w0, w1));ids.extend((0, j1, j0, 0))
                 local_ids[index] = vertices[key]
             for offset in range(0, len(flat), 3):
@@ -267,9 +282,60 @@ def taskBoneOrder(path):
     return names
 
 
-def exportGLBToMesh(glb_path, task_path):
-    """Validate and serialize fully before replacing an existing output file."""
-    model = meshFromGLB(glb_path, taskBoneOrder(task_path))
+def skeletonBones(root, skeleton):
+    """A skeleton's bone names in slot order, from the mod's skeletons.dat (or
+    its loose .cas when the mod has no packs), or None when neither has it."""
+    from ..m2formats import animpack, casanim
+    packs, _ = animpack.packs_for(root)
+    packed = packs.skeleton(skeleton) if packs else None
+    try:
+        table = packed.bone_table() if packed else casanim.skeleton_bones(root, skeleton)
+    except (OSError, ValueError):
+        table = None
+    return [bone for bone, _, _ in table] if table else None
+
+
+def skeletonBoneOrder(names):
+    """(bone order, weapons) for a skeleton's own bones: the 20-bone human
+    layout gets the four QOL weapon groups and the weapon slots after it, the
+    way IWTE's unit tasks do; any other skeleton is a creature and keeps just
+    its bones, the way the game's mount meshes do."""
+    lowered = {name.casefold() for name in names}
+    if len(names) == 20 and {'bone_rhand', 'bone_lhand'} <= lowered:
+        return list(names) + ['bone_weapon_group%02d' % index for index in range(1, 5)], True
+    return list(names), False
+
+
+def detectSkeleton(root, bone_names):
+    """The mod skeleton whose bones are exactly a rig's body bones, for rigs
+    that do not say which skeleton they are on. Every match must share one bone
+    order, since that order is all the export takes from it. None when no
+    skeleton (or several orders) fit."""
+    from ..m2formats import animpack
+    packs, _ = animpack.packs_for(root)
+    if not packs:
+        return None
+    wanted = {name.casefold() for name in bone_names} - set(WEAPON_GROUPS)
+    wanted -= {name for name, _ in WEAPON_TABLE}
+    found, orders = None, set()
+    for name in packs.skeleton_names():
+        try:
+            packed = packs.skeleton(name)
+            bones = [bone for bone, _, _ in packed.bone_table()] if packed else []
+        except (OSError, ValueError):
+            continue
+        if {bone.casefold() for bone in bones} == wanted:
+            orders.add(tuple(bone.casefold() for bone in bones))
+            found = found or name
+    return found if len(orders) == 1 else None
+
+
+def exportGLBToMesh(glb_path, task_path=None, bone_order=None, weapons=True, single_sheet=False):
+    """Validate and serialize fully before replacing an existing output file.
+    The bone order comes from an IWTE task template, or is given directly."""
+    if bone_order is None:
+        bone_order = taskBoneOrder(task_path)
+    model = meshFromGLB(glb_path, bone_order, weapons, single_sheet)
     encoded = mesh.write_mesh(model)
     checked = mesh.read_mesh_bytes(encoded, str(glb_path), layout=True)
     if checked.vertices != model.vertices or checked.triangles != model.triangles:

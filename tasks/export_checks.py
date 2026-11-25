@@ -34,10 +34,18 @@ def exportSettings(context):
     return armature.med2_toolkit_unit_export if armature else None
 
 def exportMeshes(context, armature):
+    """The armature's own meshes. A rider rig parented under its mount (Import
+    Full Unit) is a separate .mesh, so its meshes belong to the rider and are
+    left out of the mount's export."""
     export_data = armature.med2_toolkit_unit_export
+    def ownRig(obj):
+        obj = obj.parent
+        while obj is not None and obj.type != 'ARMATURE':
+            obj = obj.parent
+        return obj
     return [
         obj for obj in armature.children_recursive
-        if obj.type == 'MESH'
+        if obj.type == 'MESH' and ownRig(obj) == armature
         and (not export_data.export_visible_only or obj.visible_get())
     ]
 

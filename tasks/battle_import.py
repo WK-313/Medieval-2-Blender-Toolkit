@@ -36,12 +36,15 @@ def enabled(context=None):
     return (context or bpy.context).scene.med2_toolkit_reader.backend_battle_import == 'BUILTIN'
 
 
-def modelEntry(context, model_id, faction=''):
+def modRoot(context):
     value = selectedModFolder(context).strip().strip('"')
     if not value:
         raise ValueError('Select a mod data folder in Paths first')
-    root = Path(bpy.path.abspath(value)).resolve()
-    vanilla = Path(bpy.path.abspath(context.scene.med2_toolkit_reader.directory_med2)) / 'data'
+    return Path(bpy.path.abspath(value)).resolve()
+
+
+def modelDatabase(root):
+    """The mod's parsed battle_models.modeldb, cached until the file changes."""
     path = findDataFile(root,'unit_models/battle_models.modeldb')
     if path is None:
         raise ValueError('No battle_models.modeldb in the selected mod')
@@ -50,7 +53,23 @@ def modelEntry(context, model_id, faction=''):
     if cached is None or cached[0] != stamp:
         cached = (stamp, modeldb.parse_file(path))
         _databases[str(path)] = cached
-    entries = [e for e in cached[1].entries if e.name.casefold() == model_id.casefold()]
+    return cached[1]
+
+
+def sourceSingleSheet(root, source):
+    """Whether the modeldb entries using a mesh file have no attach texture,
+    for rigs imported before the import recorded it; None when no entry uses
+    that mesh (or the entries disagree)."""
+    tail = '/' + str(source).replace('\\', '/').casefold().lstrip('/')
+    found = {not entry.attach_textures for entry in modelDatabase(root).entries
+             if any(tail.endswith('/' + lod[0].replace('\\', '/').casefold().lstrip('/')) for lod in entry.lods[:1])}
+    return found.pop() if len(found) == 1 else None
+
+
+def modelEntry(context, model_id, faction=''):
+    root = modRoot(context)
+    vanilla = Path(bpy.path.abspath(context.scene.med2_toolkit_reader.directory_med2)) / 'data'
+    entries = [e for e in modelDatabase(root).entries if e.name.casefold() == model_id.casefold()]
     # A mod may repeat an entry per faction group (HoE's elephant_crew3: one for
     # england/hre, one for slave/merc). Same mesh and skeleton, so take the one
     # listing this faction.
@@ -270,10 +289,11 @@ def importModel(context, model_id, unit_name, faction, output_folder):
     folder = Path(bpy.path.abspath(output_folder)) / 'textures'
     folder.mkdir(parents=True, exist_ok=True)
     textures = textureFiles(root, vanilla, entry, faction, folder)
-    return importPrepared(context, unit_name, path, skeleton_name, blob, textures, folder, started)
+    return importPrepared(context, unit_name, path, skeleton_name, blob, textures, folder, started,
+                          single_sheet=not entry.attach_textures)
 
 
-def importPrepared(context, unit_name, path, skeleton_name, blob, textures, folder, started):
+def importPrepared(context, unit_name, path, skeleton_name, blob, textures, folder, started, single_sheet=False):
     from .importer import materialWorkflow, selectionBoundingBox, hideVariations
     existing = {kind: set(getattr(bpy.data, kind)) for kind in ('objects', 'meshes', 'armatures', 'materials', 'images')}
     selected, active = list(context.selected_objects), context.view_layer.objects.active
@@ -292,6 +312,8 @@ def importPrepared(context, unit_name, path, skeleton_name, blob, textures, fold
         rig['med2_battle_skeleton'] = skeleton_name
         rig['med2_battle_source'] = str(path)
         rig['med2_battle_import_backend'] = 'BUILTIN'
+        # Built-in export needs it to put a one-texture model's u back as it was.
+        rig['med2_single_sheet'] = bool(single_sheet)
         for material in set(bpy.data.materials) - existing['materials']:
             role = 'attach' if '__attach' in material.name else 'main'
             if role not in textures:
@@ -364,4 +386,5 @@ def importEngine(context, engine_id, unit_name, output_folder):
     folder.mkdir(parents=True, exist_ok=True)
     textures = textureFiles(root, vanilla, entry, 'all', folder)
     blob = nativeGLB(model, skeleton, single_sheet=True)
-    return importPrepared(context, unit_name, path, group.skeleton, blob, textures, folder, started)
+    return importPrepared(context, unit_name, path, group.skeleton, blob, textures, folder, started,
+                          single_sheet=True)
