@@ -395,6 +395,7 @@ class MED_2_TOOLKIT_Unit_data(bpy.types.PropertyGroup):
     hide_toggle: BoolProperty(name = "Hide variations", description = "Toggle to automatically hide model variations when importing units", default = bool_settings['hide_toggle'])
     frame_toggle: BoolProperty(name = "Frame models", description = "Toggle to automatically focus the view on imported models", default = bool_settings['frame_toggle'])
     textured_toggle: BoolProperty(name = "Display textures", description = "Toggle to automatically change to solid texture mode", default = bool_settings['textured_toggle'])
+    rider_offsets: BoolProperty(name = "Rider offsets", description = "Place riders and crew at their descr_mount / descr_engines offsets on the mount or engine. Off, they import at its origin, ready to export without moving the rig", default = bool_settings.get('rider_offsets', True))
     primary_secondary: EnumProperty(name = "Skeleton type", description = "Choose which skeleton to use when converting", items = [('primary','Primary',''),('secondary','Secondary','')])
 
 
@@ -1043,6 +1044,7 @@ class MED_2_TOOLKIT_PT_EDU_Import(bpy.types.Panel):
         grid.prop (context.scene.med2_toolkit_units, "use_existing", text="Use existing:", toggle = 1)
         grid.prop (context.scene.med2_toolkit_units, "frame_toggle", text="Frame imported:", toggle = 1)
         grid.prop (context.scene.med2_toolkit_units, "textured_toggle", text="Solid textured:", toggle = 1)
+        grid.prop (context.scene.med2_toolkit_units, "rider_offsets", text="Rider offsets:", toggle = 1)
         col = layout.column(align=True)
         col.prop (context.scene.med2_toolkit_units, "import_faction", text="Faction")
         col.prop (context.scene.med2_toolkit_units, "import_filter", text="Filter")

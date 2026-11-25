@@ -605,7 +605,15 @@ def exportArmatureGLB(context):
     # came out as two parts. For the export, point every face at the mesh's
     # most-used material; the face materials are restored after.
     material_index_backup = []
+    # A rider or crew rig sits at its rider_offset under the mount (or a unit
+    # was imported further along +X), and the GLB bakes that location into
+    # every vertex, so IWTE wrote the model shifted. Export from the origin;
+    # the meshes are its children and come along. Restored after.
+    rig_basis = arm.matrix_basis.copy()
     try:
+        at_origin = arm.matrix_world.copy()
+        at_origin.translation = (0, 0, 0)
+        arm.matrix_world = at_origin
         for data in {obj.data for obj in meshes}:
             indices = [poly.material_index for poly in data.polygons]
             if len(set(indices)) > 1:
@@ -651,6 +659,7 @@ def exportArmatureGLB(context):
             export_animations=export_data.export_animations
         )
     finally:
+        arm.matrix_basis = rig_basis
         for data, indices in material_index_backup:
             data.polygons.foreach_set("material_index", indices)
             data.update()

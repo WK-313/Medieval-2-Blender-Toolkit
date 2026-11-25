@@ -220,11 +220,15 @@ def placeMember(member_object, role, member_coordinates, member_width, member_z,
     missing elephant would have carried them.
 
     With a real root present nothing changes: members parent to it at exactly
-    the offsets descr_mount / descr_engines gives.
+    the offsets descr_mount / descr_engines gives - or, with the Rider offsets
+    toggle off, at its origin.
     """
     if unit['root']:
         member_object.parent = unit['root']
         location = [member_coordinates[axis] - unit['offset'][axis] for axis in range(3)]
+        if not bpy.context.scene.med2_toolkit_units.rider_offsets:
+            # Rider offsets off: on the root's origin, so the rig exports as it is
+            location = [0, 0, 0]
         if unit['grounded']:
             # nothing is carrying them any more, so they all stand on the
             # ground rather than keeping the heights the missing mount held
